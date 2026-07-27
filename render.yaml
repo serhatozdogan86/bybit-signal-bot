@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: bybit-signal-bot
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m app.main
+    healthCheckPath: /healthz
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: SYMBOLS
+        value: BTCUSDT,ETHUSDT,SOLUSDT
+      - key: HTF
+        value: "240"
+      - key: LTF
+        value: "15"
+      - key: SCAN_INTERVAL
+        value: "900"
+      - key: RISK_REWARD_MIN
+        value: "2.0"
+      - key: SEND_NO_TRADE
+        value: "false"
+      - key: LOG_LEVEL
+        value: INFO
