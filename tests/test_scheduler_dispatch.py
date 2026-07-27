@@ -73,3 +73,12 @@ def test_data_missing_not_sent_by_default():
     results = sched.scan_all(send_telegram=True)
     assert results[0].decision.value == "DATA_MISSING"
     assert notifier.sent == []
+
+
+def test_telegram_disabled_mutes_everything():
+    """TELEGRAM_ENABLED=false: SIGNAL uretilir, izlenir ama mesaj GITMEZ."""
+    settings = Settings(SYMBOLS="TESTUSDT", TELEGRAM_ENABLED=False)
+    sched, notifier = _make(settings, produce_signal=True)
+    results = sched.scan_all(send_telegram=True)
+    assert results[0].decision.value == "SIGNAL"
+    assert notifier.sent == []

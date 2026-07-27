@@ -13,6 +13,7 @@ import json
 
 from flask import Flask, jsonify, request
 
+from app.dashboard import DASHBOARD_HTML
 from app.scheduler import Scheduler
 from app.services.signal_tracker import SignalTracker
 from app.services.state_store import StateStore
@@ -22,6 +23,11 @@ def create_app(store: StateStore, scheduler: Scheduler,
                tracker: SignalTracker | None = None,
                gist_backup=None, universe=None) -> Flask:
     app = Flask(__name__)
+
+    @app.get("/")
+    def dashboard():
+        """Operasyon konsolu - sinyaller ve performans buradan izlenir."""
+        return app.response_class(DASHBOARD_HTML, mimetype="text/html")
 
     @app.get("/healthz")
     def healthz():

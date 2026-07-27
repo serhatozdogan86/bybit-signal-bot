@@ -115,6 +115,8 @@ class Scheduler:
         return telegram_formatter.render(d, self._settings.TELEGRAM_PARSE_MODE)
 
     def _dispatch(self, d: Decision) -> None:
+        if not self._settings.TELEGRAM_ENABLED:
+            return  # sessiz mod: uretim/golge takip surer, mesaj gitmez
         if d.decision is DecisionType.SIGNAL:
             if self._store.cooldown_active(d.pair, d.direction.value,
                                            self._settings.SIGNAL_COOLDOWN_SEC):
@@ -144,7 +146,13 @@ class Scheduler:
                     mode=self._universe.mode if self._universe else "static",
                     htf=s.HTF, ltf=s.LTF, interval_s=s.SCAN_INTERVAL,
                     shadow=self._tracker is not None))
-        self._notifier.send(
+        if not s.TELEGRAM_ENABLED:
+            log.info(kv(event="telegram_muted",
+                        note="signals tracked silently; view at dashboard /"))
+            startup_send = lambda _msg: None  # noqa: E731
+        else:
+            startup_send = self._notifier.send
+        startup_send(
             "Signal engine online.\n"
             f"Pairs: {pairs_txt}\n"
             f"TF: {s.HTF}/{s.LTF} | Scan: {s.SCAN_INTERVAL}s\n"

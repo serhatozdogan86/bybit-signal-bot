@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     BYBIT_API_SECRET: str = ""
 
     # Telegram
+    TELEGRAM_ENABLED: bool = True   # false -> hicbir mesaj gonderilmez (sinyal uretimi/takip surer)
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_CHAT_ID: str = ""
 

@@ -90,3 +90,19 @@ def test_orderbook_note_detects_walls():
     assert "ask wall" not in note  # ask tarafinda duvar yok
     assert orderbook_note({"b": [], "a": []}) == ""
     assert orderbook_note({}) == ""
+
+
+# ---------------------------------------------------------------- dashboard
+def test_dashboard_served_at_root(tmp_path):
+    from app.server import create_app
+    from app.services.sqlite_state_store import SQLiteStateStore
+
+    class Stub:
+        def scan_all(self, send_telegram=True):
+            return []
+
+    app = create_app(SQLiteStateStore(Database(str(tmp_path / "d.db"))), Stub())
+    r = app.test_client().get("/")
+    assert r.status_code == 200
+    assert b"signal-engine // dashboard" in r.data
+    assert b"/performance" in r.data  # kendi endpoint'lerine baglaniyor

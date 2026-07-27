@@ -82,11 +82,11 @@ def evaluate(pair: str, htf_series: KlineSeries | None, ltf_series: KlineSeries 
     vol_ok, vol_ratio = validate_event_volume(ltf, setup.event_index, params)
     d.volume_confirmation = vol_ok
     d.liquidity_note = (f"{setup.setup_type.value} @ {_fmt(setup.level)} "
-                        f"(vol {vol_ratio:.1f}x avg)")
+                        f"(vol {vol_ratio:.2f}x avg)")
     if not vol_ok:
         d.failed_filters = ["VOLUME"]
         d.reject_reason = (f"no volume confirmation on trigger bar "
-                           f"({vol_ratio:.1f}x < {params.volume_mult:.1f}x avg)")
+                           f"({vol_ratio:.2f}x < {params.volume_mult:.2f}x avg)")
         d.watch_condition = "same setup with participation expansion"
         return d
 

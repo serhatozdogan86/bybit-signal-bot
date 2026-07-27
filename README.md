@@ -242,6 +242,25 @@ geçerli: paid instance + Disk (`DB_PATH=/data/bot.db`).
 | MarkdownV2 rich mesaj | `TELEGRAM_PARSE_MODE=MarkdownV2` | kapalı (plain) | Bold başlık + monospace seviyeler, tam escape'li |
 | WebSocket kline cache | `USE_WEBSOCKET=true` | kapalı | **Deneysel.** REST bootstrap + canlı WS güncellemesi; kopunca otomatik REST fallback. 15m/4h taramada REST zaten yeterli — açmak zorunlu değil |
 
+## Sessiz mod & Dashboard (v2.3)
+
+`TELEGRAM_ENABLED=false` (render.yaml'da varsayılan) ile **hiçbir Telegram mesajı
+gönderilmez** — sinyal üretimi, gölge takip ve gist yedekleme aynen sürer. Takip,
+botun kök adresindeki operasyon konsolundan yapılır:
+
+**`https://<app>.onrender.com/`** → Dashboard:
+- KPI panosu: win rate, toplam R, açık sinyal, evren boyutu, tarama sayacı, arşiv boyutu
+- Gölge takipteki tüm sinyaller (durum/sonuç/R ile, renk kodlu)
+- Son tarama dağılımı (SIGNAL / NO_TRADE / DATA_MISSING oran çubuğu) + aktif
+  SIGNAL kararları + en sık ret nedenleri
+- Sistem satırı: evren modu, gist bağlantısı, son sync
+- 30 sn / 60 sn / 5 dk aralıkla kendini yeniler; harici bağımlılık yok, veriyi
+  botun kendi JSON endpoint'lerinden çeker.
+
+Telegram'ı geri açmak: Render → Environment → `TELEGRAM_ENABLED=true`.
+İnce ayar alternatifi: Telegram açıkken yalnızca sinyal almak zaten varsayılandır
+(`SEND_NO_TRADE=false`); tamamen susturma bu bayrakladır.
+
 ## Parite evreni (v2.2) — dinamik top-150
 
 `SYMBOLS_MODE=top` (render.yaml'da varsayılan) ile bot izleyeceği listeyi **kendisi
