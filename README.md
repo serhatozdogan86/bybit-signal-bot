@@ -170,9 +170,95 @@ ile korunur.
 
 ## Roadmap
 
-- **Phase 2:** WebSocket kline adapter (`MarketDataService` arayüzü değişmez),
-  orderbook likidite haritası, MarkdownV2 rich formatter.
-- **Phase 3:** Redis/SQLite `StateStore`, sinyal performans takibi, funding/OI verisi.
+- ~~**Phase 2:** WebSocket kline adapter, orderbook likidite haritası, MarkdownV2 rich
+  formatter, SQLite kalıcı state, gölge takip~~ ✅ **Tamamlandı (v2)** — aşağıya bakın.
+- **Phase 3:** Sinyal performans dashboard'u, funding/OI verisi, harici DB (Postgres/Redis),
+  gerçek backtest motoru (arşivlenen veriyle).
+
+## Phase 2 — Gölge Takip & Yeni Modüller (v2)
+
+### Gölge takip (SHADOW_TRACKING=true, varsayılan açık)
+
+Bot **sessizce** (Telegram'a ek mesaj atmadan) şunları yapar:
+
+1. **Karar arşivi:** Her tarama kararı (SIGNAL/NO_TRADE/DATA_MISSING, sebepleriyle)
+   `decisions` tablosuna yazılır — backtest'te "hangi koşulda ne karar verildi" etiketi.
+2. **OHLCV arşivi:** Her taramada kapanmış mumlar `candles` tablosunda birikir
+   (tekrarsız) — backtest için ham veri seti.
+3. **Sinyal sonuçlandırma:** Her SIGNAL izlenir ve sonraki mumlarla otomatik kapanır:
+
+| Sonuç | Koşul | R katkısı |
+|---|---|---|
+| `WIN` | TP1'e değdi (stop'tan önce) | +reward/risk |
+| `LOSS` | Stop'a değdi | −1.0 |
+| `NOT_FILLED` | Fiyat fill penceresi içinde entry bölgesine hiç girmedi | 0 (orana dahil değil) |
+| `EXPIRED` | Max izleme süresi doldu | kapanışa göre ± |
+| `AMBIGUOUS` | Aynı mumda hem stop hem TP kesildi (sıra bilinemez) | 0 (orana dahil değil) |
+
+Varsayımlar dürüstçe muhafazakârdır: fill = entry bölgesinin ilk değen kenarı,
+slippage yok. Bu **tahmini gölge muhasebesidir**, gerçek işlem sonucu değildir.
+
+### Yeni endpoint'ler
+
+| URL | İşlev |
+|---|---|
+| `GET /performance` | Başarı oranı, decided trade sayısı, toplam R, parite kırılımı, veri seti boyutu |
+| `GET /signals?limit=50` | İzlenen sinyallerin listesi (durum/sonuç/R ile) |
+| `GET /export/candles.csv?symbol=BTCUSDT&interval=15` | Arşivlenen OHLCV — backtest yedeği |
+| `GET /export/decisions.json` | Sinyal kayıtları yedeği |
+| `GET /backup/info` | Gist yedekleme durumu (gist_url, son sync) |
+| `GET /backup/now` | Manuel gist sync tetikle |
+
+### ⚠️ Kalıcılık — Render free plan kısıtı ve çözümü: Gist yedekleme
+
+SQLite dosyası free planda **ephemeral disktedir** (redeploy'da silinir). Bot bunu
+**kendi kendine çözer** — `GITHUB_TOKEN` verildiğinde:
+
+1. **Otomatik sync:** Saatte bir `performance.json`, `signals.json`, `decisions.json`
+   ve `candles_*.csv` dosyaları secret bir GitHub Gist'e yazılır. Gist her yazımda
+   revizyon tutar → istatistik geçmişi otomatik arşivlenir.
+2. **Self-restore:** Her açılışta DB boşsa (redeploy olmuş demektir) bot gist'i
+   bulur ve mum arşivi + sinyal kayıtlarını geri yükler — takip kaldığı yerden
+   devam eder. **İnsan müdahalesi gerekmez.**
+
+Kurulum (tek seferlik, 2 dk):
+1. github.com → sağ üst profil → **Settings** → **Developer settings** →
+   **Personal access tokens** → **Tokens (classic)** → **Generate new token (classic)**
+2. Note: `signal-bot-gist` — Expiration: `No expiration` — Scope: **yalnızca `gist`**
+   işaretle (repo erişimi VERME) → Generate → token'ı kopyala.
+3. Render → servis → Environment → `GITHUB_TOKEN` = token → Save (redeploy tetiklenir).
+4. Doğrulama: `/backup/info` → `gist_url` dolu; o URL'de dosyaları görebilirsin.
+
+Gist "secret"tir (listelenmez) ama URL'yi bilen görebilir; içerikte API key/secret
+yoktur, yalnızca sinyal istatistiği ve OHLCV vardır. Alternatif kalıcı çözüm hâlâ
+geçerli: paid instance + Disk (`DB_PATH=/data/bot.db`).
+
+### Diğer Phase 2 modülleri (bayrakla açılır)
+
+| Özellik | Env | Varsayılan | Not |
+|---|---|---|---|
+| Kalıcı cooldown/state | `STATE_BACKEND=sqlite` | açık | `memory` ile eski davranış |
+| Orderbook duvar notu | `ORDERBOOK_ENRICH=true` | kapalı | SIGNAL'in Volume satırına "bid wall 120 @ 42000" ekler; filtre DEĞİL, bilgi notudur |
+| MarkdownV2 rich mesaj | `TELEGRAM_PARSE_MODE=MarkdownV2` | kapalı (plain) | Bold başlık + monospace seviyeler, tam escape'li |
+| WebSocket kline cache | `USE_WEBSOCKET=true` | kapalı | **Deneysel.** REST bootstrap + canlı WS güncellemesi; kopunca otomatik REST fallback. 15m/4h taramada REST zaten yeterli — açmak zorunlu değil |
+
+## Parite evreni (v2.2) — dinamik top-150
+
+`SYMBOLS_MODE=top` (render.yaml'da varsayılan) ile bot izleyeceği listeyi **kendisi
+seçer**: Bybit linear USDT perp'lerini 24s ciroya göre sıralar, ilk `SYMBOLS_TOP_N`
+(150) tanesini alır, listeyi günde bir yeniler. Delist olan düşer, hacim kazanan
+kendiliğinden girer; stable-stable çiftleri (`SYMBOLS_EXCLUDE`) elenir. Ticker
+çekimi başarısız olursa son iyi liste, o da yoksa `SYMBOLS` static listesi kullanılır.
+
+- Anlık listeyi görmek: `GET /universe` (mod, sayı, tam sembol listesi).
+- 150 sembol × 2 TF ≈ tarama başına ~300 REST çağrısı, `SYMBOL_PAUSE_SEC=0.3` ile
+  tarama ~2.5-3 dk sürer — 15 dk'lık `SCAN_INTERVAL` içinde rahatça biter.
+- Ölçekte gist payload kontrolü: `GIST_CANDLE_MODE=signals` ile mum arşivi yalnızca
+  sinyal üretmiş pariteler için sync edilir (istatistik/sinyal/karar dosyaları her
+  zaman tam sync olur); `all` tüm evreni yazar, `off` kapatır. CSV başına son
+  `GIST_CANDLE_MAX_ROWS` (5000) mum tutulur. SQLite'taki yerel arşiv sınırsızdır ve
+  `/export/candles.csv` her parite için tam veriyi verir.
+- Eski davranışa dönüş: `SYMBOLS_MODE=static`.
 
 ## Ayar önerileri
 

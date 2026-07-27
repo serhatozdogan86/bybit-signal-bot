@@ -37,8 +37,13 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_CHAT_ID: str = ""
 
-    # Tarama
-    SYMBOLS: str = "BTCUSDT,ETHUSDT,SOLUSDT"
+    # Tarama & evren secimi
+    SYMBOLS: str = "BTCUSDT,ETHUSDT,SOLUSDT"   # static mod listesi + fallback
+    SYMBOLS_MODE: str = "static"                # static | top (hacme gore dinamik)
+    SYMBOLS_TOP_N: int = 150                    # top modda kac parite izlenecek
+    SYMBOLS_EXCLUDE: str = "USDCUSDT,USDEUSDT,FDUSDUSDT"  # stable-stable ciftleri
+    UNIVERSE_REFRESH_SEC: int = 86400           # evren listesi yenileme (gunluk)
+    SYMBOL_PAUSE_SEC: float = 0.3               # semboller arasi bekleme
     HTF: str = "240"
     LTF: str = "15"
     SCAN_INTERVAL: int = 900
@@ -55,6 +60,26 @@ class Settings(BaseSettings):
     SEND_DATA_MISSING: bool = False
     SIGNAL_COOLDOWN_SEC: int = 14400
     LOG_LEVEL: str = "INFO"
+
+    # Phase 2 - kalicilik & golge takip
+    DB_PATH: str = "data/bot.db"
+    STATE_BACKEND: str = "sqlite"          # sqlite | memory
+    SHADOW_TRACKING: bool = True           # sessiz performans takibi + veri arsivi
+    SHADOW_FILL_WINDOW_BARS: int = 24      # entry bolgesine giris icin bekleme (LTF bar)
+    SHADOW_MAX_TRACK_BARS: int = 192       # fill sonrasi max izleme (192x15m = 48 saat)
+
+    # Phase 2 - gist yedekleme (botun kendi kayit tutma mekanizmasi)
+    GITHUB_TOKEN: str = ""                 # sadece 'gist' scope'lu PAT
+    GIST_SYNC: bool = True                 # token varsa saatte bir gist'e yaz + boot'ta restore
+    GIST_ID: str = ""                      # bos = marker ile otomatik bul/olustur
+    GIST_SYNC_INTERVAL_SEC: int = 3600
+    GIST_CANDLE_MODE: str = "signals"      # all | signals | off (150+ sembolde payload kontrolu)
+    GIST_CANDLE_MAX_ROWS: int = 5000       # csv basina son N mum
+
+    # Phase 2 - zenginlestirme & format
+    ORDERBOOK_ENRICH: bool = False         # SIGNAL'e orderbook duvar notu ekle
+    USE_WEBSOCKET: bool = False            # deneysel: WS kline cache (REST fallback'li)
+    TELEGRAM_PARSE_MODE: str = ""          # "" (plain) | MarkdownV2
 
     @property
     def symbols(self) -> list[str]:

@@ -16,6 +16,12 @@ services:
         sync: false
       - key: SYMBOLS
         value: BTCUSDT,ETHUSDT,SOLUSDT
+      - key: SYMBOLS_MODE
+        value: top
+      - key: SYMBOLS_TOP_N
+        value: "150"
+      - key: SYMBOL_PAUSE_SEC
+        value: "0.3"
       - key: HTF
         value: "240"
       - key: LTF
@@ -28,3 +34,13 @@ services:
         value: "false"
       - key: LOG_LEVEL
         value: INFO
+      - key: SHADOW_TRACKING
+        value: "true"
+      - key: STATE_BACKEND
+        value: sqlite
+      - key: DB_PATH
+        value: data/bot.db
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: GIST_SYNC
+        value: "true"

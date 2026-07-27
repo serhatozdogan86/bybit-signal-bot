@@ -24,9 +24,10 @@ _TIMEOUT = (10, 15)
 
 
 class TelegramNotifier:
-    def __init__(self, bot_token: str, chat_id: str) -> None:
+    def __init__(self, bot_token: str, chat_id: str, parse_mode: str = "") -> None:
         self._token = bot_token
         self._chat_id = chat_id
+        self._parse_mode = parse_mode  # "" = plain text | "MarkdownV2"
         self._session = requests.Session()
 
     @property
@@ -41,6 +42,8 @@ class TelegramNotifier:
         url = f"https://api.telegram.org/bot{self._token}/sendMessage"
         payload = {"chat_id": self._chat_id, "text": text,
                    "disable_web_page_preview": True}
+        if self._parse_mode:
+            payload["parse_mode"] = self._parse_mode
 
         rate_limit_waits = 0
         attempt = 1

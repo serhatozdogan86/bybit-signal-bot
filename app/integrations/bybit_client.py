@@ -71,3 +71,16 @@ class BybitClient:
         except (KeyError, IndexError, ValueError):
             log.error(kv(event="bybit_ticker_parse_error", symbol=symbol))
             return None
+
+    def get_all_tickers(self) -> list[dict] | None:
+        """Tum linear pariteler icin ticker listesi (evren secimi icin)."""
+        data = self._get("/v5/market/tickers", {"category": _CATEGORY})
+        if data is None:
+            return None
+        return data.get("result", {}).get("list") or None
+
+    def get_orderbook(self, symbol: str, depth: int = 50) -> dict | None:
+        """Orderbook snapshot (Phase 2). result: {"b": [[p,s],...], "a": [...]}."""
+        data = self._get("/v5/market/orderbook",
+                         {"category": _CATEGORY, "symbol": symbol, "limit": depth})
+        return data.get("result") if data else None
