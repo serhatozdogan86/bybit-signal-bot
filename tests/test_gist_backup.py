@@ -32,7 +32,7 @@ class FakeGistClient:
         return gid
 
     def update_gist(self, gist_id, files):
-        self.storage[gist_id] = dict(files)
+        self.storage[gist_id] = {n: v for n, v in files.items() if v is not None}
         return True
 
     def fetch_gist(self, gist_id):
@@ -68,10 +68,10 @@ def test_sync_creates_then_updates_and_payload_complete(tmp_path):
     assert backup.sync() is True
     gid = backup.info()["gist_id"]
     files = client.storage[gid]
-    for expected in ("performance.json", "signals.json", "decisions.json",
+    for expected in ("0_performance.json", "0_signals.json", "0_decisions.json",
                      "candles_BTCUSDT_15.csv", "candles_BTCUSDT_240.csv", "README.md"):
         assert expected in files
-    assert json.loads(files["performance.json"])["open_signals"] == 1
+    assert json.loads(files["0_performance.json"])["open_signals"] == 1
     assert files["candles_BTCUSDT_15.csv"].count("\n") == 70  # header + 69 kapanmis bar
 
     # ikinci sync ayni gist'i gunceller, yenisini olusturmaz

@@ -78,13 +78,16 @@ class GistBackup:
     # ------------------------------------------------------------- sync
     def build_files(self) -> dict[str, str]:
         now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        # "0_" oneki: istatistik dosyalari alfabetik olarak mum CSV'lerinden ONCE
+        # gelsin diye. GitHub Gist API buyuk gist'lerde icerik butcesini alfabetik
+        # sirayla harcar; stats sona kalirsa API bos icerik dondurur.
         files = {
+            "0_performance.json": json.dumps(self._tracker.stats(), indent=2),
+            "0_signals.json": json.dumps(self._tracker.recent_signals(500), indent=2),
+            "0_decisions.json": json.dumps(self._tracker.recent_decisions(2000), indent=2),
             "README.md": (f"# bybit-signal-bot data\nAuto-synced: {now}\n\n"
                           "Shadow-tracking stats and backtest dataset. "
                           "Managed by the bot - do not edit manually.\n"),
-            "performance.json": json.dumps(self._tracker.stats(), indent=2),
-            "signals.json": json.dumps(self._tracker.recent_signals(500), indent=2),
-            "decisions.json": json.dumps(self._tracker.recent_decisions(2000), indent=2),
         }
         if self._candle_mode == "off":
             return files
@@ -107,7 +110,11 @@ class GistBackup:
             self._gist_id = self._client.create_gist(MARKER, files)
             ok = self._gist_id is not None
         else:
-            ok = self._client.update_gist(self._gist_id, files)
+            # eski adsiz-onekli dosyalari temizle (null = sil; yoklarsa no-op)
+            files_with_cleanup = dict(files)
+            for legacy in ("performance.json", "signals.json", "decisions.json"):
+                files_with_cleanup.setdefault(legacy, None)
+            ok = self._client.update_gist(self._gist_id, files_with_cleanup)
         if ok:
             self._last_sync = time.time()
             self._last_sync_utc = datetime.now(timezone.utc).strftime(
@@ -147,10 +154,11 @@ class GistBackup:
                     candles_total += self._tracker.import_candles(
                         symbol, interval, _parse_candles_csv(content))
         signals_total = 0
-        if "signals.json" in files:
+        sig_file = files.get("0_signals.json") or files.get("signals.json")
+        if sig_file:
             try:
                 signals_total = self._tracker.import_signals(
-                    json.loads(files["signals.json"]))
+                    json.loads(sig_file))
             except (json.JSONDecodeError, TypeError):
                 log.warning(kv(event="gist_restore_signals_parse_error"))
         log.info(kv(event="gist_restore_ok", gist_id=self._gist_id,

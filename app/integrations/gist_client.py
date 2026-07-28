@@ -62,11 +62,13 @@ class GistClient:
             log.error(kv(event="gist_create_error", error=str(exc)[:150]))
             return None
 
-    def update_gist(self, gist_id: str, files: dict[str, str]) -> bool:
+    def update_gist(self, gist_id: str, files: dict[str, str | None]) -> bool:
+        """content=None verilen dosyalar gist'ten SILINIR (eski ad temizligi)."""
         try:
+            payload = {n: ({"content": c} if c is not None else None)
+                       for n, c in files.items()}
             r = self._session.patch(f"{_API}/gists/{gist_id}", timeout=_TIMEOUT,
-                                    json={"files": {n: {"content": c}
-                                                    for n, c in files.items()}})
+                                    json={"files": payload})
             r.raise_for_status()
             return True
         except requests.RequestException as exc:
