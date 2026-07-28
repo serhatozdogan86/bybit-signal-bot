@@ -242,13 +242,21 @@ geçerli: paid instance + Disk (`DB_PATH=/data/bot.db`).
 | MarkdownV2 rich mesaj | `TELEGRAM_PARSE_MODE=MarkdownV2` | kapalı (plain) | Bold başlık + monospace seviyeler, tam escape'li |
 | WebSocket kline cache | `USE_WEBSOCKET=true` | kapalı | **Deneysel.** REST bootstrap + canlı WS güncellemesi; kopunca otomatik REST fallback. 15m/4h taramada REST zaten yeterli — açmak zorunlu değil |
 
-## Sessiz mod & Dashboard (v2.6)
+## Sessiz mod & Dashboard (v2.7)
 
 `TELEGRAM_ENABLED=false` (render.yaml'da varsayılan) ile **hiçbir Telegram mesajı
 gönderilmez** — sinyal üretimi, gölge takip ve gist yedekleme aynen sürer. Takip,
 botun kök adresindeki operasyon konsolundan yapılır:
 
-**`https://<app>.onrender.com/`** → Dashboard (v2.6 — "trading OS" yerleşimi):
+**`https://<app>.onrender.com/`** → Dashboard (v2.7 — trading-terminal şartnamesi):
+- 1920×1080 hedef, 1440×900 uyumlu, sayfa scroll'u yok (iç panel kaydırmaları hariç)
+- Palet: yeşil #16A34A · kırmızı #DC2626 · amber #F59E0B · mavi #2563EB, zemin #F5F7FA
+- Header: logo+durum | canlı özet cümle | yenileme kontrolleri
+- Sol 220px: strateji + kırmızı→yeşil skalalı filtre boru hattı + özet stacked bar
+- Orta: 5 KPI (trend oklarıyla) + Chart.js equity (CDN yoksa SVG fallback) +
+  LONG/SHORT karşılıklı çubuk + iç kaydırmalı sıkı sinyal tablosu
+- Sağ 300px: Piyasa Nabzı (BTC/ETH + F&G gauge + pulse) + Saatlik Değerlendirme
+  (6 satır clamp + "devamını gör") + 4 başlıklı haber akışı
 - Sol sidebar: strateji sözleşmesi kartı + canlı **pipeline** kartı (motorun
   7 aşamalı filtre boru hattı; son taramada her aşamanın kaç pariteyi elediği,
   aşama açıklamalarıyla — "neden sinyal yok?"un cevabı) + sistem bilgisi
