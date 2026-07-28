@@ -242,13 +242,20 @@ geçerli: paid instance + Disk (`DB_PATH=/data/bot.db`).
 | MarkdownV2 rich mesaj | `TELEGRAM_PARSE_MODE=MarkdownV2` | kapalı (plain) | Bold başlık + monospace seviyeler, tam escape'li |
 | WebSocket kline cache | `USE_WEBSOCKET=true` | kapalı | **Deneysel.** REST bootstrap + canlı WS güncellemesi; kopunca otomatik REST fallback. 15m/4h taramada REST zaten yeterli — açmak zorunlu değil |
 
-## Sessiz mod & Dashboard (v2.3)
+## Sessiz mod & Dashboard (v2.4)
 
 `TELEGRAM_ENABLED=false` (render.yaml'da varsayılan) ile **hiçbir Telegram mesajı
 gönderilmez** — sinyal üretimi, gölge takip ve gist yedekleme aynen sürer. Takip,
 botun kök adresindeki operasyon konsolundan yapılır:
 
-**`https://<app>.onrender.com/`** → Dashboard:
+**`https://<app>.onrender.com/`** → Dashboard (v2.4 karar-destek konsolu):
+- Tek cümlelik özet: motor sağlığı + toplam R + win rate'in başabaş eşiğine göre konumu
+- Kümülatif R eğrisi (equity curve) — nokta renkleri WIN/LOSS, üzerine gelince detay
+- LONG / SHORT yön bilançosu ve sonuç dağılımı çubuğu
+- Giriş isabeti (fill oranı) KPI'ı — NOT_FILLED izleme metriği
+- Sinyal tablosunda durum filtreleri (Tümü/Açık/Sonuçlanan/Dolmayan) ve açık
+  sinyaller için yaş / pencere göstergesi
+- "Nasıl okunur?" açılır rehberi (R, başabaş, durum akışı, gölge muhasebe uyarısı)
 - KPI panosu: win rate, toplam R, açık sinyal, evren boyutu, tarama sayacı, arşiv boyutu
 - Gölge takipteki tüm sinyaller (durum/sonuç/R ile, renk kodlu)
 - Son tarama dağılımı (SIGNAL / NO_TRADE / DATA_MISSING oran çubuğu) + aktif
