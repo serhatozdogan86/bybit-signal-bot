@@ -54,9 +54,11 @@ class GistBackup:
     def __init__(self, client: GistClient, tracker: SignalTracker,
                  symbols, intervals: list[str],
                  sync_interval_sec: int = 3600, pinned_gist_id: str = "",
-                 candle_mode: str = "all", candle_max_rows: int = 5000) -> None:
+                 candle_mode: str = "all", candle_max_rows: int = 5000,
+                 commentary=None) -> None:
         self._client = client
         self._tracker = tracker
+        self._commentary = commentary
         self._symbols = symbols if callable(symbols) else (lambda: list(symbols))
         self._intervals = intervals
         self._candle_mode = candle_mode      # all | signals | off
@@ -86,6 +88,9 @@ class GistBackup:
             "0_performance.json": json.dumps(self._tracker.stats(), indent=2),
             "0_signals.json": json.dumps(self._tracker.recent_signals(500), indent=2),
             "0_decisions.json": json.dumps(self._tracker.recent_decisions(2000), indent=2),
+            "0_commentary.json": json.dumps(
+                self._commentary.recent(6) if self._commentary else [],
+                indent=2),
             "README.md": (f"# bybit-signal-bot data\nAuto-synced: {now}\n\n"
                           "Shadow-tracking stats and backtest dataset. "
                           "Managed by the bot - do not edit manually.\n"),

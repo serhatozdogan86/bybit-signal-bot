@@ -37,13 +37,15 @@ class Scheduler:
                  store: StateStore, notifier: TelegramNotifier,
                  tracker: SignalTracker | None = None,
                  gist_backup=None,
-                 universe: UniverseProvider | None = None) -> None:
+                 universe: UniverseProvider | None = None,
+                 commentary=None) -> None:
         self._settings = settings
         self._md = market_data
         self._store = store
         self._notifier = notifier
         self._tracker = tracker      # None -> golge takip kapali
         self._gist = gist_backup     # None -> gist sync kapali
+        self._commentary = commentary  # None -> saatlik yorum kapali
         self._universe = universe    # None -> static SYMBOLS
         self._params = settings.strategy_params
 
@@ -163,6 +165,8 @@ class Scheduler:
         while True:
             try:
                 self.scan_all(send_telegram=True)
+                if self._commentary is not None:
+                    self._commentary.maybe_generate()
                 if self._gist is not None:
                     self._gist.maybe_sync()
             except Exception:

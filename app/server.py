@@ -21,7 +21,8 @@ from app.services.state_store import StateStore
 
 def create_app(store: StateStore, scheduler: Scheduler,
                tracker: SignalTracker | None = None,
-               gist_backup=None, universe=None) -> Flask:
+               gist_backup=None, universe=None,
+               market_info=None, commentary=None) -> Flask:
     app = Flask(__name__)
 
     @app.get("/")
@@ -109,6 +110,30 @@ def create_app(store: StateStore, scheduler: Scheduler,
                                   mimetype="application/json",
                                   headers={"Content-Disposition":
                                            "attachment; filename=signals_export.json"})
+
+    # ------------------------------------------- v2.5: yorum / market / haber
+    @app.get("/commentary")
+    def commentary_feed():
+        if commentary is None:
+            return jsonify({"error": "commentary disabled"}), 404
+        limit = min(int(request.args.get("limit", 5)), 48)
+        return app.response_class(
+            json.dumps(commentary.recent(limit), indent=2),
+            mimetype="application/json")
+
+    @app.get("/market")
+    def market_metrics():
+        if market_info is None:
+            return jsonify({"error": "market info disabled"}), 404
+        return app.response_class(json.dumps(market_info.metrics(), indent=2),
+                                  mimetype="application/json")
+
+    @app.get("/news")
+    def market_news():
+        if market_info is None:
+            return jsonify({"error": "market info disabled"}), 404
+        return app.response_class(json.dumps(market_info.news(), indent=2),
+                                  mimetype="application/json")
 
     # ----------------------------------------------- Phase 2: gist yedekleme
     @app.get("/backup/info")

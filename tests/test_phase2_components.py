@@ -8,6 +8,7 @@ from app.formatting import telegram_formatter as tf
 from app.integrations.bybit_ws import KlineCache, parse_kline_message
 from app.models.candle import Candle
 from app.services.database import Database
+from app.services.signal_tracker import SignalTracker
 from app.services.sqlite_state_store import SQLiteStateStore
 from app.strategies import signal_engine
 from app.strategies.liquidity_mapper import orderbook_note
@@ -106,3 +107,95 @@ def test_dashboard_served_at_root(tmp_path):
     assert r.status_code == 200
     assert b"signal-engine // dashboard" in r.data
     assert b"/performance" in r.data  # kendi endpoint'lerine baglaniyor
+
+
+# ------------------------------------------------------- v2.5: commentary
+def test_commentary_generates_and_deltas(tmp_path):
+    from app.services.commentary import CommentaryService
+
+    db = Database(str(tmp_path / "c.db"))
+    tracker = SignalTracker(db, ltf_interval="15")
+    tracker.import_signals([
+        {"pair": "AAAUSDT", "direction": "SHORT", "created_utc": "2026-07-28T01:00:00Z",
+         "entry_candle_ts": 1, "entry_min": 10, "entry_max": 11, "stop_loss": 12,
+         "tp1": 8, "tp2": 7, "rr": 2.0, "status": "CLOSED", "outcome": "WIN",
+         "fill_price": 10, "exit_price": 8, "r_multiple": 2.0,
+         "closed_utc": "2026-07-28T03:00:00Z", "contract_json": "{}"},
+        {"pair": "BBBUSDT", "direction": "LONG", "created_utc": "2026-07-28T01:10:00Z",
+         "entry_candle_ts": 2, "entry_min": 5, "entry_max": 5.1, "stop_loss": 4.99,
+         "tp1": 9, "tp2": 10, "rr": 8.5, "status": "CLOSED", "outcome": "LOSS",
+         "fill_price": 5.1, "exit_price": 4.99, "r_multiple": -1.0,
+         "closed_utc": "2026-07-28T04:00:00Z", "contract_json": "{}"},
+    ])
+    svc = CommentaryService(db, tracker, interval_sec=3600)
+    row = svc.generate()
+    assert "golge muhasebe" in row["text"]
+    assert "WIN" in row["text"] and "LOSS" in row["text"]
+    assert "RR 8.5" in row["text"]          # yuksek-RR kaybi uyarisi
+    # ikinci uretim: delta cumlesi olusmali
+    row2 = svc.generate()
+    assert "Onceki degerlendirmeden bu yana" in row2["text"]
+    assert len(svc.recent(10)) == 2
+
+
+# ------------------------------------------------------ v2.5: market info
+def test_market_metrics_and_feed_parse():
+    from app.config.settings import Settings
+    from app.services.market_info import MarketInfoService, parse_feed
+
+    class FakeBybit:
+        def get_all_tickers(self):
+            return [
+                {"symbol": "BTCUSDT", "lastPrice": "64000", "price24hPcnt": "-0.012",
+                 "fundingRate": "0.0001", "turnover24h": "9e9"},
+                {"symbol": "ETHUSDT", "lastPrice": "1800", "price24hPcnt": "0.02",
+                 "fundingRate": "0.0001", "turnover24h": "5e9"},
+                {"symbol": "PUMPUSDT", "lastPrice": "1", "price24hPcnt": "0.4",
+                 "fundingRate": "0", "turnover24h": "30000000"},
+                {"symbol": "ILLIQUSDT", "lastPrice": "1", "price24hPcnt": "4.0",
+                 "fundingRate": "0", "turnover24h": "1000"},  # elenmeli
+            ]
+
+    svc = MarketInfoService(FakeBybit(), Settings(SYMBOLS="BTCUSDT"))
+    m = svc.metrics()
+    assert [x["symbol"] for x in m["majors"]] == ["BTCUSDT", "ETHUSDT"]
+    assert m["gainers"][0]["symbol"] == "PUMPUSDT"          # likit lider
+    assert all(x["symbol"] != "ILLIQUSDT" for x in m["gainers"])
+    assert m["majors"][0]["pct24h"] == -1.2
+
+    rss = """<rss><channel><item><title>T1</title><link>http://a/1</link>
+      <pubDate>Tue, 28 Jul 2026 10:00:00 GMT</pubDate></item></channel></rss>"""
+    atom = """<feed xmlns="http://www.w3.org/2005/Atom"><entry>
+      <title>T2</title><link href="http://b/2"/>
+      <updated>2026-07-28T09:00:00Z</updated></entry></feed>"""
+    assert parse_feed(rss, "a")[0]["title"] == "T1"
+    assert parse_feed(atom, "b")[0]["url"] == "http://b/2"
+    assert parse_feed("<broken", "x") == []
+
+
+# ------------------------------------------------- v2.5: yeni endpoint'ler
+def test_new_endpoints_serve(tmp_path):
+    from app.server import create_app
+    from app.services.sqlite_state_store import SQLiteStateStore
+
+    class StubSched:
+        def scan_all(self, send_telegram=True): return []
+
+    class StubMarket:
+        def metrics(self): return {"majors": []}
+        def news(self): return {"items": []}
+
+    class StubComment:
+        def recent(self, limit=5): return [{"ts_utc": "x", "text": "y"}]
+
+    app = create_app(SQLiteStateStore(Database(str(tmp_path / "e.db"))),
+                     StubSched(), market_info=StubMarket(),
+                     commentary=StubComment())
+    c = app.test_client()
+    assert c.get("/market").status_code == 200
+    assert c.get("/news").status_code == 200
+    assert b"y" in c.get("/commentary").data
+    body = c.get("/").data.decode()
+    for marker in ("hourly_review", "kripto haber", "canlı metrikler",
+                   "Nasıl okunur?", "signal-engine // dashboard"):
+        assert marker in body, marker

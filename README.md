@@ -242,13 +242,20 @@ geçerli: paid instance + Disk (`DB_PATH=/data/bot.db`).
 | MarkdownV2 rich mesaj | `TELEGRAM_PARSE_MODE=MarkdownV2` | kapalı (plain) | Bold başlık + monospace seviyeler, tam escape'li |
 | WebSocket kline cache | `USE_WEBSOCKET=true` | kapalı | **Deneysel.** REST bootstrap + canlı WS güncellemesi; kopunca otomatik REST fallback. 15m/4h taramada REST zaten yeterli — açmak zorunlu değil |
 
-## Sessiz mod & Dashboard (v2.4)
+## Sessiz mod & Dashboard (v2.5)
 
 `TELEGRAM_ENABLED=false` (render.yaml'da varsayılan) ile **hiçbir Telegram mesajı
 gönderilmez** — sinyal üretimi, gölge takip ve gist yedekleme aynen sürer. Takip,
 botun kök adresindeki operasyon konsolundan yapılır:
 
-**`https://<app>.onrender.com/`** → Dashboard (v2.4 karar-destek konsolu):
+**`https://<app>.onrender.com/`** → Dashboard (v2.5 — açık tema, tek ekran):
+- Masaüstünde sayfa kaydırma yok: 100vh grid; uzun listeler kendi paneli içinde kayar
+- `hourly_review`: motorun saatte bir ürettiği kural-tabanlı değerlendirme
+  (CommentaryService — LLM değildir; analiz şablonları koddadır, /commentary)
+- `market`: BTC/ETH fiyat + 24s değişim + funding, likit evrende 24s en çok
+  yükselen/düşenler (/market, Bybit ticker'ları, 60 sn önbellek)
+- `news`: kripto haber başlıklarının birleşik akışı (/news, RSS/Atom,
+  NEWS_FEEDS ile özelleştirilebilir, 10 dk önbellek, yorum içermez)
 - Tek cümlelik özet: motor sağlığı + toplam R + win rate'in başabaş eşiğine göre konumu
 - Kümülatif R eğrisi (equity curve) — nokta renkleri WIN/LOSS, üzerine gelince detay
 - LONG / SHORT yön bilançosu ve sonuç dağılımı çubuğu

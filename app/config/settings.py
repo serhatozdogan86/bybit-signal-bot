@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     BYBIT_API_KEY: str = ""
     BYBIT_API_SECRET: str = ""
 
+    # v2.5: dashboard market/haber/yorum panelleri
+    NEWS_FEEDS: str = ("https://www.coindesk.com/arc/outboundfeeds/rss/,"
+                       "https://cointelegraph.com/rss")
+    NEWS_TTL_SEC: int = 600
+    MARKET_TTL_SEC: int = 60
+    COMMENT_INTERVAL_SEC: int = 3600
+
     # Telegram
     TELEGRAM_ENABLED: bool = True   # false -> hicbir mesaj gonderilmez (sinyal uretimi/takip surer)
     TELEGRAM_BOT_TOKEN: str = ""
