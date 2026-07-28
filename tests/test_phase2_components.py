@@ -156,12 +156,18 @@ def test_market_metrics_and_feed_parse():
                  "fundingRate": "0", "turnover24h": "1000"},  # elenmeli
             ]
 
+    import time as _t
     svc = MarketInfoService(FakeBybit(), Settings(SYMBOLS="BTCUSDT"))
+    svc._fng_cache = {"value": 34, "label_en": "Fear", "label_tr": "Korku"}
+    svc._fng_ts = _t.time()   # gercek HTTP cagrisini engelle (offline test)
     m = svc.metrics()
     assert [x["symbol"] for x in m["majors"]] == ["BTCUSDT", "ETHUSDT"]
     assert m["gainers"][0]["symbol"] == "PUMPUSDT"          # likit lider
     assert all(x["symbol"] != "ILLIQUSDT" for x in m["gainers"])
     assert m["majors"][0]["pct24h"] == -1.2
+    assert m["breadth"]["advancers"] == 2 and m["breadth"]["decliners"] == 1
+    assert "pulse" in m and "BTC 24s" in m["pulse"]
+    assert m["fng"]["value"] == 34 and "Korku" in m["pulse"]
 
     rss = """<rss><channel><item><title>T1</title><link>http://a/1</link>
       <pubDate>Tue, 28 Jul 2026 10:00:00 GMT</pubDate></item></channel></rss>"""
@@ -197,5 +203,6 @@ def test_new_endpoints_serve(tmp_path):
     assert b"y" in c.get("/commentary").data
     body = c.get("/").data.decode()
     for marker in ("hourly_review", "kripto haber", "canlı metrikler",
-                   "Nasıl okunur?", "signal-engine // dashboard"):
+                   "Nasıl okunur?", "signal-engine // dashboard",
+                   "pipeline", "strateji sözleşmesi", "renderPipeline"):
         assert marker in body, marker

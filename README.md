@@ -242,13 +242,20 @@ geçerli: paid instance + Disk (`DB_PATH=/data/bot.db`).
 | MarkdownV2 rich mesaj | `TELEGRAM_PARSE_MODE=MarkdownV2` | kapalı (plain) | Bold başlık + monospace seviyeler, tam escape'li |
 | WebSocket kline cache | `USE_WEBSOCKET=true` | kapalı | **Deneysel.** REST bootstrap + canlı WS güncellemesi; kopunca otomatik REST fallback. 15m/4h taramada REST zaten yeterli — açmak zorunlu değil |
 
-## Sessiz mod & Dashboard (v2.5)
+## Sessiz mod & Dashboard (v2.6)
 
 `TELEGRAM_ENABLED=false` (render.yaml'da varsayılan) ile **hiçbir Telegram mesajı
 gönderilmez** — sinyal üretimi, gölge takip ve gist yedekleme aynen sürer. Takip,
 botun kök adresindeki operasyon konsolundan yapılır:
 
-**`https://<app>.onrender.com/`** → Dashboard (v2.5 — açık tema, tek ekran):
+**`https://<app>.onrender.com/`** → Dashboard (v2.6 — "trading OS" yerleşimi):
+- Sol sidebar: strateji sözleşmesi kartı + canlı **pipeline** kartı (motorun
+  7 aşamalı filtre boru hattı; son taramada her aşamanın kaç pariteyi elediği,
+  aşama açıklamalarıyla — "neden sinyal yok?"un cevabı) + sistem bilgisi
+- Market paneli: BTC/ETH + **Korku & Açgözlülük endeksi** (alternative.me,
+  1 sa önbellek) + piyasa genişliği (likit evrende ▲/▼) + **market pulse**
+  (kural tabanlı anlık piyasa okuması; şablon üretimidir, böyle etiketlenir)
+- Tam genişlik tek-ekran yerleşim (masaüstünde kaydırma yok)
 - Masaüstünde sayfa kaydırma yok: 100vh grid; uzun listeler kendi paneli içinde kayar
 - `hourly_review`: motorun saatte bir ürettiği kural-tabanlı değerlendirme
   (CommentaryService — LLM değildir; analiz şablonları koddadır, /commentary)

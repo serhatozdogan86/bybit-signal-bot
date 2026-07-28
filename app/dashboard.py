@@ -1,19 +1,19 @@
 """
-Dashboard v2.5 - acik tema, tek-ekran karar-destek konsolu.
+Dashboard v2.6 - "trading OS" esinli, acik temali, tam genislik konsol.
 
-v2.4'e gore:
-- ACIK TEMA: kagit-beyazi zemin, murekkep metin, koyu-kehribar vurgu.
-- TEK EKRAN: masaustunde sayfa kaydirma yok (100vh grid); uzun iceriklerin
-  (sinyal tablosu, haberler, yorum) kendi panelinde ic kaydirmasi vardir.
-  Dar ekranlarda (<1080px) tek sutuna duser ve normal kaydirma acilir.
-- hourly_review paneli: CommentaryService'in saatlik kural-tabanli
-  degerlendirmesi (/commentary). "Otomatik analiz" olarak etiketlenir.
-- market paneli: /market -> BTC/ETH fiyat, 24s degisim, funding + likit
-  evrende 24s en cok yukselen/dusenler.
-- news paneli: /news -> kripto haber basliklarinin birlesik akisi.
-- Sikistirmalar: outcomes + last_scan tek "dagilimlar" paneline indi;
-  aktif kararlar tek satir ozet oldu; "Nasil okunur?" sabit yer kaplamayan
-  bir kaplama (overlay) oldu.
+v2.5'e gore:
+- SIDEBAR yerlesimi: sol sutunda marka + STRATEJI karti + PIPELINE karti
+  (motorun 7 asamali filtre boru hatti, son taramanin ret dagilimiyla canli)
+  + sistem bilgisi. Ana alan ekranin kalanini kullanir (bos kenar kalmaz).
+- FEAR & GREED endeksi (/market icindeki fng alani; alternative.me, 1 sa
+  onbellek, ulasilamazsa panel gizlenir) - renk skalali serit gosterge.
+- MARKET PULSE: kural tabanli anlik piyasa okumasi (BTC/ETH 24s + likit
+  evren genisligi + endeks -> sablon cumleler; boyle etiketlenir).
+- PIPELINE karti ayni zamanda "ret sebepleri aciklamasi"dir: her asamanin
+  ne yaptigi bir satirla anlatilir, son taramada kacar pariteyi eledigi
+  gosterilir.
+Tek-ekran ilkesi korunur (masaustunde sayfa kaydirmasi yok; ic paneller
+kayar). Dar ekranda tek sutuna duser.
 """
 
 DASHBOARD_HTML = r"""<!doctype html>
@@ -24,8 +24,9 @@ DASHBOARD_HTML = r"""<!doctype html>
 <title>signal-engine // dashboard</title>
 <style>
   :root{
-    --bg:#EDF0F5; --panel:#FFFFFF; --panel2:#F5F7FB; --line:#DCE3EE;
-    --text:#1D2534; --muted:#69758D; --accent:#9A6A14; --accent-soft:#F6EAD2;
+    --bg:#EDF0F5; --panel:#FFFFFF; --panel2:#F5F7FB; --side:#F8FAFD;
+    --line:#DCE3EE; --text:#1D2534; --muted:#69758D;
+    --accent:#9A6A14; --accent-soft:#F6EAD2;
     --win:#177E52; --win-soft:#E3F3EB; --loss:#C43D3D; --loss-soft:#FBE9E9;
     --pend:#9A6A14; --pend-soft:#F6EAD2; --info:#2B66C4; --info-soft:#E7EEFA;
     --nf:#8A96AC; --nf-soft:#EDF0F5;
@@ -37,85 +38,114 @@ DASHBOARD_HTML = r"""<!doctype html>
   html,body{height:100%}
   body{background:var(--bg);color:var(--text);font-family:var(--sans);
        font-size:13px;line-height:1.45;overflow:hidden}
-  .wrap{height:100vh;max-width:1560px;margin:0 auto;padding:10px 14px;
-        display:grid;grid-template-rows:auto auto auto minmax(0,1fr) auto;
-        gap:8px}
-  /* --- kv log-line header (imza) --- */
-  .loghead{font-family:var(--mono);font-size:12px;color:var(--muted);
-           display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}
-  .kv b{color:var(--accent);font-weight:600}
-  .kv i{color:var(--text);font-style:normal}
+  .app{display:grid;grid-template-columns:225px minmax(0,1fr);height:100vh}
+  /* ================= SIDEBAR ================= */
+  .side{background:var(--side);border-right:1px solid var(--line);
+        display:flex;flex-direction:column;gap:8px;padding:12px 10px;
+        min-height:0}
+  .brand{font-family:var(--mono);padding:0 4px}
+  .brand .t{font-size:14px;font-weight:700;letter-spacing:.02em}
+  .brand .t b{color:var(--accent)}
+  .brand .s{font-size:10px;color:var(--muted)}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--win);
-       display:inline-block;margin-right:4px}
+       display:inline-block;margin-right:5px}
   .dot.err{background:var(--loss)}
   @media (prefers-reduced-motion:no-preference){
     .dot{animation:pulse 2.4s ease-in-out infinite}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
   }
+  .scard{background:var(--panel);border:1px solid var(--line);border-radius:9px;
+         box-shadow:var(--shadow);padding:8px 10px;min-height:0;
+         display:flex;flex-direction:column}
+  .scard h3{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;
+            color:var(--muted);font-weight:700;margin-bottom:5px}
+  .scard h3 b{color:var(--accent);font-family:var(--mono)}
+  .strat{font-size:11px;color:var(--muted)}
+  .strat b{color:var(--text);font-weight:600}
+  .strat .row{display:flex;justify-content:space-between;gap:6px;
+              padding:1.5px 0;font-family:var(--mono);font-size:10.5px}
+  /* pipeline */
+  .pipe{overflow-y:auto;scrollbar-width:thin;flex:1;min-height:0}
+  .step{padding:4px 0 5px;border-bottom:1px dashed var(--line)}
+  .step:last-child{border-bottom:0}
+  .step .h{display:flex;justify-content:space-between;align-items:baseline;
+           font-family:var(--mono);font-size:10.5px}
+  .step .h b{font-weight:600}
+  .step .h .n{color:var(--muted)}
+  .step .d{font-size:9.8px;color:var(--muted);line-height:1.3}
+  .step .g{height:4px;border-radius:2px;background:var(--panel2);
+           margin-top:3px;overflow:hidden}
+  .step .g div{height:100%;background:#C7CFDD}
+  .step.pass .g div{background:var(--win)}
+  .step.pass .h b{color:var(--win)}
+  .sysinfo{font-family:var(--mono);font-size:10px;color:var(--muted);
+           padding:0 4px}
+  .sysinfo a{color:var(--info)}
+  .sysinfo div{padding:1px 0}
+  /* ================= MAIN ================= */
+  .mainwrap{display:grid;grid-template-rows:auto auto auto minmax(0,1fr);
+            gap:8px;padding:10px 12px;min-height:0}
+  .loghead{font-family:var(--mono);font-size:11.5px;color:var(--muted);
+           display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}
+  .kv b{color:var(--accent);font-weight:600}
+  .kv i{color:var(--text);font-style:normal}
   .ctrl{margin-left:auto;display:flex;gap:6px;align-items:center}
   select,button{background:var(--panel);color:var(--text);border:1px solid var(--line);
     border-radius:6px;padding:4px 9px;font-family:var(--mono);font-size:11px;
     cursor:pointer;box-shadow:var(--shadow)}
   button:hover,select:hover{border-color:var(--accent)}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  /* --- verdict --- */
-  .verdict{padding:8px 14px;background:var(--panel);border:1px solid var(--line);
+  .verdict{padding:7px 14px;background:var(--panel);border:1px solid var(--line);
            border-left:3px solid var(--accent);border-radius:9px;
-           font-size:13px;box-shadow:var(--shadow)}
+           font-size:12.8px;box-shadow:var(--shadow)}
   .verdict b{color:var(--accent)}
-  /* --- KPIs --- */
   .kpis{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;
         background:var(--line);border:1px solid var(--line);border-radius:9px;
         overflow:hidden;box-shadow:var(--shadow)}
-  .kpi{background:var(--panel);padding:7px 12px 6px}
+  .kpi{background:var(--panel);padding:6px 12px 5px}
   .kpi .lbl{font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;
             color:var(--muted)}
-  .kpi .val{font-family:var(--mono);font-size:18px;margin-top:1px}
+  .kpi .val{font-family:var(--mono);font-size:17.5px;margin-top:1px}
   .kpi .sub{font-family:var(--mono);font-size:10px;color:var(--muted);
             white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .pos{color:var(--win)} .neg{color:var(--loss)} .amb{color:var(--pend)}
-  /* --- main 3-col --- */
-  .main{display:grid;grid-template-columns:0.95fr 1.35fr 1fr;gap:10px;
+  .main{display:grid;grid-template-columns:1fr 1.45fr 1.05fr;gap:9px;
         min-height:0}
   .col{display:flex;flex-direction:column;gap:8px;min-height:0}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:9px;
          box-shadow:var(--shadow);display:flex;flex-direction:column;min-height:0}
-  .phead{padding:7px 12px 0;font-size:10.5px;letter-spacing:.09em;
+  .phead{padding:6px 12px 0;font-size:10px;letter-spacing:.09em;
          text-transform:uppercase;color:var(--muted);font-weight:600;
          display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
   .phead b{color:var(--accent);font-family:var(--mono);font-weight:600}
-  .phead .note{font-size:10px;text-transform:none;letter-spacing:0;
+  .phead .note{font-size:9.8px;text-transform:none;letter-spacing:0;
                font-weight:400;margin-left:auto}
-  .pbody{padding:6px 12px 10px;min-height:0}
+  .pbody{padding:5px 12px 9px;min-height:0}
   .scroll{overflow-y:auto;scrollbar-width:thin}
   .fill{flex:1}
-  .empty{color:var(--muted);font-family:var(--mono);font-size:11.5px;
-         padding:8px 0}
-  /* --- equity --- */
+  .empty{color:var(--muted);font-family:var(--mono);font-size:11px;padding:6px 0}
+  /* equity */
   .curve svg{width:100%;height:100%;display:block}
   .curve .zero{stroke:var(--muted);stroke-width:1;stroke-dasharray:4 4;opacity:.55}
   .curve .path{fill:none;stroke:var(--accent);stroke-width:2}
   .curve .area{fill:var(--accent);opacity:.09}
   .curve text{font-family:var(--mono);font-size:10px;fill:var(--muted)}
-  /* --- direction --- */
   .dir{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .dside{background:var(--panel2);border:1px solid var(--line);border-radius:7px;
-         padding:6px 10px}
-  .dside .big{font-family:var(--mono);font-size:16px}
+         padding:5px 10px}
+  .dside .big{font-family:var(--mono);font-size:15px}
   .dside .sub{font-family:var(--mono);font-size:10px;color:var(--muted)}
-  /* --- bars --- */
-  .bar{display:flex;height:10px;border-radius:5px;overflow:hidden;
-       border:1px solid var(--line);margin:5px 0 4px}
+  .bar{display:flex;height:9px;border-radius:5px;overflow:hidden;
+       border:1px solid var(--line);margin:4px 0 3px}
   .bar div{height:100%}
-  .legend{font-family:var(--mono);font-size:10px;color:var(--muted);
-          display:flex;gap:10px;flex-wrap:wrap}
+  .legend{font-family:var(--mono);font-size:9.8px;color:var(--muted);
+          display:flex;gap:9px;flex-wrap:wrap}
   .legend b{color:var(--text);font-weight:600}
   .sw{display:inline-block;width:8px;height:8px;border-radius:2px;
       margin-right:4px;vertical-align:-1px}
-  .mline{font-family:var(--mono);font-size:10.5px;color:var(--muted);
-         margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mline{font-family:var(--mono);font-size:10px;color:var(--muted);
+         margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .mline b{color:var(--text);font-weight:600}
-  /* --- pills / table --- */
   .pill{display:inline-block;padding:0 7px;border-radius:99px;font-size:10px;
         font-family:var(--mono)}
   .pill.WIN{background:var(--win-soft);color:var(--win)}
@@ -129,50 +159,58 @@ DASHBOARD_HTML = r"""<!doctype html>
   th{color:var(--muted);text-align:left;font-weight:600;font-size:9.5px;
      letter-spacing:.06em;text-transform:uppercase;padding:6px 9px;
      border-bottom:1px solid var(--line);background:var(--panel2);
-     position:sticky;top:0}
-  td{padding:4px 9px;border-bottom:1px solid var(--panel2);white-space:nowrap}
+     position:sticky;top:0;z-index:1}
+  td{padding:3.5px 9px;border-bottom:1px solid var(--panel2);white-space:nowrap}
   tr:last-child td{border-bottom:0}
   tr.dim td{opacity:.5}
   .age{font-size:9.5px;color:var(--muted)}
   .chips{display:flex;gap:6px;flex-wrap:wrap}
   .chip{background:var(--panel2);border:1px solid var(--line);color:var(--muted);
-        border-radius:99px;padding:2px 9px;font-family:var(--mono);
+        border-radius:99px;padding:1.5px 9px;font-family:var(--mono);
         font-size:10px;cursor:pointer}
   .chip.on{border-color:var(--accent);color:var(--accent);
            background:var(--accent-soft)}
-  /* --- review --- */
-  .review p{margin:0 0 7px;font-size:12.3px}
+  .review p{margin:0 0 6px;font-size:12px}
   .review .rts{font-family:var(--mono);font-size:10px;color:var(--muted)}
   .review .warnline{border-left:3px solid var(--loss);padding-left:8px;
                     background:var(--loss-soft);border-radius:4px}
-  .review details{margin-top:4px}
+  .review details{margin-top:3px}
   .review summary{cursor:pointer;font-family:var(--mono);font-size:10.5px;
                   color:var(--info);list-style:none}
   .review summary::-webkit-details-marker{display:none}
   .prev{border-top:1px dashed var(--line);margin-top:6px;padding-top:6px}
-  /* --- market --- */
+  /* market */
   .majors{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .mj{background:var(--panel2);border:1px solid var(--line);border-radius:7px;
-      padding:5px 10px;font-family:var(--mono)}
+      padding:4px 10px;font-family:var(--mono)}
   .mj .sym{font-size:10px;color:var(--muted)}
-  .mj .px{font-size:15px}
+  .mj .px{font-size:14.5px}
   .mj .row{font-size:10px;color:var(--muted)}
+  .fng{margin-top:7px}
+  .fng .lbl{display:flex;justify-content:space-between;font-family:var(--mono);
+            font-size:10px;color:var(--muted)}
+  .fng .lbl b{color:var(--text)}
+  .fng .track{position:relative;height:9px;border-radius:5px;margin-top:3px;
+    background:linear-gradient(90deg,#C43D3D 0%,#D98A3D 30%,#B9B9B9 50%,
+                               #7FB98A 70%,#177E52 100%);
+    border:1px solid var(--line)}
+  .fng .mark{position:absolute;top:-3px;width:3px;height:15px;background:var(--text);
+             border-radius:2px}
   .movers{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:7px;
-          font-family:var(--mono);font-size:10.5px}
+          font-family:var(--mono);font-size:10.3px}
   .movers .m{display:flex;justify-content:space-between;padding:1px 0}
-  .movers h4{font-size:9.5px;color:var(--muted);letter-spacing:.06em;
-             font-weight:600;margin-bottom:2px}
-  /* --- news --- */
-  .news li{list-style:none;padding:5px 0;border-bottom:1px solid var(--panel2)}
+  .movers h4{font-size:9.3px;color:var(--muted);letter-spacing:.06em;
+             font-weight:600;margin-bottom:1px}
+  .pulse{margin-top:7px;font-size:11.3px;background:var(--info-soft);
+         border-left:3px solid var(--info);border-radius:5px;padding:6px 9px}
+  .pulse .tag{font-family:var(--mono);font-size:9.3px;color:var(--muted)}
+  .news li{list-style:none;padding:4px 0;border-bottom:1px solid var(--panel2)}
   .news li:last-child{border-bottom:0}
-  .news a{color:var(--text);text-decoration:none;font-size:12px;line-height:1.35;
-          display:block}
+  .news a{color:var(--text);text-decoration:none;font-size:11.7px;
+          line-height:1.3;display:block}
   .news a:hover{color:var(--info);text-decoration:underline}
-  .news .src{font-family:var(--mono);font-size:9.5px;color:var(--muted)}
-  /* --- footer + howto overlay --- */
-  .footer{display:flex;align-items:center;gap:12px}
-  .footer .loghead{flex:1}
-  #howtoBtn{white-space:nowrap}
+  .news .src{font-family:var(--mono);font-size:9.3px;color:var(--muted)}
+  /* howto overlay */
   #overlay{position:fixed;inset:0;background:rgba(23,32,50,.45);display:none;
            align-items:center;justify-content:center;z-index:50;padding:20px}
   #overlay.show{display:flex}
@@ -190,95 +228,117 @@ DASHBOARD_HTML = r"""<!doctype html>
     .flash{animation:flash .5s ease}
     @keyframes flash{from{color:var(--accent)}to{color:var(--muted)}}
   }
-  /* --- dar ekran: tek sutun + normal kaydirma --- */
   @media (max-width:1080px){
     body{overflow:auto}
-    .wrap{height:auto;grid-template-rows:none}
+    .app{grid-template-columns:1fr;height:auto}
+    .side{flex-direction:column;border-right:0;border-bottom:1px solid var(--line)}
+    .mainwrap{grid-template-rows:none}
     .kpis{grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
     .main{grid-template-columns:1fr}
     .curve{height:170px}
     .scroll{max-height:55vh}
+    .pipe{max-height:none}
   }
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="app">
 
-  <div class="loghead">
-    <span class="kv"><span class="dot" id="dot"></span><b>event</b>=<i>dashboard</i></span>
-    <span class="kv"><b>mode</b>=<i>shadow-tracking</i></span>
-    <span class="kv"><b>telegram</b>=<i>muted</i></span>
-    <span class="kv"><b>updated</b>=<i id="updated">--:--:--</i></span>
-    <span class="ctrl">
-      <label for="iv" style="font-size:10px;color:var(--muted)">yenileme</label>
-      <select id="iv">
-        <option value="30000">30 sn</option>
-        <option value="60000" selected>60 sn</option>
-        <option value="300000">5 dk</option>
-      </select>
-      <button id="refresh">Yenile</button>
-    </span>
-  </div>
+  <!-- ================= SIDEBAR ================= -->
+  <aside class="side">
+    <div class="brand">
+      <div class="t"><span class="dot" id="dot"></span>signal<b>-engine</b></div>
+      <div class="s">shadow-tracking · telegram=muted</div>
+    </div>
 
-  <div class="verdict" id="verdict">yükleniyor…</div>
-
-  <div class="kpis" id="kpis"></div>
-
-  <div class="main">
-    <!-- SOL: equity + yon + dagilimlar -->
-    <div class="col">
-      <div class="panel fill">
-        <div class="phead"><b>equity</b> kümülatif R
-          <span class="note">nokta: sinyal · yeşil WIN / kırmızı LOSS</span></div>
-        <div class="pbody fill curve" id="curve"><div class="empty">henüz sonuçlanan sinyal yok</div></div>
+    <div class="scard">
+      <h3><b>strategy</b> · strateji sözleşmesi</h3>
+      <div class="strat">
+        <b>Conservative swing.</b> Yapı önce gelir; indikatörler yalnız teyittir.
+        Kenar net değilse karar <b>NO_TRADE</b>'dir.
+        <div class="row"><span>Zaman dilimi</span><b>4H → 15m</b></div>
+        <div class="row"><span>Hacim teyidi</span><b>≥1.5× ort.</b></div>
+        <div class="row"><span>Min risk/ödül</span><b>2.0</b></div>
+        <div class="row"><span>Setup</span><b>retest · sweep</b></div>
+        <div class="row"><span>Evren</span><b id="stratUni">top-150</b></div>
       </div>
-      <div class="panel">
-        <div class="phead"><b>direction</b> yön bilançosu</div>
-        <div class="pbody dir"><div class="dside" id="sideL"></div><div class="dside" id="sideS"></div></div>
+    </div>
+
+    <div class="scard" style="flex:1">
+      <h3><b>pipeline</b> · filtre boru hattı <span style="float:right" id="pipeMeta"></span></h3>
+      <div class="pipe" id="pipe"><div class="empty">tarama bekleniyor…</div></div>
+    </div>
+
+    <div class="sysinfo" id="sysline"></div>
+    <button id="howtoBtn">Nasıl okunur?</button>
+  </aside>
+
+  <!-- ================= MAIN ================= -->
+  <div class="mainwrap">
+    <div class="loghead">
+      <span class="kv"><b>event</b>=<i>dashboard</i></span>
+      <span class="kv"><b>updated</b>=<i id="updated">--:--:--</i></span>
+      <span class="ctrl">
+        <label for="iv" style="font-size:10px;color:var(--muted)">yenileme</label>
+        <select id="iv">
+          <option value="30000">30 sn</option>
+          <option value="60000" selected>60 sn</option>
+          <option value="300000">5 dk</option>
+        </select>
+        <button id="refresh">Yenile</button>
+      </span>
+    </div>
+
+    <div class="verdict" id="verdict">yükleniyor…</div>
+    <div class="kpis" id="kpis"></div>
+
+    <div class="main">
+      <div class="col">
+        <div class="panel fill">
+          <div class="phead"><b>equity</b> kümülatif R
+            <span class="note">nokta: sinyal · yeşil WIN / kırmızı LOSS</span></div>
+          <div class="pbody fill curve" id="curve"><div class="empty">henüz sonuçlanan sinyal yok</div></div>
+        </div>
+        <div class="panel">
+          <div class="phead"><b>direction</b> yön bilançosu</div>
+          <div class="pbody dir"><div class="dside" id="sideL"></div><div class="dside" id="sideS"></div></div>
+        </div>
+        <div class="panel">
+          <div class="phead"><b>distributions</b> sonuçlar + son tarama</div>
+          <div class="pbody">
+            <div class="bar" id="obar"></div><div class="legend" id="olegend"></div>
+            <div class="bar" style="margin-top:7px" id="bar"></div><div class="legend" id="legend"></div>
+            <div class="mline" id="activeline"></div>
+          </div>
+        </div>
       </div>
-      <div class="panel">
-        <div class="phead"><b>distributions</b> sonuçlar + son tarama</div>
-        <div class="pbody">
-          <div class="bar" id="obar"></div><div class="legend" id="olegend"></div>
-          <div class="bar" style="margin-top:8px" id="bar"></div><div class="legend" id="legend"></div>
-          <div class="mline" id="activeline"></div>
-          <div class="mline" id="rejline"></div>
+
+      <div class="col">
+        <div class="panel fill">
+          <div class="phead"><b>signals</b> gölge takip
+            <span class="chips" id="chips" style="margin-left:auto"></span></div>
+          <div class="pbody fill scroll" id="signals"><div class="empty">yükleniyor…</div></div>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="panel" style="flex:1.2">
+          <div class="phead"><b>hourly_review</b> saatlik değerlendirme
+            <span class="note">otomatik kural-tabanlı analiz</span></div>
+          <div class="pbody fill scroll review" id="review"><div class="empty">ilk değerlendirme bekleniyor…</div></div>
+        </div>
+        <div class="panel">
+          <div class="phead"><b>market</b> canlı metrikler
+            <span class="note" id="mupd"></span></div>
+          <div class="pbody" id="market"><div class="empty">yükleniyor…</div></div>
+        </div>
+        <div class="panel fill">
+          <div class="phead"><b>news</b> kripto haber akışı
+            <span class="note">dış kaynak · yorum içermez</span></div>
+          <div class="pbody fill scroll"><ul class="news" id="news"><li class="empty">yükleniyor…</li></ul></div>
         </div>
       </div>
     </div>
-
-    <!-- ORTA: sinyaller -->
-    <div class="col">
-      <div class="panel fill">
-        <div class="phead"><b>signals</b> gölge takip
-          <span class="chips" id="chips" style="margin-left:auto"></span></div>
-        <div class="pbody fill scroll" id="signals"><div class="empty">yükleniyor…</div></div>
-      </div>
-    </div>
-
-    <!-- SAG: saatlik degerlendirme + market + haberler -->
-    <div class="col">
-      <div class="panel" style="flex:1.25">
-        <div class="phead"><b>hourly_review</b> saatlik değerlendirme
-          <span class="note">otomatik kural-tabanlı analiz</span></div>
-        <div class="pbody fill scroll review" id="review"><div class="empty">ilk değerlendirme bekleniyor…</div></div>
-      </div>
-      <div class="panel">
-        <div class="phead"><b>market</b> canlı metrikler
-          <span class="note" id="mupd"></span></div>
-        <div class="pbody" id="market"><div class="empty">yükleniyor…</div></div>
-      </div>
-      <div class="panel fill">
-        <div class="phead"><b>news</b> kripto haber akışı
-          <span class="note">dış kaynak · yorum içermez</span></div>
-        <div class="pbody fill scroll"><ul class="news" id="news"><li class="empty">yükleniyor…</li></ul></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="footer">
-    <div class="loghead" id="sysline"></div>
-    <button id="howtoBtn">Nasıl okunur?</button>
   </div>
 </div>
 
@@ -287,19 +347,17 @@ DASHBOARD_HTML = r"""<!doctype html>
     <h3>Nasıl okunur?</h3>
     <dl>
       <dt>R (risk katsayısı)</dt>
-      <dd>Her işlemin sonucu, riske atılan birim cinsinden: kayıp = −1R, kazanç = ödül/risk oranı kadar (+2.2R gibi). Farklı fiyatlı pariteleri karşılaştırılabilir yapar.</dd>
+      <dd>Her işlemin sonucu, riske atılan birim cinsinden: kayıp = −1R, kazanç = ödül/risk oranı kadar (+2.2R gibi).</dd>
       <dt>Win rate ve başabaş</dt>
-      <dd>Kazançlar kayıplardan büyükse %50 isabet gerekmez. Başabaş = 1 / (1 + ort. kazanç R). Win rate bu eşiğin üzerindeyse sistem artıdadır.</dd>
+      <dd>Kazançlar kayıplardan büyükse %50 isabet gerekmez. Başabaş = 1 / (1 + ort. kazanç R). Win rate eşiğin üzerindeyse sistem artıdadır.</dd>
+      <dt>pipeline (filtre boru hattı)</dt>
+      <dd>Motor her pariteyi 7 aşamadan geçirir; herhangi biri geçilemezse karar NO_TRADE olur. Kenardaki kart, son taramada her aşamanın kaç pariteyi elediğini gösterir — "neden sinyal yok?" sorusunun cevabı budur.</dd>
       <dt>PENDING → FILLED → WIN/LOSS</dt>
-      <dd>Sinyal üretilince fiyatın giriş bölgesine gelmesi 6 saat beklenir (PENDING). Gelirse pozisyon dolmuş sayılır (FILLED) ve 48 saat izlenir; önce stop görülürse LOSS, önce hedef görülürse WIN.</dd>
-      <dt>NOT_FILLED</dt>
-      <dd>Fiyat giriş bölgesine hiç gelmedi; işlem açılmadı. Orana dahil edilmez — ama oranı yüksekse giriş yöntemi tartışılır.</dd>
-      <dt>AMBIGUOUS</dt>
-      <dd>Aynı mumda hem stop hem hedef görüldü; hangisi önce bilinemez, dürüstlük gereği sayılmaz.</dd>
-      <dt>hourly_review</dt>
-      <dd>Motorun saatte bir ürettiği kural-tabanlı değerlendirmedir (canlı bir insan/yapay zekâ yorumu değildir); analiz şablonları proje boyunca elle yapılan değerlendirmelerden kodlanmıştır.</dd>
+      <dd>Fiyatın giriş bölgesine gelmesi 6 saat beklenir; gelirse 48 saat izlenir. Önce stop = LOSS, önce hedef = WIN. NOT_FILLED orana dahil edilmez; AMBIGUOUS (aynı mumda ikisi) sayılmaz.</dd>
+      <dt>market pulse / hourly_review</dt>
+      <dd>İkisi de kural tabanlı otomatik üretimdir (canlı insan/LLM yorumu değildir); şablonlar bu projede elle yapılan analizlerden kodlanmıştır. Korku/Açgözlülük endeksi alternative.me kaynağından gelir.</dd>
     </dl>
-    <div class="warn">Bu panodaki tüm sonuçlar <b>gölge muhasebedir</b>: varsayımsal giriş, kayma ve komisyon yok, gerçek emir yok. Geçmiş performans gelecek için garanti değildir; hiçbir şey yatırım tavsiyesi değildir. Haber başlıkları dış kaynaklardan aynen aktarılır.</div>
+    <div class="warn">Bu panodaki tüm sonuçlar <b>gölge muhasebedir</b>: varsayımsal giriş, kayma/komisyon yok, gerçek emir yok. Geçmiş performans gelecek için garanti değildir; hiçbir şey yatırım tavsiyesi değildir. Haber başlıkları dış kaynaklardan aynen aktarılır.</div>
     <div style="text-align:right;margin-top:12px"><button id="howtoClose">Kapat</button></div>
   </div>
 </div>
@@ -324,7 +382,7 @@ async function j(url){
 }
 const OUT=s=>s.outcome||s.status;
 
-/* ---------- verdict ---------- */
+/* ---------- verdict / kpis (v2.5 ile ayni mantik) ---------- */
 function renderVerdict(perf,status){
   const el=$("verdict");
   if(!status){el.innerHTML="⚠ Bota ulaşılamıyor — servis uykuda olabilir (ücretsiz plan), 30-50 sn içinde tekrar deneyin.";return;}
@@ -338,8 +396,6 @@ function renderVerdict(perf,status){
   const nWarn=perf.decided_trades<30?" — örneklem küçük ("+perf.decided_trades+"), hüküm için erken":"";
   el.innerHTML=`<b>Motor çalışıyor.</b> ${perf.decided_trades} sonuçlanan sinyalde toplam <b>${(tr>0?"+":"")+num(tr)}R</b>, isabet %${num(wr,1)}${be!=null?" (başabaş ~%"+num(be,1)+")":""} → ${judge}${nWarn}.`;
 }
-
-/* ---------- KPIs ---------- */
 function renderKpis(perf,status,uni,signals){
   const meta=(status&&status.meta)||{};
   const cbo=(perf&&perf.closed_by_outcome)||{};
@@ -365,13 +421,13 @@ function renderKpis(perf,status,uni,signals){
         (ds.decisions_recorded??0)+" karar");
 }
 
-/* ---------- equity ---------- */
+/* ---------- equity / direction / distributions ---------- */
 function renderCurve(signals){
   const done=(signals||[]).filter(s=>["WIN","LOSS"].includes(OUT(s)))
     .sort((a,b)=>(a.closed_utc||a.created_utc||"").localeCompare(b.closed_utc||b.created_utc||""));
   if(!done.length){$("curve").innerHTML='<div class="empty">henüz sonuçlanan sinyal yok</div>';return;}
   let c=0; const pts=[[0,0]].concat(done.map((s,i)=>[i+1,c+=(s.r_multiple||0)]));
-  const W=560,H=200,P=30;
+  const W=560,H=210,P=30;
   const ys=pts.map(p=>p[1]); const ymin=Math.min(0,...ys), ymax=Math.max(0,...ys);
   const yr=(ymax-ymin)||1;
   const X=i=>P+(W-P-8)*i/(pts.length-1||1);
@@ -390,8 +446,6 @@ function renderCurve(signals){
     <text x="${W-8}" y="${Y(last)-8}" text-anchor="end" fill="${last>=0?'var(--win)':'var(--loss)'}">${(last>0?"+":"")+num(last)}R</text>
   </svg>`;
 }
-
-/* ---------- direction ---------- */
 function renderSplit(signals){
   const mk=(dir,el)=>{
     const rows=(signals||[]).filter(s=>s.direction===dir);
@@ -404,8 +458,6 @@ function renderSplit(signals){
   };
   mk("LONG",$("sideL")); mk("SHORT",$("sideS"));
 }
-
-/* ---------- distributions ---------- */
 function renderOutcomes(signals){
   const order=[["WIN","var(--win)"],["LOSS","var(--loss)"],["FILLED","var(--pend)"],
                ["PENDING","#E4CE9C"],["NOT_FILLED","#C7CFDD"],
@@ -418,33 +470,39 @@ function renderOutcomes(signals){
     .map(([k,c])=>`<span><span class="sw" style="background:${c}"></span><b>${cnt[k]}</b> ${k}</span>`).join("")
     +`<span><b>${total}</b> sinyal</span>`;
 }
-function renderScan(status){
+
+/* ---------- pipeline (sidebar) ---------- */
+const STEPS=[
+  ["DATA","Yeterli mum yok (yeni listeleme)","insufficient data"],
+  ["REGIME","ADX<20: yönsüz/chop piyasa elenir","chop regime"],
+  ["HTF STRUCTURE","4H yapı net değil: HH/HL–LH/LL çelişkili","HTF structure unclear"],
+  ["LTF SETUP","15m'de doğrulanmış retest/sweep yok","no valid LTF setup"],
+  ["VOLUME","Tetik barda hacim <1.5× ortalama","no volume confirmation"],
+  ["RISK/REWARD","Plan RR < 2.0: kenar yetersiz","RR "],
+];
+function renderPipeline(status){
   const res=(status&&status.results)||{};
-  const vals=Object.values(res); const total=vals.length||1;
-  const counts={SIGNAL:0,NO_TRADE:0,DATA_MISSING:0};
-  const reasons={}; const active=[];
+  const vals=Object.values(res); const total=vals.length;
+  if(!total){$("pipe").innerHTML='<div class="empty">tarama bekleniyor…</div>';return;}
+  const cnt={}; let signals=0;
   for(const d of vals){
-    counts[d.decision]=(counts[d.decision]||0)+1;
-    if(d.decision==="SIGNAL")active.push(d);
-    else if(d.reject_reason){
-      const key=d.reject_reason.split("(")[0].trim();
-      reasons[key]=(reasons[key]||0)+1;
-    }
+    if(d.decision==="SIGNAL"){signals++;continue;}
+    const r=(d.decision==="DATA_MISSING")?"insufficient data":(d.reject_reason||"");
+    const step=STEPS.find(([, ,pat])=>r.startsWith(pat)||r.includes(pat));
+    const key=step?step[0]:"OTHER";
+    cnt[key]=(cnt[key]||0)+1;
   }
-  const seg=(n,c)=>`<div style="width:${100*n/total}%;background:${c}"></div>`;
-  $("bar").innerHTML=seg(counts.SIGNAL,"var(--win)")+
-    seg(counts.NO_TRADE,"#C7CFDD")+seg(counts.DATA_MISSING,"var(--loss)");
-  $("legend").innerHTML=
-    `<span><span class="sw" style="background:var(--win)"></span><b>${counts.SIGNAL}</b> SIGNAL</span>`+
-    `<span><span class="sw" style="background:#C7CFDD"></span><b>${counts.NO_TRADE}</b> NO_TRADE</span>`+
-    `<span><span class="sw" style="background:var(--loss)"></span><b>${counts.DATA_MISSING}</b> DATA_MISSING</span>`+
-    `<span><b>${vals.length}</b> tarandı</span>`;
-  $("activeline").innerHTML=active.length?
-    "<b>aktif:</b> "+active.map(d=>`${d.pair} ${d.direction==="LONG"?"L":"S"} (${num(d.rr,1)})`).join(" · "):
-    "<b>aktif:</b> son taramada SIGNAL yok";
-  const top=Object.entries(reasons).sort((a,b)=>b[1]-a[1]).slice(0,3);
-  $("rejline").innerHTML=top.length?
-    "<b>ret:</b> "+top.map(([k,v])=>`${k} (${v})`).join(" · "):"";
+  $("pipeMeta").textContent=total+" parite";
+  const rows=STEPS.map(([name,desc])=>{
+    const n=cnt[name]||0;
+    return `<div class="step"><div class="h"><b>${name}</b><span class="n">−${n}</span></div>
+      <div class="d">${desc}</div>
+      <div class="g"><div style="width:${Math.min(100,100*n/total)}%"></div></div></div>`;
+  }).join("");
+  const pass=`<div class="step pass"><div class="h"><b>→ SIGNAL</b><span class="n">${signals}</span></div>
+    <div class="d">Tüm aşamaları geçenler gölge takibe alınır</div>
+    <div class="g"><div style="width:${Math.min(100,100*signals/total*10)}%"></div></div></div>`;
+  $("pipe").innerHTML=rows+pass;
 }
 
 /* ---------- signals table ---------- */
@@ -489,7 +547,7 @@ function renderSignals(){
     <th>RR</th><th>R</th></tr></thead><tbody>${tr}</tbody></table>`;
 }
 
-/* ---------- hourly review ---------- */
+/* ---------- review / market / news ---------- */
 function renderReview(comments){
   const el=$("review");
   if(!comments||!comments.length){
@@ -506,8 +564,6 @@ function renderReview(comments){
   }
   el.innerHTML=`<div class="rts">${fmtTs(latest.ts_utc)} UTC</div>${paras}${prev}`;
 }
-
-/* ---------- market ---------- */
 function renderMarket(m){
   const el=$("market");
   if(!m){el.innerHTML='<div class="empty">market verisine ulaşılamadı</div>';return;}
@@ -518,18 +574,26 @@ function renderMarket(m){
       <div class="px">${Number(t.last).toLocaleString("en-US",{maximumFractionDigits:2})}</div>
       <div class="row"><span class="${cls}">${(t.pct24h>0?"+":"")+num(t.pct24h,2)}%</span>
        · f ${num(t.funding,3)}%</div></div>`;}).join("");
-  const mov=(list)=>list.map(t=>{
+  let fng="";
+  if(m.fng&&m.fng.value!=null){
+    fng=`<div class="fng"><div class="lbl"><span>Korku &amp; Açgözlülük</span>
+      <b>${m.fng.value} · ${m.fng.label_tr}</b></div>
+      <div class="track"><div class="mark" style="left:calc(${m.fng.value}% - 1px)"></div></div></div>`;
+  }
+  const br=m.breadth?`<div class="mline" style="margin-top:6px">
+    <b>genişlik:</b> <span class="pos">${m.breadth.advancers}▲</span> /
+    <span class="neg">${m.breadth.decliners}▼</span> (likit ${m.liquid_universe})</div>`:"";
+  const mov=list=>list.map(t=>{
     const cls=t.pct24h>0?"pos":"neg";
     return `<div class="m"><span>${t.symbol.replace("USDT","")}</span>
       <span class="${cls}">${(t.pct24h>0?"+":"")+num(t.pct24h,1)}%</span></div>`;}).join("");
-  el.innerHTML=`<div class="majors">${mj}</div>
+  const pulse=m.pulse?`<div class="pulse"><span class="tag">market pulse · kural-tabanlı okuma</span><br>${m.pulse}</div>`:"";
+  el.innerHTML=`<div class="majors">${mj}</div>${fng}${br}
     <div class="movers">
       <div><h4>24s yükselen</h4>${mov(m.gainers||[])}</div>
       <div><h4>24s düşen</h4>${mov(m.losers||[])}</div>
-    </div>`;
+    </div>${pulse}`;
 }
-
-/* ---------- news ---------- */
 function renderNews(n){
   const el=$("news");
   if(!n||!n.items||!n.items.length){
@@ -541,16 +605,14 @@ function renderNews(n){
 
 /* ---------- system / howto ---------- */
 function renderSys(uni,backup,healthy){
-  const parts=[];
-  parts.push(`<span class="kv"><b>universe</b>=<i>${uni?uni.mode+":"+uni.count:"—"}</i></span>`);
+  const rows=[];
+  rows.push(`<div><b style="color:var(--accent)">universe</b>=${uni?uni.mode+":"+uni.count:"—"}</div>`);
+  if(uni)$("stratUni").textContent=uni.mode+"-"+uni.count;
   if(backup&&backup.gist_url){
-    parts.push(`<span class="kv"><b>gist</b>=<i><a href="${backup.gist_url}" target="_blank" rel="noopener">açık</a></i></span>`);
-    parts.push(`<span class="kv"><b>last_sync</b>=<i>${fmtTs(backup.last_sync_utc)}</i></span>`);
-  }else{
-    parts.push(`<span class="kv"><b>gist</b>=<i>kapalı</i></span>`);
-  }
-  parts.push(`<span class="kv"><b>endpoints</b>=<i>/performance /signals /commentary /market /news</i></span>`);
-  $("sysline").innerHTML=parts.join("");
+    rows.push(`<div><b style="color:var(--accent)">gist</b>=<a href="${backup.gist_url}" target="_blank" rel="noopener">açık</a> · sync ${fmtTs(backup.last_sync_utc)}</div>`);
+  }else{rows.push(`<div><b style="color:var(--accent)">gist</b>=kapalı</div>`);}
+  rows.push(`<div>/performance /signals /commentary /market /news</div>`);
+  $("sysline").innerHTML=rows.join("");
   $("dot").className="dot"+(healthy?"":" err");
 }
 $("howtoBtn").addEventListener("click",()=>$("overlay").classList.add("show"));
@@ -570,7 +632,8 @@ async function refresh(){
   renderSplit(SIGNALS);
   renderOutcomes(SIGNALS);
   renderChips(); renderSignals();
-  renderScan(status);
+  renderScanBars(status);
+  renderPipeline(status);
   renderReview(comments);
   renderMarket(market);
   renderNews(news);
@@ -578,6 +641,27 @@ async function refresh(){
   const u=$("updated");
   u.textContent=new Date().toLocaleTimeString("tr-TR");
   u.classList.remove("flash");void u.offsetWidth;u.classList.add("flash");
+}
+function renderScanBars(status){
+  const res=(status&&status.results)||{};
+  const vals=Object.values(res); const total=vals.length||1;
+  const counts={SIGNAL:0,NO_TRADE:0,DATA_MISSING:0};
+  const active=[];
+  for(const d of vals){
+    counts[d.decision]=(counts[d.decision]||0)+1;
+    if(d.decision==="SIGNAL")active.push(d);
+  }
+  const seg=(n,c)=>`<div style="width:${100*n/total}%;background:${c}"></div>`;
+  $("bar").innerHTML=seg(counts.SIGNAL,"var(--win)")+
+    seg(counts.NO_TRADE,"#C7CFDD")+seg(counts.DATA_MISSING,"var(--loss)");
+  $("legend").innerHTML=
+    `<span><span class="sw" style="background:var(--win)"></span><b>${counts.SIGNAL}</b> SIGNAL</span>`+
+    `<span><span class="sw" style="background:#C7CFDD"></span><b>${counts.NO_TRADE}</b> NO_TRADE</span>`+
+    `<span><span class="sw" style="background:var(--loss)"></span><b>${counts.DATA_MISSING}</b> DATA_MISSING</span>`+
+    `<span><b>${vals.length}</b> tarandı</span>`;
+  $("activeline").innerHTML=active.length?
+    "<b>aktif:</b> "+active.map(d=>`${d.pair} ${d.direction==="LONG"?"L":"S"} (${num(d.rr,1)})`).join(" · "):
+    "<b>aktif:</b> son taramada SIGNAL yok";
 }
 let timer=null;
 function schedule(){

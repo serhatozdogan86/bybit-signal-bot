@@ -93,6 +93,8 @@ class MarketInfoService:
         self._m_ts = 0.0
         self._n_cache: dict | None = None
         self._n_ts = 0.0
+        self._fng_cache: dict | None = None
+        self._fng_ts = 0.0
 
     # ------------------------------------------------------------- metrics
     def metrics(self) -> dict:
@@ -123,12 +125,19 @@ class MarketInfoService:
                         reverse=True)
         mover = lambda t: {"symbol": t.get("symbol"),  # noqa: E731
                            "pct24h": _f(t.get("price24hPcnt")) * 100}
+        adv = sum(1 for t in liquid if _f(t.get("price24hPcnt")) > 0)
+        dec = sum(1 for t in liquid if _f(t.get("price24hPcnt")) < 0)
+        fng = self._get_fng()
+        majors = [m for m in (major("BTCUSDT"), major("ETHUSDT")) if m]
         payload = {
             "updated_utc": _now_iso(),
-            "majors": [m for m in (major("BTCUSDT"), major("ETHUSDT")) if m],
+            "majors": majors,
             "gainers": [mover(t) for t in ranked[:3]],
             "losers": [mover(t) for t in ranked[-3:]][::-1],
             "liquid_universe": len(liquid),
+            "breadth": {"advancers": adv, "decliners": dec},
+            "fng": fng,
+            "pulse": _pulse(majors, adv, dec, fng),
         }
         with self._lock:
             self._m_cache, self._m_ts = payload, time.time()
@@ -163,6 +172,80 @@ class MarketInfoService:
         with self._lock:
             self._n_cache, self._n_ts = payload, time.time()
         return payload
+
+
+    # -------------------------------------------------- fear & greed (1 sa)
+    def _get_fng(self) -> dict | None:
+        with self._lock:
+            if self._fng_cache and time.time() - self._fng_ts < 3600:
+                return self._fng_cache
+        try:
+            resp = requests.get("https://api.alternative.me/fng/?limit=1",
+                                timeout=_FEED_TIMEOUT, headers=_UA)
+            data = (resp.json().get("data") or [{}])[0]
+            value = int(data.get("value"))
+            fng = {"value": value,
+                   "label_en": data.get("value_classification", ""),
+                   "label_tr": _fng_tr(value)}
+        except Exception:  # noqa: BLE001 - dis kaynak; hata FNG'siz devam
+            log.warning(kv(event="fng_fetch_error"))
+            fng = None
+        with self._lock:
+            self._fng_cache, self._fng_ts = fng, time.time()
+        return fng
+
+
+def _fng_tr(v: int) -> str:
+    if v < 25:
+        return "Asiri Korku"
+    if v < 45:
+        return "Korku"
+    if v <= 55:
+        return "Notr"
+    if v <= 75:
+        return "Acgozluluk"
+    return "Asiri Acgozluluk"
+
+
+def _pulse(majors: list[dict], adv: int, dec: int,
+           fng: dict | None) -> str:
+    """Kural tabanli anlik piyasa okumasi (yorum degil, sablon).
+
+    Girdi: BTC/ETH 24s, likit evren genisligi, korku/acgozluluk endeksi.
+    Cikti: tek paragraf Turkce ozet + motorun sinyal profiline baglanti.
+    """
+    btc = next((m for m in majors if m["symbol"] == "BTCUSDT"), None)
+    parts: list[str] = []
+    if btc:
+        eth = next((m for m in majors if m["symbol"] == "ETHUSDT"), None)
+        seg = f"BTC 24s {btc['pct24h']:+.1f}%"
+        if eth:
+            seg += f", ETH {eth['pct24h']:+.1f}%"
+        parts.append(seg + ".")
+    total = adv + dec
+    if total:
+        ratio = adv / total
+        tone = ("genislik pozitif" if ratio > 0.6 else
+                "genislik negatif" if ratio < 0.4 else "genislik karisik")
+        parts.append(f"Likit evrende {adv} yukselen / {dec} dusen -> {tone}.")
+    if fng:
+        parts.append(f"Korku/Acgozluluk {fng['value']} ({fng['label_tr']}).")
+    # motor profiline baglanti
+    if btc:
+        neg = btc["pct24h"] < -1 or (total and adv / total < 0.4)
+        pos = btc["pct24h"] > 1 or (total and adv / total > 0.6)
+        if neg:
+            parts.append("Risk istahi zayif: karsi-trend LONG kurulumlari "
+                         "dusuk olasilikli bolgede; SHORT tarafinin "
+                         "kosullari daha temiz.")
+        elif pos:
+            parts.append("Risk istahi guclu: karsi-trend SHORT kurulumlari "
+                         "dusuk olasilikli bolgede; LONG tarafinin "
+                         "kosullari daha temiz.")
+        else:
+            parts.append("Yon netligi dusuk: motorun NO_TRADE agirlikli "
+                         "davranmasi beklenir; sabir maliyet degildir.")
+    return " ".join(parts)
 
 
 def _f(v) -> float:
