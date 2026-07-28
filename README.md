@@ -242,13 +242,19 @@ geçerli: paid instance + Disk (`DB_PATH=/data/bot.db`).
 | MarkdownV2 rich mesaj | `TELEGRAM_PARSE_MODE=MarkdownV2` | kapalı (plain) | Bold başlık + monospace seviyeler, tam escape'li |
 | WebSocket kline cache | `USE_WEBSOCKET=true` | kapalı | **Deneysel.** REST bootstrap + canlı WS güncellemesi; kopunca otomatik REST fallback. 15m/4h taramada REST zaten yeterli — açmak zorunlu değil |
 
-## Sessiz mod & Dashboard (v2.7)
+## Sessiz mod & Dashboard (v2.8)
 
 `TELEGRAM_ENABLED=false` (render.yaml'da varsayılan) ile **hiçbir Telegram mesajı
 gönderilmez** — sinyal üretimi, gölge takip ve gist yedekleme aynen sürer. Takip,
 botun kök adresindeki operasyon konsolundan yapılır:
 
-**`https://<app>.onrender.com/`** → Dashboard (v2.7 — trading-terminal şartnamesi):
+**`https://<app>.onrender.com/`** → Dashboard (v2.8 — sıcak tema + tıklanabilir paneller):
+- Sıcak "linen" zemin (#F5F1E8) — bembeyaz parlamaz, uzun bakışta yormaz
+- Derinlikli equity: gölgeli çizgi + katmanlı gradyan + beyaz halkalı WIN/LOSS noktaları
+- Tıklanabilir: KPI kartları tabloyu filtreler · boru hattı aşaması → elenen
+  pariteler modali · sinyal satırı → tam detay kartı (tp2/fill/exit/gerçekleşen R,
+  aktifse invalidasyon+likidite+confluence) · yön bilançosu → LONG/SHORT filtresi ·
+  market movers → Bybit işlem sayfası
 - 1920×1080 hedef, 1440×900 uyumlu, sayfa scroll'u yok (iç panel kaydırmaları hariç)
 - Palet: yeşil #16A34A · kırmızı #DC2626 · amber #F59E0B · mavi #2563EB, zemin #F5F7FA
 - Header: logo+durum | canlı özet cümle | yenileme kontrolleri

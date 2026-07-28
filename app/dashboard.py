@@ -1,21 +1,23 @@
 """
-Dashboard v2.7 - kullanici sartnamesine gore tam yeniden tasarim.
+Dashboard v2.8 - sicak tema + derinlikli grafik + tiklanabilir paneller.
 
-Sartname ozeti (birebir uygulanir):
-- 1920x1080 hedef, 1440x900'de tasmasiz; TEK EKRAN, sayfa scroll'u YOK
-  (body overflow:hidden; yalniz sinyal tablosu/haber/yorum ic scroll).
-- Acik zemin #F5F7FA; kartlar beyaz, 1px border + hafif shadow.
-- Palet: pozitif #16A34A, negatif #DC2626, bekleyen #F59E0B, vurgu #2563EB.
-- Font: Inter/Roboto/SF stack; govde 11-13px, basliklar 16-20px;
-  sayisal alanlar tabular-nums.
-- 3 sutun: HEADER (56px, logo+ozet+kontroller) | SOL 220px (strateji +
-  filtre boru hatti kirmizi->yesil skalali bar'lar + ozet stacked bar) |
-  ORTA (5 KPI + equity Chart.js + yon bilancosu + siki sinyal tablosu) |
-  SAG 300px (piyasa nabzi + F&G gauge + saatlik degerlendirme (5 satir,
-  devamini gor) + 4 haberlik akis).
-- Equity: Chart.js (cdnjs). CDN yuklenemezse ayni veriyle SVG'ye geri
-  duser - pano hicbir kosulda grafiksiz kalmaz.
-- KPI kartlarinda onceki yenilemeye gore trend oku (^ v -).
+v2.7 sartname yerlesimi korunur; uc tasarim karari eklenir:
+1) SICAK ZEMIN: bembeyaz yerine "linen" paleti (#F5F1E8 zemin, #FFFEFA kart,
+   sicak cizgi/golge tonlari) - uzun bakista goz yormaz.
+2) DERINLIK: equity grafigi katmanli gradyan + cizgi altinda yumusak golge
+   (canvas shadow plugin) + beyaz halkali WIN/LOSS noktalari -> "yuzen"
+   premium his (kitsch 3D degil). SVG fallback ayni derinligi feDropShadow
+   ile verir.
+3) TIKLANABILIRLIK:
+   - KPI kartlari tabloyu filtreler (Win Rate/Toplam R -> Sonuclanan,
+     Acik Pozisyon -> Acik, Giris Isabeti -> Dolmayan, Evren -> Tumu)
+   - Boru hatti asamasina tiklayinca o asamada elenen paritelerin listesi
+     modal olarak acilir (son tarama verisinden)
+   - Sinyal satirina tiklayinca detay karti: tum seviyeler (tp2/fill/exit
+     dahil), gerceklesen R; parite son taramada aktif SIGNAL ise plan
+     detaylari (invalidation, likidite notu, confluence) da eklenir
+   - Yon bilancosu bloklari LONG/SHORT yon filtresini acar/kapar
+   - Market yukselen/dusenler Bybit islem sayfasina baglanir
 """
 
 DASHBOARD_HTML = r"""<!doctype html>
@@ -27,15 +29,16 @@ DASHBOARD_HTML = r"""<!doctype html>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root{
-    --bg:#F5F7FA; --card:#FFFFFF; --card2:#F8FAFC; --line:#E2E8F0;
-    --text:#0F172A; --muted:#64748B;
-    --green:#16A34A; --green-bg:#DCFCE7;
-    --red:#DC2626;   --red-bg:#FEE2E2;
-    --amber:#F59E0B; --amber-bg:#FEF3C7;
-    --blue:#2563EB;  --blue-bg:#DBEAFE;
-    --grey:#94A3B8;  --grey-bg:#F1F5F9;
+    --bg:#F5F1E8; --card:#FFFEFA; --card2:#F9F5EC; --line:#E6DECE;
+    --text:#2A241B; --muted:#8A7F6C;
+    --green:#16A34A; --green-bg:#E2F2E2; --green-ink:#14532D;
+    --red:#DC2626;   --red-bg:#FBE7E2;   --red-ink:#7F1D1D;
+    --amber:#D97706; --amber-bg:#FBEFD4; --amber-ink:#78350F;
+    --blue:#2563EB;  --blue-bg:#E3EBFA;  --blue-ink:#1E3A8A;
+    --grey:#98907F;  --grey-bg:#F0EBDF;
     --sans:Inter,Roboto,-apple-system,"SF Pro Text","Segoe UI",sans-serif;
-    --shadow:0 1px 3px rgba(15,23,42,.06);
+    --shadow:0 1px 2px rgba(88,70,38,.06),0 5px 14px rgba(88,70,38,.05);
+    --shadow-hi:0 2px 4px rgba(88,70,38,.08),0 10px 24px rgba(88,70,38,.09);
     --pad:clamp(8px,1vh,14px);
   }
   *{box-sizing:border-box;margin:0}
@@ -46,8 +49,10 @@ DASHBOARD_HTML = r"""<!doctype html>
   .num{font-variant-numeric:tabular-nums;letter-spacing:-.01em}
   .app{display:grid;grid-template-rows:56px minmax(0,1fr);height:100vh;
        gap:10px;padding:10px 12px;max-width:1920px;margin:0 auto}
+  .clickable{cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}
+  .clickable:hover{transform:translateY(-1px);box-shadow:var(--shadow-hi)}
   /* ============ HEADER ============ */
-  .hdr{background:var(--card);border:1px solid var(--line);border-radius:10px;
+  .hdr{background:var(--card);border:1px solid var(--line);border-radius:11px;
        box-shadow:var(--shadow);display:flex;align-items:center;gap:16px;
        padding:0 16px}
   .logo{display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px}
@@ -61,7 +66,7 @@ DASHBOARD_HTML = r"""<!doctype html>
   .hsum{flex:1;text-align:center;color:var(--muted);font-size:12.5px;
         overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .hsum b{color:var(--text);font-weight:600}
-  .hsum .t{color:var(--muted);font-size:11.5px;margin-right:8px}
+  .hsum .t{font-size:11.5px;margin-right:8px}
   .hctl{display:flex;gap:8px;align-items:center}
   select,button{background:var(--card);color:var(--text);
     border:1px solid var(--line);border-radius:8px;padding:5px 10px;
@@ -69,13 +74,12 @@ DASHBOARD_HTML = r"""<!doctype html>
   button:hover,select:hover{border-color:var(--blue)}
   :focus-visible{outline:2px solid var(--blue);outline-offset:2px}
   .icon{width:30px;padding:5px 0;text-align:center}
-  /* ============ BODY GRID ============ */
+  /* ============ GRID ============ */
   .cols{display:grid;grid-template-columns:220px minmax(0,1fr) 300px;
         gap:10px;min-height:0}
   .col{display:flex;flex-direction:column;gap:10px;min-height:0}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;
-        box-shadow:var(--shadow);display:flex;flex-direction:column;
-        min-height:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:11px;
+        box-shadow:var(--shadow);display:flex;flex-direction:column;min-height:0}
   .chead{padding:var(--pad) 14px 0;font-size:11px;font-weight:600;
          letter-spacing:.04em;text-transform:uppercase;color:var(--muted);
          display:flex;align-items:baseline;gap:8px}
@@ -86,7 +90,7 @@ DASHBOARD_HTML = r"""<!doctype html>
   .fill{flex:1}
   .empty{color:var(--muted);font-size:11px;padding:6px 0}
   .pos{color:var(--green)} .neg{color:var(--red)} .amb{color:var(--amber)}
-  /* ============ SOL: strateji + pipeline ============ */
+  /* ============ SOL ============ */
   .strat{font-size:11.5px;color:var(--muted)}
   .strat p{margin-bottom:6px}
   .strat b{color:var(--text);font-weight:600}
@@ -95,7 +99,9 @@ DASHBOARD_HTML = r"""<!doctype html>
   .srow:last-child{border-bottom:0}
   .srow b{font-weight:600;color:var(--text)}
   .pipe{overflow-y:auto;scrollbar-width:thin}
-  .step{padding:5px 0}
+  .step{padding:5px 6px;margin:0 -6px;border-radius:8px;cursor:pointer;
+        transition:background .12s}
+  .step:hover{background:var(--card2)}
   .step .h{display:flex;justify-content:space-between;font-size:11px;
            font-weight:600}
   .step .h .n{color:var(--muted);font-weight:500}
@@ -103,15 +109,14 @@ DASHBOARD_HTML = r"""<!doctype html>
   .step .g{height:5px;border-radius:3px;background:var(--grey-bg);
            margin-top:3px;overflow:hidden}
   .step .g div{height:100%;border-radius:3px}
-  .psummary{margin-top:2px}
   .psummary .bar{display:flex;height:12px;border-radius:6px;overflow:hidden;
                  border:1px solid var(--line)}
   .psummary .bar div{height:100%}
   .psummary .lbl{font-size:9.5px;color:var(--muted);margin-top:3px;
                  display:flex;justify-content:space-between}
-  /* ============ ORTA: KPI ============ */
+  /* ============ KPI ============ */
   .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
-  .kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:11px;
        box-shadow:var(--shadow);padding:8px 14px 7px;position:relative}
   .kpi .lbl{font-size:10px;letter-spacing:.05em;text-transform:uppercase;
             color:var(--muted);font-weight:600}
@@ -119,16 +124,18 @@ DASHBOARD_HTML = r"""<!doctype html>
   .kpi .sub{font-size:10.5px;color:var(--muted);white-space:nowrap;
             overflow:hidden;text-overflow:ellipsis}
   .kpi .tr{position:absolute;top:8px;right:12px;font-size:12px}
-  /* ============ ORTA: grafik satiri ============ */
+  /* ============ orta grafik satiri ============ */
   .midrow{display:grid;grid-template-columns:1.35fr 1fr;gap:10px;
           min-height:clamp(180px,26vh,300px)}
   .chartwrap{position:relative;flex:1;min-height:0}
   .chartwrap canvas{position:absolute;inset:0;width:100%!important;
                     height:100%!important}
   .curve svg{width:100%;height:100%;display:block}
-  /* yon bilancosu */
-  .duel{display:flex;flex-direction:column;gap:10px;justify-content:center;
-        flex:1}
+  .duel{display:flex;flex-direction:column;gap:10px;justify-content:center;flex:1}
+  .drow{padding:6px 8px;margin:0 -8px;border-radius:9px;cursor:pointer;
+        transition:background .12s}
+  .drow:hover{background:var(--card2)}
+  .drow.on{background:var(--blue-bg)}
   .drow .top{display:flex;justify-content:space-between;font-size:11px;
              margin-bottom:3px}
   .drow .top b{font-weight:700}
@@ -138,34 +145,37 @@ DASHBOARD_HTML = r"""<!doctype html>
   .dstat{font-size:10.5px;color:var(--muted);margin-top:2px}
   .axis{display:flex;justify-content:space-between;font-size:10px;
         color:var(--muted);border-top:1px dashed var(--line);padding-top:4px}
-  /* ============ tablolar / badge ============ */
+  /* ============ tablo/badge ============ */
   table{width:100%;border-collapse:collapse;font-size:11.5px}
   th{color:var(--muted);text-align:left;font-weight:600;font-size:10px;
      letter-spacing:.05em;text-transform:uppercase;padding:7px 10px;
      border-bottom:1px solid var(--line);background:var(--card2);
      position:sticky;top:0;z-index:1}
-  td{padding:5px 10px;border-bottom:1px solid var(--card2);
-     white-space:nowrap}
+  td{padding:5px 10px;border-bottom:1px solid var(--card2);white-space:nowrap}
+  tbody tr{cursor:pointer}
+  tbody tr:hover td{background:var(--card2)}
   tr:last-child td{border-bottom:0}
   tr.dim td{opacity:.55}
   .badge{display:inline-block;padding:1px 9px;border-radius:99px;
          font-size:10px;font-weight:600}
-  .b-LONG{background:var(--green-bg);color:#14532D}
-  .b-SHORT{background:var(--red-bg);color:#7F1D1D}
-  .b-WIN{background:var(--green-bg);color:#14532D}
-  .b-LOSS{background:var(--red-bg);color:#7F1D1D}
-  .b-PENDING,.b-FILLED{background:var(--amber-bg);color:#78350F}
-  .b-NOT_FILLED,.b-EXPIRED{background:var(--grey-bg);color:#475569}
-  .b-AMBIGUOUS{background:var(--blue-bg);color:#1E3A8A}
+  .b-LONG{background:var(--green-bg);color:var(--green-ink)}
+  .b-SHORT{background:var(--red-bg);color:var(--red-ink)}
+  .b-WIN{background:var(--green-bg);color:var(--green-ink)}
+  .b-LOSS{background:var(--red-bg);color:var(--red-ink)}
+  .b-PENDING,.b-FILLED{background:var(--amber-bg);color:var(--amber-ink)}
+  .b-NOT_FILLED,.b-EXPIRED{background:var(--grey-bg);color:#5B5344}
+  .b-AMBIGUOUS{background:var(--blue-bg);color:var(--blue-ink)}
   .age{font-size:9.5px;color:var(--muted)}
-  .chips{display:flex;gap:6px}
+  .chips{display:flex;gap:6px;align-items:center}
   .chip{background:var(--card2);border:1px solid var(--line);
         color:var(--muted);border-radius:99px;padding:1px 9px;
         font-size:10px;cursor:pointer;font-weight:500}
   .chip.on{border-color:var(--blue);color:var(--blue);background:var(--blue-bg)}
-  /* ============ SAG panel ============ */
+  .chip.dir{border-color:var(--amber);color:var(--amber-ink);
+            background:var(--amber-bg)}
+  /* ============ SAG ============ */
   .majors{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .mj{background:var(--card2);border:1px solid var(--line);border-radius:8px;
+  .mj{background:var(--card2);border:1px solid var(--line);border-radius:9px;
       padding:5px 10px}
   .mj .sym{font-size:10px;color:var(--muted);font-weight:600}
   .mj .px{font-size:15px;font-weight:600}
@@ -175,16 +185,22 @@ DASHBOARD_HTML = r"""<!doctype html>
             color:var(--muted)}
   .fng .lbl b{color:var(--text)}
   .fng .track{position:relative;height:10px;border-radius:5px;margin-top:4px;
-    background:linear-gradient(90deg,#DC2626,#F59E0B 40%,#94A3B8 52%,
+    background:linear-gradient(90deg,#DC2626,#F59E0B 40%,#B9B29F 52%,
                                #84CC16 68%,#16A34A);
     border:1px solid var(--line)}
   .fng .mark{position:absolute;top:-3px;width:3px;height:16px;
              background:var(--text);border-radius:2px}
   .breadth{font-size:10.5px;color:var(--muted);margin-top:6px}
+  .movers{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:7px;
+          font-size:10.5px}
+  .movers h4{font-size:9.5px;color:var(--muted);letter-spacing:.05em;
+             font-weight:600;margin-bottom:2px;text-transform:uppercase}
+  .movers a{display:flex;justify-content:space-between;color:var(--text);
+            text-decoration:none;padding:1px 0}
+  .movers a:hover{color:var(--blue)}
   .pulse{margin-top:7px;font-size:11px;background:var(--blue-bg);
-         border-left:3px solid var(--blue);border-radius:6px;padding:6px 9px}
+         border-left:3px solid var(--blue);border-radius:7px;padding:6px 9px}
   .pulse .tg{font-size:9.5px;color:var(--muted)}
-  /* review */
   .review{font-size:11.5px}
   .review .rts{font-size:10px;color:var(--muted)}
   .review .txt{display:-webkit-box;-webkit-line-clamp:6;
@@ -194,28 +210,33 @@ DASHBOARD_HTML = r"""<!doctype html>
   .review .warnline{border-left:3px solid var(--red);padding-left:7px;
                     background:var(--red-bg);border-radius:4px}
   .more{color:var(--blue);font-size:10.5px;cursor:pointer;font-weight:500}
-  /* news */
   .news li{list-style:none;padding:5px 0;border-bottom:1px solid var(--card2)}
   .news li:last-child{border-bottom:0}
   .news a{color:var(--text);text-decoration:none;font-size:11.5px;
           line-height:1.35;display:block}
   .news a:hover{color:var(--blue)}
   .news .src{font-size:9.5px;color:var(--muted)}
-  /* overlay */
-  #overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;
-           align-items:center;justify-content:center;z-index:50;padding:20px}
-  #overlay.show{display:flex}
-  .howto{background:var(--card);border-radius:12px;max-width:640px;
+  /* ============ overlay & modal ============ */
+  .ovl{position:fixed;inset:0;background:rgba(42,36,27,.45);display:none;
+       align-items:center;justify-content:center;z-index:50;padding:20px}
+  .ovl.show{display:flex}
+  .sheet{background:var(--card);border-radius:14px;max-width:640px;width:100%;
          max-height:82vh;overflow-y:auto;padding:18px 22px;
-         box-shadow:0 10px 40px rgba(15,23,42,.25)}
-  .howto h3{font-size:16px;font-weight:600;margin-bottom:8px;
-            color:var(--blue)}
-  .howto dt{font-weight:600;font-size:12.5px;margin-top:9px}
-  .howto dd{margin:1px 0 0;color:var(--muted);font-size:12px}
-  .howto .warn{margin-top:12px;padding:9px 12px;border-left:3px solid var(--red);
-               background:var(--red-bg);border-radius:6px;font-size:12px}
+         box-shadow:0 16px 50px rgba(42,36,27,.3)}
+  .sheet h3{font-size:16px;font-weight:600;margin-bottom:8px;color:var(--blue)}
+  .sheet dt{font-weight:600;font-size:12.5px;margin-top:9px}
+  .sheet dd{margin:1px 0 0;color:var(--muted);font-size:12px}
+  .sheet .warn{margin-top:12px;padding:9px 12px;border-left:3px solid var(--red);
+               background:var(--red-bg);border-radius:7px;font-size:12px}
+  .kvgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;
+          font-size:12px;margin-top:6px}
+  .kvgrid .k{color:var(--muted)}
+  .kvgrid .v{text-align:right;font-weight:600}
+  .taglist{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .note{margin-top:10px;font-size:11.5px;background:var(--card2);
+        border-radius:7px;padding:7px 10px;color:var(--muted)}
+  .note b{color:var(--text)}
   a{color:var(--blue)}
-  /* 1440x900 sikistirma */
   @media (max-height:940px){
     :root{--pad:7px}
     body{font-size:11.5px}
@@ -234,8 +255,6 @@ DASHBOARD_HTML = r"""<!doctype html>
 </head>
 <body>
 <div class="app">
-
-  <!-- ============ HEADER ============ -->
   <header class="hdr">
     <div class="logo"><span class="dot" id="dot"></span>signal<b>-engine</b></div>
     <div class="hsum"><span class="t" id="updated">--:--:--</span><span id="hsum">yükleniyor…</span></div>
@@ -251,7 +270,6 @@ DASHBOARD_HTML = r"""<!doctype html>
   </header>
 
   <div class="cols">
-    <!-- ============ SOL ============ -->
     <div class="col">
       <div class="card">
         <div class="chead">Strateji <span class="tag">strateji sözleşmesi</span></div>
@@ -274,7 +292,6 @@ DASHBOARD_HTML = r"""<!doctype html>
       </div>
     </div>
 
-    <!-- ============ ORTA ============ -->
     <div class="col">
       <div class="kpis" id="kpis"></div>
       <div class="midrow">
@@ -283,18 +300,17 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="cbody fill chartwrap curve" id="curveWrap"><canvas id="eqChart"></canvas></div>
         </div>
         <div class="card">
-          <div class="chead">Yön Bilançosu <span class="tag">LONG vs SHORT</span></div>
+          <div class="chead">Yön Bilançosu <span class="tag">tıkla → yön filtresi</span></div>
           <div class="cbody fill duel" id="duel"></div>
         </div>
       </div>
       <div class="card fill">
-        <div class="chead">Sinyaller · Gölge Takip
+        <div class="chead">Sinyaller · Gölge Takip <span class="tag" style="margin-left:0">satıra tıkla → detay</span>
           <span class="chips" id="chips" style="margin-left:auto"></span></div>
         <div class="cbody fill scroll" id="signals" style="padding:0 0 4px"><div class="empty" style="padding:8px 14px">yükleniyor…</div></div>
       </div>
     </div>
 
-    <!-- ============ SAG ============ -->
     <div class="col">
       <div class="card">
         <div class="chead">Piyasa Nabzı <span class="tag" id="mupd">canlı metrikler</span></div>
@@ -312,23 +328,31 @@ DASHBOARD_HTML = r"""<!doctype html>
   </div>
 </div>
 
-<div id="overlay">
-  <div class="howto">
+<div id="overlay" class="ovl">
+  <div class="sheet">
     <h3>Nasıl okunur?</h3>
     <dl>
       <dt>R (risk katsayısı)</dt>
       <dd>Her işlemin sonucu, riske atılan birim cinsinden: kayıp = −1R, kazanç = ödül/risk oranı kadar (+2.2R gibi).</dd>
       <dt>Win rate ve başabaş</dt>
-      <dd>Kazançlar kayıplardan büyükse %50 isabet gerekmez. Başabaş = 1 / (1 + ort. kazanç R). Win rate eşiğin üzerindeyse sistem artıdadır.</dd>
+      <dd>Kazançlar kayıplardan büyükse %50 isabet gerekmez. Başabaş = 1 / (1 + ort. kazanç R).</dd>
       <dt>Filtre boru hattı</dt>
-      <dd>Motor her pariteyi sırayla DATA → REGIME → HTF → LTF → VOLUME → RR aşamalarından geçirir; herhangi biri geçilemezse NO_TRADE. Kart, son taramada her aşamanın kaç pariteyi elediğini gösterir.</dd>
+      <dd>DATA → REGIME → HTF → LTF → VOLUME → RR; herhangi biri geçilemezse NO_TRADE. Aşamaya tıklayınca o aşamada elenen pariteler listelenir.</dd>
       <dt>PENDING → FILLED → WIN/LOSS</dt>
-      <dd>Fiyatın giriş bölgesine gelmesi 6 saat beklenir; gelirse 48 saat izlenir. Önce stop = LOSS, önce hedef = WIN. NOT_FILLED orana dahil edilmez; AMBIGUOUS sayılmaz.</dd>
+      <dd>Girişe gelmesi 6 saat beklenir; gelirse 48 saat izlenir. Önce stop = LOSS, önce hedef = WIN. NOT_FILLED orana dahil edilmez; AMBIGUOUS sayılmaz.</dd>
       <dt>Piyasa Nabzı / Saatlik Değerlendirme</dt>
-      <dd>İkisi de kural tabanlı otomatik üretimdir (canlı insan/LLM yorumu değildir). Korku &amp; Açgözlülük endeksi alternative.me kaynağından gelir.</dd>
+      <dd>Kural tabanlı otomatik üretimdir (canlı insan/LLM yorumu değildir). Korku &amp; Açgözlülük: alternative.me.</dd>
     </dl>
-    <div class="warn">Panodaki tüm sonuçlar <b>gölge muhasebedir</b>: varsayımsal giriş, kayma/komisyon yok, gerçek emir yok. Geçmiş performans gelecek için garanti değildir; hiçbir şey yatırım tavsiyesi değildir. Haber başlıkları dış kaynaklardan aynen aktarılır.</div>
+    <div class="warn">Tüm sonuçlar <b>gölge muhasebedir</b>: varsayımsal giriş, kayma/komisyon yok, gerçek emir yok. Geçmiş performans garanti değildir; yatırım tavsiyesi değildir. Haber başlıkları dış kaynaktan aynen aktarılır.</div>
     <div style="text-align:right;margin-top:12px"><button id="howtoClose">Kapat</button></div>
+  </div>
+</div>
+
+<div id="modal" class="ovl">
+  <div class="sheet">
+    <h3 id="modalTitle"></h3>
+    <div id="modalBody"></div>
+    <div style="text-align:right;margin-top:12px"><button id="modalClose">Kapat</button></div>
   </div>
 </div>
 
@@ -351,30 +375,45 @@ async function j(url){
   catch(e){return null;}
 }
 const OUT=s=>s.outcome||s.status;
-const PREV={};   // KPI trend oklari icin onceki degerler
+const PREV={};
 function arrow(key,val){
-  const p=PREV[key]; PREV[key]=val;
+  const p=PREV[key];PREV[key]=val;
   if(p==null||val==null||p===val)return '<span class="tr" style="color:var(--grey)">–</span>';
   return val>p?'<span class="tr pos">▲</span>':'<span class="tr neg">▼</span>';
 }
+let LAST_STATUS=null;
 
-/* ---------- header ozeti ---------- */
+/* ---------- modal ---------- */
+function openModal(title,html){
+  $("modalTitle").innerHTML=title;$("modalBody").innerHTML=html;
+  $("modal").classList.add("show");
+}
+["overlay","modal"].forEach(id=>{
+  $(id).addEventListener("click",e=>{if(e.target.id===id)$(id).classList.remove("show");});
+});
+$("modalClose").addEventListener("click",()=>$("modal").classList.remove("show"));
+$("howtoBtn").addEventListener("click",()=>$("overlay").classList.add("show"));
+$("howtoClose").addEventListener("click",()=>$("overlay").classList.remove("show"));
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){$("overlay").classList.remove("show");$("modal").classList.remove("show");}});
+
+/* ---------- header ---------- */
 function renderHeader(perf,status){
   const el=$("hsum");
   if(!status){el.innerHTML="⚠ bota ulaşılamıyor — servis uyanıyor olabilir (30-50 sn)";return;}
   if(!perf||!perf.decided_trades){el.innerHTML="<b>Motor çalışıyor</b> · henüz sonuçlanan sinyal yok — filtreler koşul bekliyor";return;}
-  const wr=(perf.win_rate*100).toFixed(1), tr=perf.total_r_multiple;
+  const wr=(perf.win_rate*100).toFixed(1),tr=perf.total_r_multiple;
   const w=(perf.closed_by_outcome||{}).WIN||{count:0,sum_r:0};
   const be=w.count?(100/(1+(w.sum_r/w.count))).toFixed(1):null;
   const pos=be&&Number(wr)>Number(be);
   el.innerHTML=`<b>${perf.decided_trades}</b> sinyal sonuçlandı · isabet <b>%${wr}</b>${be?" (başabaş ~%"+be+")":""} · toplam <b class="${tr>=0?"pos":"neg"}">${(tr>0?"+":"")+num(tr)}R</b> · ${pos?'<span class="pos">eşiğin üzerinde</span>':'<span class="neg">eşiğin altında</span>'} · n<30, hüküm için erken`;
 }
 
-/* ---------- KPI ---------- */
+/* ---------- KPI (tiklanabilir -> tablo filtresi) ---------- */
 function renderKpis(perf,status,uni,signals){
   const meta=(status&&status.meta)||{};
   const cbo=(perf&&perf.closed_by_outcome)||{};
-  const w=cbo.WIN||{count:0,sum_r:0}, l=cbo.LOSS||{count:0,sum_r:0};
+  const w=cbo.WIN||{count:0,sum_r:0},l=cbo.LOSS||{count:0,sum_r:0};
   const wrV=perf&&perf.win_rate!=null?perf.win_rate*100:null;
   const be=w.count?(100/(1+(w.sum_r/w.count))).toFixed(1):null;
   const trV=perf?perf.total_r_multiple:null;
@@ -382,72 +421,89 @@ function renderKpis(perf,status,uni,signals){
   const nf=(signals||[]).filter(s=>OUT(s)==="NOT_FILLED").length;
   const frV=(filled+nf)?100*filled/(filled+nf):null;
   const openV=perf?perf.open_signals:null;
-  const kpi=(lbl,val,cls,sub,tr)=>`<div class="kpi">${tr||""}
+  const kpi=(f,lbl,val,cls,sub,tr)=>`<div class="kpi clickable" data-f="${f}"
+    title="tabloyu filtreler">${tr||""}
     <div class="lbl">${lbl}</div><div class="val num ${cls||""}">${val}</div>
     <div class="sub">${sub||""}</div></div>`;
   $("kpis").innerHTML=
-    kpi("Win Rate",wrV==null?"—":wrV.toFixed(1)+"%","",
+    kpi("DONE","Win Rate",wrV==null?"—":wrV.toFixed(1)+"%","",
         be?`başabaş ~%${be}`:"",arrow("wr",wrV))+
-    kpi("Toplam R",trV==null?"—":(trV>0?"+":"")+num(trV),
+    kpi("DONE","Toplam R",trV==null?"—":(trV>0?"+":"")+num(trV),
         trV>0?"pos":trV<0?"neg":"",`+${num(w.sum_r)} / −${num(Math.abs(l.sum_r))}`,
         arrow("tr",trV))+
-    kpi("Açık Pozisyon",openV==null?"—":openV,"amb","gölge takipte",
+    kpi("OPEN","Açık Pozisyon",openV==null?"—":openV,"amb","gölge takipte",
         arrow("open",openV))+
-    kpi("Giriş İsabeti",frV==null?"—":Math.round(frV)+"%","",
+    kpi("NF","Giriş İsabeti",frV==null?"—":Math.round(frV)+"%","",
         `${filled} doldu / ${nf} değil`,arrow("fr",frV))+
-    kpi("Taranan Evren",uni?uni.count:"—","",
+    kpi("ALL","Taranan Evren",uni?uni.count:"—","",
         (uni?uni.mode:"")+" · "+(meta.scan_count??"—")+" tarama",null);
+  $("kpis").querySelectorAll(".kpi").forEach(k=>k.addEventListener("click",()=>{
+    FILTER=k.dataset.f;renderChips();renderSignals();}));
 }
 
-/* ---------- equity: Chart.js + SVG fallback ---------- */
+/* ---------- equity: derinlikli Chart.js + SVG fallback ---------- */
 let eqChart=null;
+const shadowPlugin={id:"lineShadow",
+  beforeDatasetDraw(c,args){
+    if(args.index!==0)return;
+    const x=c.ctx;x.save();
+    x.shadowColor="rgba(37,99,235,.30)";x.shadowBlur=10;x.shadowOffsetY=5;},
+  afterDatasetDraw(c,args){if(args.index===0)c.ctx.restore();}};
 function renderCurve(signals){
   const done=(signals||[]).filter(s=>["WIN","LOSS"].includes(OUT(s)))
     .sort((a,b)=>(a.closed_utc||a.created_utc||"").localeCompare(b.closed_utc||b.created_utc||""));
   const wrap=$("curveWrap");
   if(!done.length){wrap.innerHTML='<div class="empty">henüz sonuçlanan sinyal yok</div>';eqChart=null;return;}
-  let c=0; const data=done.map(s=>c+=(s.r_multiple||0));
+  let c=0;const data=done.map(s=>c+=(s.r_multiple||0));
   const labels=done.map((s,i)=>i+1);
   const ptCol=done.map(s=>OUT(s)==="WIN"?"#16A34A":"#DC2626");
   const tips=done.map(s=>`${s.pair} ${s.direction} ${OUT(s)} ${(s.r_multiple>0?"+":"")+num(s.r_multiple)}R`);
   if(window.Chart){
     if(!document.getElementById("eqChart")){wrap.innerHTML='<canvas id="eqChart"></canvas>';eqChart=null;}
     const ctx=$("eqChart").getContext("2d");
-    const grad=ctx.createLinearGradient(0,0,0,wrap.clientHeight||240);
-    grad.addColorStop(0,"rgba(37,99,235,.18)");grad.addColorStop(1,"rgba(37,99,235,0)");
+    const H=wrap.clientHeight||240;
+    const grad=ctx.createLinearGradient(0,0,0,H);
+    grad.addColorStop(0,"rgba(37,99,235,.26)");
+    grad.addColorStop(.55,"rgba(37,99,235,.10)");
+    grad.addColorStop(1,"rgba(37,99,235,0)");
     const cfg={type:"line",
       data:{labels,datasets:[
-        {data,borderColor:"#2563EB",borderWidth:2,fill:true,backgroundColor:grad,
-         tension:.25,pointRadius:3.2,pointBackgroundColor:ptCol,
-         pointBorderColor:ptCol},
-        {data:labels.map(()=>0),borderColor:"#94A3B8",borderWidth:1,
+        {data,borderColor:"#2563EB",borderWidth:2.5,fill:true,
+         backgroundColor:grad,tension:.35,
+         pointRadius:4,pointHoverRadius:6,
+         pointBackgroundColor:ptCol,pointBorderColor:"#FFFEFA",
+         pointBorderWidth:2},
+        {data:labels.map(()=>0),borderColor:"#B7AE9A",borderWidth:1,
          borderDash:[4,4],pointRadius:0,fill:false}]},
       options:{responsive:true,maintainAspectRatio:false,animation:false,
         plugins:{legend:{display:false},
           tooltip:{callbacks:{label:i=>i.datasetIndex===0?tips[i.dataIndex]+
             " · küm "+(data[i.dataIndex]>0?"+":"")+num(data[i.dataIndex])+"R":""}}},
         scales:{x:{display:false},
-          y:{grid:{color:"#EEF2F7"},ticks:{font:{size:10},color:"#64748B",
-             callback:v=>(v>0?"+":"")+v+"R"}}}}};
+          y:{grid:{color:"#F0EAD9"},border:{display:false},
+             ticks:{font:{size:10},color:"#8A7F6C",
+             callback:v=>(v>0?"+":"")+v+"R"}}}},
+      plugins:[shadowPlugin]};
     if(eqChart){eqChart.data=cfg.data;eqChart.update("none");}
     else eqChart=new Chart(ctx,cfg);
     return;
   }
-  /* SVG fallback (CDN yuklenemedi) */
-  const W=560,H=220,P=34;
+  const W=560,H2=220,P=34;
   const pts=[[0,0]].concat(data.map((v,i)=>[i+1,v]));
   const ys=pts.map(p=>p[1]);const ymin=Math.min(0,...ys),ymax=Math.max(0,...ys);
   const yr=(ymax-ymin)||1;
   const X=i=>P+(W-P-8)*i/(pts.length-1||1);
-  const Y=v=>10+(H-24)*(1-(v-ymin)/yr);
+  const Y=v=>10+(H2-24)*(1-(v-ymin)/yr);
   const path=pts.map((p,i)=>(i?"L":"M")+X(p[0]).toFixed(1)+" "+Y(p[1]).toFixed(1)).join(" ");
-  const dots=done.map((s,i)=>`<circle cx="${X(i+1)}" cy="${Y(data[i])}" r="3" fill="${ptCol[i]}"><title>${tips[i]}</title></circle>`).join("");
-  wrap.innerHTML=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-    <line x1="${P}" y1="${Y(0)}" x2="${W-8}" y2="${Y(0)}" stroke="#94A3B8" stroke-dasharray="4 4"/>
-    <path d="${path}" fill="none" stroke="#2563EB" stroke-width="2"/>${dots}</svg>`;
+  const dots=done.map((s,i)=>`<circle cx="${X(i+1)}" cy="${Y(data[i])}" r="4" fill="${ptCol[i]}" stroke="#FFFEFA" stroke-width="2"><title>${tips[i]}</title></circle>`).join("");
+  wrap.innerHTML=`<svg viewBox="0 0 ${W} ${H2}" preserveAspectRatio="none">
+    <defs><filter id="ds"><feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#2563EB" flood-opacity=".3"/></filter></defs>
+    <line x1="${P}" y1="${Y(0)}" x2="${W-8}" y2="${Y(0)}" stroke="#B7AE9A" stroke-dasharray="4 4"/>
+    <path d="${path}" fill="none" stroke="#2563EB" stroke-width="2.5" filter="url(#ds)"/>${dots}</svg>`;
 }
 
-/* ---------- yon bilancosu ---------- */
+/* ---------- yon bilancosu (tiklanabilir yon filtresi) ---------- */
+let DIRF="ALL";
 function renderDuel(signals){
   const side=dir=>{
     const rows=(signals||[]).filter(s=>s.direction===dir);
@@ -460,52 +516,82 @@ function renderDuel(signals){
   };
   const L=side("LONG"),S=side("SHORT");
   const mx=Math.max(Math.abs(L.r),Math.abs(S.r),1);
-  const track=(v)=>{
+  const track=v=>{
     const w=Math.round(50*Math.abs(v)/mx);
     const left=v<0?`<div style="width:${w}%;background:var(--red);margin-left:${50-w}%"></div>`:
                    `<div style="width:50%"></div>`;
     const right=v>0?`<div style="width:${w}%;background:var(--green)"></div>`:"";
     return `<div class="track">${left}${right}</div>`;
   };
-  const row=(name,d)=>`<div class="drow">
+  const row=(name,d)=>`<div class="drow${DIRF===name?" on":""}" data-d="${name}"
+    title="tabloyu ${name} ile filtreler">
     <div class="top"><b>${name}</b><b class="num ${d.r>0?"pos":d.r<0?"neg":""}">${(d.r>0?"+":"")+num(d.r)}R</b></div>
     ${track(d.r)}
     <div class="dstat">${d.w} WIN · ${d.l} LOSS · ${d.open} açık</div></div>`;
   $("duel").innerHTML=row("LONG",L)+row("SHORT",S)+
     `<div class="axis"><span>−${num(mx,1)}R</span><span>0</span><span>+${num(mx,1)}R</span></div>`;
+  $("duel").querySelectorAll(".drow").forEach(el=>el.addEventListener("click",()=>{
+    DIRF=DIRF===el.dataset.d?"ALL":el.dataset.d;
+    renderDuel(SIGNALS);renderChips();renderSignals();}));
 }
 
-/* ---------- pipeline ---------- */
+/* ---------- pipeline (tiklanabilir detay) ---------- */
 const STEPS=[
   ["DATA","Yeterli mum yok (yeni listeleme)","insufficient data","#DC2626"],
   ["REGIME","ADX<20: yönsüz piyasa","chop regime","#EA580C"],
   ["HTF STRUCTURE","4H yapı çelişkili","HTF structure unclear","#F59E0B"],
-  ["LTF SETUP","Doğrulanmış retest/sweep yok","no valid LTF setup","#EAB308"],
+  ["LTF SETUP","Doğrulanmış retest/sweep yok","no valid LTF setup","#D3B411"],
   ["VOLUME","Tetik hacmi <1.5× ort.","no volume confirmation","#84CC16"],
   ["RISK/REWARD","Plan RR < 2.0","RR ","#16A34A"],
 ];
+function stageOf(d){
+  if(d.decision==="SIGNAL")return "SIGNAL";
+  const r=(d.decision==="DATA_MISSING")?"insufficient data":(d.reject_reason||"");
+  const st=STEPS.find(([, ,p])=>r.startsWith(p)||r.includes(p));
+  return st?st[0]:"OTHER";
+}
+function pipeDetail(name){
+  const res=(LAST_STATUS&&LAST_STATUS.results)||{};
+  const rows=Object.values(res).filter(d=>stageOf(d)===name);
+  if(!rows.length){openModal(name,'<div class="empty">bu aşamada elenen parite yok</div>');return;}
+  if(name==="SIGNAL"){
+    openModal("→ SIGNAL · "+rows.length+" parite",
+      rows.map(d=>`<div class="kvgrid"><span class="k"><b>${d.pair}</b>
+        <span class="badge b-${d.direction}">${d.direction}</span> ${d.setup_type||""}</span>
+        <span class="v num">RR ${num(d.rr,2)} · ${d.confidence||""}</span></div>`).join("")+
+      '<div class="note">Tüm aşamaları geçen kararlar; gölge takibe alınır.</div>');
+    return;
+  }
+  const st=STEPS.find(s=>s[0]===name);
+  openModal(name+" · "+rows.length+" parite elendi",
+    `<div class="note"><b>${st?st[1]:""}</b> — bu aşama motorun "${name}" filtresidir; geçilemeyen parite o taramada NO_TRADE olur.</div>
+     <div class="taglist">`+
+    rows.map(d=>`<span class="badge b-NOT_FILLED" title="${(d.reject_reason||"").replace(/"/g,"'")}">${d.pair}</span>`).join("")+
+    "</div>");
+}
 function renderPipeline(status){
   const res=(status&&status.results)||{};
   const vals=Object.values(res);const total=vals.length;
   if(!total){$("pipe").innerHTML='<div class="empty">tarama bekleniyor…</div>';return;}
   const cnt={};let sig=0;
   for(const d of vals){
-    if(d.decision==="SIGNAL"){sig++;continue;}
-    const r=(d.decision==="DATA_MISSING")?"insufficient data":(d.reject_reason||"");
-    const st=STEPS.find(([, ,p])=>r.startsWith(p)||r.includes(p));
-    cnt[st?st[0]:"OTHER"]=(cnt[st?st[0]:"OTHER"]||0)+1;
+    const s=stageOf(d);
+    if(s==="SIGNAL"){sig++;continue;}
+    cnt[s]=(cnt[s]||0)+1;
   }
   $("pipeMeta").textContent=total+" parite";
   $("pipe").innerHTML=STEPS.map(([n,d,,col])=>{
     const c=cnt[n]||0;
-    return `<div class="step"><div class="h"><span>${n}</span><span class="n num">−${c}</span></div>
+    return `<div class="step" data-s="${n}" title="tıkla: elenenleri gör">
+      <div class="h"><span>${n}</span><span class="n num">−${c}</span></div>
       <div class="d">${d}</div>
       <div class="g"><div style="width:${Math.min(100,100*c/total)}%;background:${col}"></div></div></div>`;
   }).join("")+
-  `<div class="step"><div class="h"><span class="pos">→ SIGNAL</span><span class="n num pos">${sig}</span></div>
+  `<div class="step" data-s="SIGNAL"><div class="h"><span class="pos">→ SIGNAL</span><span class="n num pos">${sig}</span></div>
     <div class="d">Tüm aşamaları geçenler takibe alınır</div>
     <div class="g"><div style="width:${Math.min(100,sig/total*1000)}%;background:var(--green)"></div></div></div>`;
-  /* ozet stacked bar */
+  $("pipe").querySelectorAll(".step").forEach(el=>
+    el.addEventListener("click",()=>pipeDetail(el.dataset.s)));
   $("pbar").innerHTML=STEPS.map(([n,,,col])=>{
     const c=cnt[n]||0;
     return c?`<div style="width:${100*c/total}%;background:${col}" title="${n}: ${c}"></div>`:"";
@@ -513,10 +599,11 @@ function renderPipeline(status){
   $("plbl").innerHTML=`SIGNAL <b class="pos num">${sig}</b>`;
 }
 
-/* ---------- sinyal tablosu ---------- */
+/* ---------- sinyal tablosu + detay modali ---------- */
 let FILTER="ALL",SIGNALS=[];
 const FILTERS=[["ALL","Tümü"],["OPEN","Açık"],["DONE","Sonuç"],["NF","Dolmayan"]];
 function matches(s){
+  if(DIRF!=="ALL"&&s.direction!==DIRF)return false;
   const o=OUT(s);
   if(FILTER==="OPEN")return o==="PENDING"||o==="FILLED";
   if(FILTER==="DONE")return o==="WIN"||o==="LOSS"||o==="AMBIGUOUS";
@@ -524,24 +611,58 @@ function matches(s){
   return true;
 }
 function renderChips(){
-  const c={ALL:SIGNALS.length,
-    OPEN:SIGNALS.filter(s=>["PENDING","FILLED"].includes(OUT(s))).length,
-    DONE:SIGNALS.filter(s=>["WIN","LOSS","AMBIGUOUS"].includes(OUT(s))).length,
-    NF:SIGNALS.filter(s=>["NOT_FILLED","EXPIRED"].includes(OUT(s))).length};
-  $("chips").innerHTML=FILTERS.map(([k,l])=>
+  const base=s=>DIRF==="ALL"||s.direction===DIRF;
+  const c={ALL:SIGNALS.filter(base).length,
+    OPEN:SIGNALS.filter(s=>base(s)&&["PENDING","FILLED"].includes(OUT(s))).length,
+    DONE:SIGNALS.filter(s=>base(s)&&["WIN","LOSS","AMBIGUOUS"].includes(OUT(s))).length,
+    NF:SIGNALS.filter(s=>base(s)&&["NOT_FILLED","EXPIRED"].includes(OUT(s))).length};
+  let html=FILTERS.map(([k,l])=>
     `<button class="chip${FILTER===k?" on":""}" data-f="${k}">${l} ${c[k]||0}</button>`).join("");
+  if(DIRF!=="ALL")html+=`<button class="chip dir" data-clr="1">yön: ${DIRF} ✕</button>`;
+  $("chips").innerHTML=html;
   $("chips").querySelectorAll(".chip").forEach(b=>b.addEventListener("click",()=>{
-    FILTER=b.dataset.f;renderChips();renderSignals();}));
+    if(b.dataset.clr){DIRF="ALL";renderDuel(SIGNALS);}
+    else FILTER=b.dataset.f;
+    renderChips();renderSignals();}));
+}
+function signalDetail(s){
+  const o=OUT(s);
+  const risk=s.direction==="LONG"?(s.entry_max-s.stop_loss):(s.stop_loss-s.entry_min);
+  const g=(k,v,cls)=>`<span class="k">${k}</span><span class="v num ${cls||""}">${v}</span>`;
+  let html=`<div style="display:flex;gap:8px;align-items:center">
+    <span class="badge b-${s.direction}">${s.direction}</span>
+    <span class="badge b-${o}">${o}</span>
+    <span class="num" style="color:var(--muted);font-size:11px">#${s.id} · ${fmtTs(s.created_utc)} UTC</span></div>
+  <div class="kvgrid">`+
+    g("Entry bölgesi",`${num(s.entry_min,4)} – ${num(s.entry_max,4)}`)+
+    g("Stop",num(s.stop_loss,4),"neg")+
+    g("TP1 / TP2",`${num(s.tp1,4)} / ${num(s.tp2,4)}`,"pos")+
+    g("Plan RR",num(s.rr,2))+
+    g("Risk (fiyat)",num(risk,4))+
+    g("Fill fiyatı",s.fill_price==null?"—":num(s.fill_price,4))+
+    g("Çıkış fiyatı",s.exit_price==null?"—":num(s.exit_price,4))+
+    g("Gerçekleşen R",s.r_multiple==null?"—":(s.r_multiple>0?"+":"")+num(s.r_multiple),
+      s.r_multiple>0?"pos":s.r_multiple<0?"neg":"")+
+    g("Kapanış",s.closed_utc?fmtTs(s.closed_utc)+" UTC":"—")+"</div>";
+  const live=LAST_STATUS&&LAST_STATUS.results&&LAST_STATUS.results[s.pair];
+  if(live&&live.decision==="SIGNAL"){
+    html+=`<div class="note"><b>Son taramada aktif plan:</b> ${live.setup_type||""} · güven ${live.confidence||""}<br>
+      <b>İnvalidasyon:</b> ${live.invalidation||"—"}<br>
+      <b>Likidite:</b> ${live.liquidity_note||"—"}<br>
+      <b>Confluence:</b> ${(live.indicator_confluence||[]).join(", ")||"—"}</div>`;
+  }
+  html+='<div class="note">Gölge muhasebe: varsayımsal giriş, kayma/komisyon yok; yatırım tavsiyesi değildir.</div>';
+  openModal(s.pair,html);
 }
 function renderSignals(){
   const rows=SIGNALS.filter(matches);
   const el=$("signals");
   if(!rows.length){el.innerHTML='<div class="empty" style="padding:8px 14px">bu filtrede sinyal yok</div>';return;}
-  const tr=rows.map(s=>{
+  const tr=rows.map((s,i)=>{
     const o=OUT(s),r=s.r_multiple;
     const open=o==="PENDING"||o==="FILLED";
     const age=open?`<div class="age">${fmtAge(s.created_utc)} / ${o==="PENDING"?"6 sa":"48 sa"}</div>`:"";
-    return `<tr${o==="NOT_FILLED"?' class="dim"':""}>
+    return `<tr data-i="${i}"${o==="NOT_FILLED"?' class="dim"':""}>
       <td class="num">${s.id}</td><td><b>${s.pair}</b></td>
       <td><span class="badge b-${s.direction}">${s.direction}</span></td>
       <td class="num">${fmtTs(s.created_utc)}${age}</td>
@@ -553,6 +674,8 @@ function renderSignals(){
   el.innerHTML=`<table><thead><tr><th>#</th><th>Parite</th><th>Yön</th>
     <th>Zaman</th><th>Durum</th><th>Entry</th><th>Stop</th><th>TP1</th>
     <th>RR</th><th>R</th></tr></thead><tbody>${tr}</tbody></table>`;
+  el.querySelectorAll("tbody tr").forEach(row=>row.addEventListener("click",
+    ()=>signalDetail(rows[Number(row.dataset.i)])));
 }
 
 /* ---------- sag panel ---------- */
@@ -590,8 +713,18 @@ function renderMarket(m){
     <span class="pos">${m.breadth.advancers}▲</span> /
     <span class="neg">${m.breadth.decliners}▼</span>
     <span> · likit ${m.liquid_universe}</span></div>`:"";
+  const link=s=>`https://www.bybit.com/trade/usdt/${s}`;
+  const mov=list=>list.map(t=>{
+    const cls=t.pct24h>0?"pos":"neg";
+    return `<a href="${link(t.symbol)}" target="_blank" rel="noopener" title="Bybit'te aç">
+      <span>${t.symbol.replace("USDT","")}</span>
+      <span class="num ${cls}">${(t.pct24h>0?"+":"")+num(t.pct24h,1)}%</span></a>`;}).join("");
   const pulse=m.pulse?`<div class="pulse"><span class="tg">market pulse · kural-tabanlı okuma</span><br>${m.pulse}</div>`:"";
-  el.innerHTML=`<div class="majors">${mj}</div>${fng}${br}${pulse}`;
+  el.innerHTML=`<div class="majors">${mj}</div>${fng}${br}
+    <div class="movers">
+      <div><h4>24s yükselen</h4>${mov(m.gainers||[])}</div>
+      <div><h4>24s düşen</h4>${mov(m.losers||[])}</div>
+    </div>${pulse}`;
 }
 function renderNews(n){
   const el=$("news");
@@ -605,15 +738,13 @@ function renderSys(uni,healthy){
   if(uni)$("stratUni").textContent=(uni.mode||"")+"-"+(uni.count||"");
   $("dot").className="dot"+(healthy?"":" err");
 }
-$("howtoBtn").addEventListener("click",()=>$("overlay").classList.add("show"));
-$("howtoClose").addEventListener("click",()=>$("overlay").classList.remove("show"));
-$("overlay").addEventListener("click",e=>{if(e.target.id==="overlay")$("overlay").classList.remove("show");});
 
 /* ---------- loop ---------- */
 async function refresh(){
   const [perf,signals,status,uni,comments,market,news]=await Promise.all([
     j("/performance"),j("/signals?limit=200"),j("/status"),j("/universe"),
     j("/commentary?limit=4"),j("/market"),j("/news")]);
+  LAST_STATUS=status;
   SIGNALS=(signals||[]).slice().sort((a,b)=>(b.id||0)-(a.id||0));
   renderHeader(perf,status);
   renderKpis(perf,status,uni,SIGNALS);
