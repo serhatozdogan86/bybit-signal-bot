@@ -242,13 +242,17 @@ geçerli: paid instance + Disk (`DB_PATH=/data/bot.db`).
 | MarkdownV2 rich mesaj | `TELEGRAM_PARSE_MODE=MarkdownV2` | kapalı (plain) | Bold başlık + monospace seviyeler, tam escape'li |
 | WebSocket kline cache | `USE_WEBSOCKET=true` | kapalı | **Deneysel.** REST bootstrap + canlı WS güncellemesi; kopunca otomatik REST fallback. 15m/4h taramada REST zaten yeterli — açmak zorunlu değil |
 
-## Sessiz mod & Dashboard (v2.8)
+## Sessiz mod & Dashboard (v2.8.1)
 
 `TELEGRAM_ENABLED=false` (render.yaml'da varsayılan) ile **hiçbir Telegram mesajı
 gönderilmez** — sinyal üretimi, gölge takip ve gist yedekleme aynen sürer. Takip,
 botun kök adresindeki operasyon konsolundan yapılır:
 
 **`https://<app>.onrender.com/`** → Dashboard (v2.8 — sıcak tema + tıklanabilir paneller):
+- **Portföy Simülasyonu** (sol sütun): panodan düzenlenebilir başlangıç $ +
+  işlem başına risk %; R sonuçları bileşik dolar bakiyesine çevrilir; bugün /
+  7 gün / 30 gün kâr-zarar satırları (kapanan+açılan sayılarıyla). Girdiler
+  tarayıcıda saklanır (localStorage). Gölge simülasyondur, gerçek para değildir.
 - Sıcak "linen" zemin (#F5F1E8) — bembeyaz parlamaz, uzun bakışta yormaz
 - Derinlikli equity: gölgeli çizgi + katmanlı gradyan + beyaz halkalı WIN/LOSS noktaları
 - Tıklanabilir: KPI kartları tabloyu filtreler · boru hattı aşaması → elenen

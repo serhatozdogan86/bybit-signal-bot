@@ -204,5 +204,6 @@ def test_new_endpoints_serve(tmp_path):
     body = c.get("/").data.decode()
     for marker in ("hourly_review", "kripto haber", "canlı metrikler",
                    "Nasıl okunur?", "signal-engine // dashboard",
-                   "pipeline", "strateji sözleşmesi", "renderPipeline"):
+                   "pipeline", "strateji sözleşmesi", "renderPipeline",
+                   "Portföy Simülasyonu", "renderPortfolio"):
         assert marker in body, marker

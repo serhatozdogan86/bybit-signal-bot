@@ -210,6 +210,26 @@ DASHBOARD_HTML = r"""<!doctype html>
   .review .warnline{border-left:3px solid var(--red);padding-left:7px;
                     background:var(--red-bg);border-radius:4px}
   .more{color:var(--blue);font-size:10.5px;cursor:pointer;font-weight:500}
+  /* portfoy simulasyonu */
+  .pf .inputs{display:flex;gap:8px;align-items:center;font-size:10.5px;
+              color:var(--muted);flex-wrap:wrap}
+  .pf input{width:74px;background:var(--card2);border:1px solid var(--line);
+            border-radius:7px;padding:3px 7px;font-family:var(--sans);
+            font-size:11.5px;color:var(--text);
+            font-variant-numeric:tabular-nums}
+  .pf input:focus{border-color:var(--blue);outline:none}
+  .pf .bal{margin-top:7px;background:var(--card2);border:1px solid var(--line);
+           border-radius:9px;padding:6px 10px}
+  .pf .bal .b{font-size:19px;font-weight:700}
+  .pf .bal .p{font-size:11px;font-weight:600}
+  .pf .prow{display:flex;justify-content:space-between;align-items:baseline;
+            padding:3.5px 0;border-bottom:1px dashed var(--line);
+            font-size:11px}
+  .pf .prow:last-of-type{border-bottom:0}
+  .pf .prow .w{color:var(--muted);font-weight:600;width:48px}
+  .pf .prow .d{font-weight:700}
+  .pf .prow .c{color:var(--muted);font-size:9.8px}
+  .pf .foot{font-size:9.5px;color:var(--muted);margin-top:4px}
   .news li{list-style:none;padding:5px 0;border-bottom:1px solid var(--card2)}
   .news li:last-child{border-bottom:0}
   .news a{color:var(--text);text-decoration:none;font-size:11.5px;
@@ -282,12 +302,22 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="srow"><span>Evren</span><b id="stratUni">top-150</b></div>
         </div>
       </div>
-      <div class="card fill">
+      <div class="card">
         <div class="chead">Filtre Boru Hattı <span class="tag" id="pipeMeta"></span></div>
         <div class="cbody pipe fill" id="pipe"><div class="empty">tarama bekleniyor…</div></div>
         <div class="cbody psummary">
           <div class="bar" id="pbar"></div>
           <div class="lbl"><span>elenen →</span><span id="plbl">SIGNAL</span></div>
+        </div>
+      </div>
+      <div class="card fill pf">
+        <div class="chead">Portföy Simülasyonu <span class="tag">gölge · bileşik</span></div>
+        <div class="cbody fill scroll" id="pf">
+          <div class="inputs">
+            <label>Başlangıç $ <input type="number" id="pfCap" min="1" step="100" value="10000"></label>
+            <label>Risk % <input type="number" id="pfRisk" min="0.1" max="10" step="0.1" value="1.0" style="width:52px"></label>
+          </div>
+          <div id="pfBody"><div class="empty">hesaplanıyor…</div></div>
         </div>
       </div>
     </div>
@@ -734,6 +764,63 @@ function renderNews(n){
     `<li><a href="${it.url}" target="_blank" rel="noopener">${it.title}</a>
      <span class="src">${it.source}${it.published_utc?" · "+fmtAge(it.published_utc)+" önce":""}</span></li>`).join("");
 }
+/* ---------- portfoy simulasyonu ---------- */
+function pfLoad(){
+  try{
+    const c=localStorage.getItem("pf_capital"),r=localStorage.getItem("pf_risk");
+    if(c)$("pfCap").value=c;
+    if(r)$("pfRisk").value=r;
+  }catch(e){}
+}
+function pfSave(){
+  try{
+    localStorage.setItem("pf_capital",$("pfCap").value);
+    localStorage.setItem("pf_risk",$("pfRisk").value);
+  }catch(e){}
+}
+function renderPortfolio(signals){
+  const cap0=Math.max(1,Number($("pfCap").value)||10000);
+  const riskPct=Math.min(10,Math.max(.1,Number($("pfRisk").value)||1))/100;
+  const done=(signals||[]).filter(s=>["WIN","LOSS"].includes(OUT(s))&&s.closed_utc)
+    .sort((a,b)=>a.closed_utc.localeCompare(b.closed_utc));
+  const now=Date.now();
+  const dayStart=new Date();dayStart.setUTCHours(0,0,0,0);
+  const T={gun:dayStart.getTime(),hafta:now-7*864e5,ay:now-30*864e5};
+  // bilesik yurutme: her kapanista capital *= 1 + riskPct * R
+  let cap=cap0;const at={gun:cap0,hafta:cap0,ay:cap0};const cnt={gun:0,hafta:0,ay:0};
+  const seen={gun:false,hafta:false,ay:false};
+  for(const s of done){
+    const t=Date.parse(s.closed_utc.endsWith("Z")?s.closed_utc:s.closed_utc+"Z");
+    for(const k of ["gun","hafta","ay"]){
+      if(!seen[k]&&t>=T[k]){at[k]=cap;seen[k]=true;}
+      if(t>=T[k])cnt[k]++;
+    }
+    cap=cap*(1+riskPct*(s.r_multiple||0));
+  }
+  for(const k of ["gun","hafta","ay"])if(!seen[k])at[k]=cap; // pencerede islem yok
+  const openedToday=(signals||[]).filter(s=>{
+    const t=Date.parse((s.created_utc||"").endsWith("Z")?s.created_utc:(s.created_utc||"")+"Z");
+    return t>=T.gun;}).length;
+  const money=v=>"$"+v.toLocaleString("en-US",{maximumFractionDigits:0});
+  const totPct=100*(cap-cap0)/cap0;
+  const row=(lbl,base,n,extra)=>{
+    const d=cap-base,p=base?100*d/base:0;
+    const cls=d>0?"pos":d<0?"neg":"";
+    const sign=d>=0?"+":"−";
+    return `<div class="prow"><span class="w">${lbl}</span>
+      <span class="d num ${cls}">${sign}${money(Math.abs(d))} <span style="font-weight:500">(${(p>0?"+":"")+num(p,2)}%)</span></span>
+      <span class="c num">${n} kapanan${extra||""}</span></div>`;
+  };
+  $("pfBody").innerHTML=
+    `<div class="bal"><div style="display:flex;justify-content:space-between;align-items:baseline">
+       <span class="b num">${money(cap)}</span>
+       <span class="p num ${totPct>0?"pos":totPct<0?"neg":""}">${(totPct>0?"+":"")+num(totPct,2)}%</span></div>
+       <div class="c" style="font-size:9.8px;color:var(--muted)">güncel bakiye · ${done.length} işlem · başlangıç ${money(cap0)}</div></div>`+
+    row("Bugün",at.gun,cnt.gun," / "+openedToday+" açılan")+
+    row("7 gün",at.hafta,cnt.hafta)+
+    row("30 gün",at.ay,cnt.ay)+
+    `<div class="foot">Simülasyon: her işlemde bakiyenin %${(riskPct*100).toFixed(1)}'i riske atılır, sonuç R×risk olarak bileşik işler. Kayma/komisyon yok; gölge muhasebedir, gerçek para değildir. Günler UTC'dir.</div>`;
+}
 function renderSys(uni,healthy){
   if(uni)$("stratUni").textContent=(uni.mode||"")+"-"+(uni.count||"");
   $("dot").className="dot"+(healthy?"":" err");
@@ -755,6 +842,7 @@ async function refresh(){
   renderReview(comments);
   renderMarket(market);
   renderNews(news);
+  renderPortfolio(SIGNALS);
   renderSys(uni,!!status);
   $("updated").textContent=new Date().toLocaleTimeString("tr-TR");
 }
@@ -765,6 +853,9 @@ function schedule(){
 }
 $("iv").addEventListener("change",schedule);
 $("refresh").addEventListener("click",refresh);
+pfLoad();
+["pfCap","pfRisk"].forEach(id=>$(id).addEventListener("input",()=>{
+  pfSave();renderPortfolio(SIGNALS);}));
 refresh();schedule();
 </script>
 </body>
