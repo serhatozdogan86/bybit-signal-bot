@@ -128,3 +128,25 @@ def test_candle_mode_signals_and_row_cap(tmp_path):
     off = GistBackup(FakeGistClient(), tracker, ["BTCUSDT"], ["15"], 3600,
                      candle_mode="off")
     assert not any(n.startswith("candles_") for n in off.build_files())
+
+
+class NullRejectingClient(FakeGistClient):
+    """GitHub'in var olmayan dosyaya null'u 422'ledigi senaryoyu taklit eder."""
+    def update_gist(self, gist_id, files):
+        if any(v is None for v in files.values()):
+            return False
+        return super().update_gist(gist_id, files)
+
+
+def test_sync_survives_rejected_cleanup(tmp_path):
+    db = Database(str(tmp_path / "t.db"))
+    tracker = SignalTracker(db, ltf_interval="15")
+    client = NullRejectingClient()
+    gb = GistBackup(client, tracker, symbols=[], intervals=["15"])
+    from app.services.gist_backup import MARKER as _M
+    gb._gist_id = client.create_gist(_M, {"README.md": "x"})
+    client.storage[gb._gist_id] = {"README.md": "x"}  # eski dosya yok
+    assert gb.sync() is True                  # null'lu PATCH reddedilse de
+    assert gb._legacy_cleanup_done is True    # geri cekilme calisti
+    assert gb.sync() is True                  # ikinci sync artik null'suz
+    assert "0_performance.json" in client.storage[gb._gist_id]

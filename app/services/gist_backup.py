@@ -64,6 +64,7 @@ class GistBackup:
         self._interval = sync_interval_sec
         self._gist_id: str | None = pinned_gist_id or None
         self._last_sync: float = 0.0
+        self._legacy_cleanup_done: bool = False
         self._last_sync_utc: str | None = None
 
     # ------------------------------------------------------------- durum
@@ -110,11 +111,20 @@ class GistBackup:
             self._gist_id = self._client.create_gist(MARKER, files)
             ok = self._gist_id is not None
         else:
-            # eski adsiz-onekli dosyalari temizle (null = sil; yoklarsa no-op)
-            files_with_cleanup = dict(files)
-            for legacy in ("performance.json", "signals.json", "decisions.json"):
-                files_with_cleanup.setdefault(legacy, None)
-            ok = self._client.update_gist(self._gist_id, files_with_cleanup)
+            payload = dict(files)
+            if not self._legacy_cleanup_done:
+                # eski adsiz-onekli dosyalari bir kez temizle (null = sil)
+                for legacy in ("performance.json", "signals.json",
+                               "decisions.json"):
+                    payload.setdefault(legacy, None)
+            ok = self._client.update_gist(self._gist_id, payload)
+            if not ok and not self._legacy_cleanup_done:
+                # temizlik PATCH'i reddedilmis olabilir; veri sync'ini
+                # temizliksiz tekrar dene - yedekleme asla temizlige kurban
+                # edilmez
+                ok = self._client.update_gist(self._gist_id, dict(files))
+            if ok:
+                self._legacy_cleanup_done = True
         if ok:
             self._last_sync = time.time()
             self._last_sync_utc = datetime.now(timezone.utc).strftime(
