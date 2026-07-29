@@ -124,6 +124,22 @@ DASHBOARD_HTML = r"""<!doctype html>
   .kpi .sub{font-size:10.5px;color:var(--muted);white-space:nowrap;
             overflow:hidden;text-overflow:ellipsis}
   .kpi .tr{position:absolute;top:8px;right:12px;font-size:12px}
+  /* KPI tooltip balonu */
+  .kpi::after{content:attr(data-tip);position:absolute;top:calc(100% + 8px);
+    left:50%;transform:translateX(-50%);background:#2A241B;color:#FBF8F2;
+    padding:8px 11px;border-radius:9px;font-size:10.8px;line-height:1.45;
+    font-weight:400;width:max-content;max-width:250px;white-space:normal;
+    opacity:0;visibility:hidden;pointer-events:none;z-index:40;
+    box-shadow:0 8px 24px rgba(42,36,27,.28);
+    transition:opacity .15s ease .25s,visibility 0s .4s}
+  .kpi::before{content:"";position:absolute;top:calc(100% + 2px);left:50%;
+    transform:translateX(-50%);border:6px solid transparent;
+    border-bottom-color:#2A241B;opacity:0;visibility:hidden;z-index:41;
+    transition:opacity .15s ease .25s,visibility 0s .4s}
+  .kpi:hover::after,.kpi:hover::before,
+  .kpi:focus-visible::after,.kpi:focus-visible::before{
+    opacity:1;visibility:visible;transition-delay:.25s}
+  .kpi:last-child::after{left:auto;right:0;transform:none}
   /* ============ orta grafik satiri ============ */
   .midrow{display:grid;grid-template-columns:1.35fr 1fr;gap:10px;
           min-height:clamp(180px,26vh,300px)}
@@ -455,8 +471,14 @@ function renderKpis(perf,status,uni,signals){
   const nf=(signals||[]).filter(s=>OUT(s)==="NOT_FILLED").length;
   const frV=(filled+nf)?100*filled/(filled+nf):null;
   const openV=perf?perf.open_signals:null;
+  const TIPS={
+    "Win Rate":"Sonuçlanan (WIN+LOSS) sinyaller içinde kazananların oranı — NOT_FILLED hesaba katılmaz. Alt satırdaki başabaş, kâra geçiş eşiğidir: 1 / (1 + ortalama kazanç R). Win rate bu eşiğin üzerindeyse sistem artıdadır. · tıkla → sonuçlananları filtrele",
+    "Toplam R":"Tüm sonuçlanan işlemlerin R toplamı. R = riske atılan birim: kayıp −1R, kazanç ödül/risk oranı kadar (+2.2R gibi). Alt satır: brüt kazanç / brüt kayıp. Para değil, risk birimi sayar — pariteler böyle karşılaştırılır. · tıkla → sonuçlananları filtrele",
+    "Açık Pozisyon":"Gölge takipte hâlâ sonuçlanmamış sinyaller: PENDING (girişe gelmesi bekleniyor, 6 sa) + FILLED (dolu, 48 sa izlemede). · tıkla → açıkları filtrele",
+    "Giriş İsabeti":"Üretilen sinyallerden fiyatı giriş bölgesine gelip dolanların oranı. NOT_FILLED = 6 saat içinde fiyat girişe hiç uğramadı; kazanç/kayıp oranına dahil edilmez. · tıkla → dolmayanları filtrele",
+    "Taranan Evren":"24s hacme göre her gün yeniden seçilen parite sayısı ve bugüne kadarki tarama turu. Her tur ~15 dakikada bir tüm evreni 7 aşamalı filtreden geçirir. · tıkla → tüm sinyaller"};
   const kpi=(f,lbl,val,cls,sub,tr)=>`<div class="kpi clickable" data-f="${f}"
-    title="tabloyu filtreler">${tr||""}
+    data-tip="${TIPS[lbl]||""}" tabindex="0">${tr||""}
     <div class="lbl">${lbl}</div><div class="val num ${cls||""}">${val}</div>
     <div class="sub">${sub||""}</div></div>`;
   $("kpis").innerHTML=
