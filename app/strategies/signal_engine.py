@@ -117,6 +117,14 @@ def evaluate(pair: str, htf_series: KlineSeries | None, ltf_series: KlineSeries 
     # Sonda olmasinin nedeni: bloklanan karar TAM plan seviyeleri tasir ->
     # golge defterde blocked=1 kohortu olarak izlenip kapinin gercek
     # etkisi (koruma mi, firsat maliyeti mi) olculebilir.
+    if params.market_gate and market_bias == "halt":
+        # v3.5 fail-closed: BTC rejim verisi yok (TTL asildi) -> kor ucus
+        # yerine her iki yon de kesilir. Karsi-olgu kohortuna YAZILMAZ.
+        d.failed_filters = ["MARKET_GATE"]
+        d.reject_reason = "market data unavailable (fail-closed gate)"
+        d.watch_condition = "BTC feed recovery"
+        return d
+
     if params.market_gate and (
             (market_bias == "bear" and direction is Direction.LONG)
             or (market_bias == "bull" and direction is Direction.SHORT)):

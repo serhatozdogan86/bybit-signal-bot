@@ -199,3 +199,17 @@ def test_blocked_cohort_isolated(tmp_path):
     d2 = signal_engine.evaluate("BLKUSDT", htf, ltf, StrategyParams())
     assert tracker.maybe_track(d2, ltf) is True
     assert tracker.stats()["open_signals"] == 1
+
+
+def test_cost_r_and_cluster(tmp_path):
+    """v3.5: maliyet motoru mantikli deger uretir; cluster_id yazilir."""
+    from app.services.signal_tracker import cost_r
+    row = {"outcome": "LOSS", "direction": "SHORT", "fill_price": 100.0,
+           "entry_min": 100.0, "entry_max": 101.0, "stop_loss": 102.0,
+           "r_multiple": -1.0, "created_utc": "2026-07-29T00:00:00Z",
+           "closed_utc": "2026-07-29T16:00:00Z"}
+    c = cost_r(row)                     # stop %2; fee+slip=%0.16; funding SHORT alir
+    assert c is not None and 0.0 < c < 0.10
+    win = dict(row, outcome="WIN", r_multiple=2.5)
+    cw = cost_r(win)
+    assert cw is not None and cw < c    # kayma yalniz stop cikisinda

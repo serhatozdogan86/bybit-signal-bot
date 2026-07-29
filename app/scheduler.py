@@ -93,6 +93,7 @@ class Scheduler:
             if decision.decision is DecisionType.SIGNAL and ltf is not None:
                 self._tracker.maybe_track(decision, ltf)
             elif ("MARKET_GATE" in (decision.failed_filters or [])
+                  and "counter-regime" in (decision.reject_reason or "")
                   and ltf is not None):
                 self._tracker.track_blocked(decision, ltf)  # v3.4 karsi-olgu
             self._tracker.evaluate_open(decision.pair)
@@ -126,25 +127,52 @@ class Scheduler:
 
     # ---------------------------------------------------- v3.0 yardimcilar
     def _compute_market_bias(self) -> str:
-        """BTC 4H kapanisinin EMA200'e konumu -> bull / bear / neutral.
+        """BTC 4H rejimi -> bull / bear / neutral / halt  (v3.5).
 
-        Motorun yon kapisi (market gate) icin tek referans. Veri yoksa veya
-        yetersizse "neutral" doner (fail-open: kapi kimseyi bloklamaz).
-        Notr bant +-%0.25: EMA uzerinde surtunen fiyatta kapi titremesin.
+        Konsey revizyonlari:
+        - HISTEREZIS: rejim degisimi icin son 2 KAPANMIS 4H mumun da esigin
+          otesinde olmasi gerekir (esik +-%0.5). Kosul saglanmazsa onceki
+          rejim korunur -> EMA cevresi testere kapiyi titretmez.
+        - FAIL-CLOSED + TTL: BTC verisi alinamazsa son bilinen rejim 2 saat
+          (TTL) daha kullanilir; TTL de asilirsa "halt" doner ve kapi HER
+          IKI yonu de keser. Kor ucus yok.
         """
+        now = time.time()
         try:
             series = self._md.get_series("BTCUSDT", self._settings.HTF)
             if series is None or len(series) < 120:
-                return "neutral"
+                raise ValueError("insufficient BTC data")
             close = series.to_dataframe()["close"]
-            ema = close.ewm(span=200, adjust=False).mean().iloc[-1]
-            diff = close.iloc[-1] / ema - 1
-            bias = "bull" if diff > 0.0025 else "bear" if diff < -0.0025 else "neutral"
-            log.info(kv(event="market_bias", bias=bias, diff=f"{diff:+.4f}"))
+            ema = close.ewm(span=200, adjust=False).mean()
+            band = 0.005
+            votes = []
+            for i in (-2, -1):          # son iki kapanmis 4H mum
+                diff = close.iloc[i] / ema.iloc[i] - 1
+                votes.append("bull" if diff > band
+                             else "bear" if diff < -band else "neutral")
+            prev = getattr(self, "_bias_state", "neutral")
+            if votes[0] == votes[1] and votes[1] != "neutral":
+                bias = votes[1]                      # 2 mumluk teyitli gecis
+            elif votes[1] == "neutral" and prev != "neutral":
+                bias = prev                          # banda geri sarkti: koru
+            elif prev == "neutral" and votes[1] != "neutral":
+                bias = prev                          # tek mum yetmez: bekle
+            else:
+                bias = prev
+            self._bias_state = bias
+            self._bias_ts = now
+            log.info(kv(event="market_bias", bias=bias,
+                        votes="/".join(votes)))
             return bias
         except Exception:
             log.exception(kv(event="market_bias_error"))
-            return "neutral"
+            last_ts = getattr(self, "_bias_ts", 0.0)
+            if now - last_ts <= 7200 and hasattr(self, "_bias_state"):
+                log.warning(kv(event="market_bias_stale",
+                               bias=self._bias_state,
+                               age_s=int(now - last_ts)))
+                return self._bias_state              # TTL icinde: son rejim
+            return "halt"                            # fail-closed
 
     def _evaluate_orphans(self, scanned: set[str]) -> None:
         """Evren disina dusen paritelerin acik sinyallerini yasat (v3.0).

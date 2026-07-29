@@ -21,6 +21,7 @@ Varsayimlar (golge muhasebesi - dokumante edilmis, muhafazakar):
 from __future__ import annotations
 
 import json
+import os
 import logging
 from datetime import datetime, timezone
 
@@ -36,6 +37,60 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+_ENGINE_SHA = (os.environ.get("RENDER_GIT_COMMIT") or "dev")[:7]
+
+
+def _cluster_id(d, ltf) -> str:
+    """Ayni yon + ayni 4H penceresi = tek 'fikir' (konsey P0-4).
+
+    Kume istatistigi icin gozlem birimi; n_eff tartismasinin altyapisi.
+    """
+    bucket = int(ltf.candles[-1].ts // 14_400_000)   # 4H ms penceresi
+    return f"{d.direction.value[0]}{bucket}"
+
+
+# ---------------- v3.5 maliyet motoru v0 (konsey P0-1) ----------------
+# Varsayimlar (proxy; tick-level degil):
+#   fee: 2 x taker %0.055 (limit varsayimi kanitlanana kadar taker)
+#   kayma: yalniz stop cikisinda 5 bps (hizli piyasa cezasi)
+#   funding: |0.01%| / 8s, tutus suresince; isaret: LONG oder, SHORT alir
+#            (Bybit uzun donem ortalama pozitif funding varsayimi; tarihsel
+#             oranlarla degistirilebilir - bilincli v0 yaklasikligi)
+TAKER_FEE = 0.00055
+STOP_SLIP = 0.0005
+FUNDING_8H = 0.0001
+
+
+def cost_r(row: dict) -> float | None:
+    """Kapanmis bir sinyalin toplam maliyetini R cinsinden dondurur.
+
+    R birimi = stop mesafesi (notional orani); maliyet orani / stop orani
+    dogrudan R'ye cevrilir. Veri eksikse None.
+    """
+    try:
+        if row.get("outcome") not in ("WIN", "LOSS"):
+            return None
+        entry = row.get("fill_price") or (
+            row["entry_max"] if row["direction"] == "LONG" else row["entry_min"])
+        stop_frac = abs(entry - row["stop_loss"]) / entry
+        if stop_frac <= 0:
+            return None
+        fee = 2 * TAKER_FEE
+        slip = STOP_SLIP if row["outcome"] == "LOSS" else 0.0
+        hours = 0.0
+        if row.get("created_utc") and row.get("closed_utc"):
+            from datetime import datetime
+            fmt = "%Y-%m-%dT%H:%M:%SZ"
+            t0 = datetime.strptime(row["created_utc"], fmt)
+            t1 = datetime.strptime(row["closed_utc"], fmt)
+            hours = max(0.0, min(48.0, (t1 - t0).total_seconds() / 3600))
+        funding = FUNDING_8H * (hours / 8.0)
+        signed_funding = funding if row["direction"] == "LONG" else -funding
+        return round((fee + slip + signed_funding) / stop_frac, 4)
+    except Exception:
+        return None
+
+
 class SignalTracker:
     def __init__(self, db: Database, ltf_interval: str,
                  fill_window_bars: int = 24, max_track_bars: int = 192) -> None:
@@ -48,7 +103,8 @@ class SignalTracker:
     def _migrate(self) -> None:
         """v3.3: eski DB'lere confidence/setup_type kolonlarini ekle."""
         for ddl in ("confidence TEXT", "setup_type TEXT",
-                    "blocked INTEGER NOT NULL DEFAULT 0"):
+                    "blocked INTEGER NOT NULL DEFAULT 0",
+                    "cluster_id TEXT", "engine_sha TEXT"):
             try:
                 self._db.execute(f"ALTER TABLE signals ADD COLUMN {ddl}")
             except Exception:
@@ -86,12 +142,13 @@ class SignalTracker:
         self._db.execute(
             "INSERT INTO signals(pair,direction,created_utc,entry_candle_ts,"
             "entry_min,entry_max,stop_loss,tp1,tp2,rr,contract_json,"
-            "confidence,setup_type) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "confidence,setup_type,cluster_id,engine_sha) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (d.pair, d.direction.value, d.timestamp_utc, ltf.candles[-1].ts,
              d.entry_zone.min, d.entry_zone.max, d.stop_loss,
              d.targets.tp1, d.targets.tp2, d.rr, json.dumps(d.contract_dict()),
-             d.confidence.value, d.setup_type.value))
+             d.confidence.value, d.setup_type.value,
+             _cluster_id(d, ltf), _ENGINE_SHA))
         log.info(kv(event="shadow_track", pair=d.pair, direction=d.direction.value))
         return True
 
@@ -112,12 +169,13 @@ class SignalTracker:
         self._db.execute(
             "INSERT INTO signals(pair,direction,created_utc,entry_candle_ts,"
             "entry_min,entry_max,stop_loss,tp1,tp2,rr,contract_json,"
-            "confidence,setup_type,blocked) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1)",
+            "confidence,setup_type,blocked,cluster_id,engine_sha) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)",
             (d.pair, d.direction.value, d.timestamp_utc, ltf.candles[-1].ts,
              d.entry_zone.min, d.entry_zone.max, d.stop_loss,
              d.targets.tp1, d.targets.tp2, d.rr, json.dumps(d.contract_dict()),
-             d.confidence.value, d.setup_type.value))
+             d.confidence.value, d.setup_type.value,
+             _cluster_id(d, ltf), _ENGINE_SHA))
         log.info(kv(event="shadow_track_blocked", pair=d.pair,
                     direction=d.direction.value))
         return True
@@ -206,6 +264,20 @@ class SignalTracker:
             "GROUP BY pair, outcome ORDER BY pair")
         counts = self._db.query_one(
             "SELECT (SELECT COUNT(*) FROM decisions) d, (SELECT COUNT(*) FROM candles) c")
+        # v3.5: maliyet-sonrasi net metrikler + kume sayisi (n_eff altyapisi)
+        closed_rows = self._db.query(
+            "SELECT direction,outcome,entry_min,entry_max,stop_loss,"
+            "fill_price,r_multiple,created_utc,closed_utc,cluster_id "
+            "FROM signals WHERE status='CLOSED' AND blocked=0 "
+            "AND outcome IN ('WIN','LOSS')")
+        net_vals = []
+        for r in closed_rows:
+            cst = cost_r(r)
+            if cst is not None and r.get("r_multiple") is not None:
+                net_vals.append(r["r_multiple"] - cst)
+        total_r_net = round(sum(net_vals), 2) if net_vals else None
+        clusters = len({r["cluster_id"] for r in closed_rows
+                        if r.get("cluster_id")}) or None
         return {
             "note": "Shadow accounting: estimated fills, no slippage. Not real trading results.",
             "open_signals": open_row["n"] if open_row else 0,
@@ -213,6 +285,11 @@ class SignalTracker:
             "win_rate": round(wins / decided, 3) if decided else None,
             "decided_trades": decided,
             "total_r_multiple": total_r,
+            "total_r_net": total_r_net,
+            "expectancy_net": (round(total_r_net / len(net_vals), 3)
+                               if net_vals else None),
+            "cost_model": "v0: 2x taker 0.055% + stop slip 5bps + funding 0.01%/8h signed",
+            "clusters_closed": clusters,
             "per_pair": per_pair,
             "dataset": {"decisions_recorded": counts["d"], "candles_archived": counts["c"]},
         }
@@ -221,15 +298,22 @@ class SignalTracker:
         return self._db.query(
             "SELECT id,pair,direction,created_utc,entry_candle_ts,status,outcome,"
             "entry_min,entry_max,stop_loss,tp1,tp2,rr,fill_price,exit_price,"
-            "r_multiple,closed_utc,confidence,setup_type "
+            "r_multiple,closed_utc,confidence,setup_type,cluster_id,engine_sha "
             "FROM signals WHERE blocked=0 ORDER BY id DESC LIMIT ?", (limit,))
+        for r in rows:
+            c = cost_r(r)
+            r["r_net"] = (round(r["r_multiple"] - c, 2)
+                          if c is not None and r.get("r_multiple") is not None
+                          else None)
+        return rows
 
     def blocked_signals(self, limit: int = 300) -> list[dict]:
         """Karsi-olgu kohortu: kapinin blokladigi, golgede izlenen kararlar."""
         return self._db.query(
             "SELECT id,pair,direction,created_utc,entry_candle_ts,status,outcome,"
             "entry_min,entry_max,stop_loss,tp1,tp2,rr,fill_price,exit_price,"
-            "r_multiple,closed_utc,confidence,setup_type,blocked "
+            "r_multiple,closed_utc,confidence,setup_type,blocked,"
+            "cluster_id,engine_sha "
             "FROM signals WHERE blocked=1 ORDER BY id DESC LIMIT ?", (limit,))
 
     def recent_decisions(self, limit: int = 2000) -> list[dict]:
@@ -280,8 +364,8 @@ class SignalTracker:
                 "INSERT INTO signals(pair,direction,created_utc,entry_candle_ts,"
                 "entry_min,entry_max,stop_loss,tp1,tp2,rr,status,outcome,"
                 "fill_price,exit_price,r_multiple,closed_utc,confidence,"
-                "setup_type,blocked) "
-                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "setup_type,blocked,cluster_id,engine_sha) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (r.get("pair"), r.get("direction"), r.get("created_utc"),
                  r.get("entry_candle_ts"), r.get("entry_min"), r.get("entry_max"),
                  r.get("stop_loss"), r.get("tp1"), r.get("tp2"), r.get("rr"),
@@ -289,6 +373,7 @@ class SignalTracker:
                  r.get("fill_price"), r.get("exit_price"),
                  r.get("r_multiple"), r.get("closed_utc"),
                  r.get("confidence"), r.get("setup_type"),
-                 r.get("blocked", 0)))
+                 r.get("blocked", 0), r.get("cluster_id"),
+                 r.get("engine_sha")))
             imported += 1
         return imported

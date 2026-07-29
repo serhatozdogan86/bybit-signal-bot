@@ -515,7 +515,7 @@ async function j(url){
   catch(e){return null;}
 }
 const OUT=s=>s.outcome||s.status;
-let PRICES={},PREV_PRICES={};
+let PRICES={},PREV_PRICES={},PERF=null;
 const fmtPx=v=>v==null?"—":Number(v).toLocaleString("en-US",
   {maximumFractionDigits:v>=100?2:v>=1?4:6});
 const PREV={};
@@ -619,7 +619,8 @@ function renderCurve(signals){
   let peak=0,maxDD=0;
   for(const v of data){peak=Math.max(peak,v);maxDD=Math.max(maxDD,peak-v);}
   const st=$("eqStats");
-  if(st)st.innerHTML=`PF <b class="num">${pf==null?"∞":num(pf,2)}</b> · beklenti <b class="num">${(exp>0?"+":"")+num(exp,2)}R</b>/işlem · maksDD <b class="num neg">−${num(maxDD,2)}R</b>`;
+  const netTxt=(PERF&&PERF.expectancy_net!=null)?` · net <b class="num">${(PERF.expectancy_net>0?"+":"")+num(PERF.expectancy_net,2)}R</b>`:"";
+  if(st)st.innerHTML=`PF <b class="num">${pf==null?"∞":num(pf,2)}</b> · beklenti <b class="num">${(exp>0?"+":"")+num(exp,2)}R</b>/işlem${netTxt} · maksDD <b class="num neg">−${num(maxDD,2)}R</b>`;
   const labels=done.map((s,i)=>i+1);
   const ptCol=done.map(s=>OUT(s)==="WIN"?"#16A34A":"#DC2626");
   const tips=done.map(s=>`${s.pair} ${s.direction} ${OUT(s)} ${(s.r_multiple>0?"+":"")+num(s.r_multiple)}R`);
@@ -823,7 +824,8 @@ function signalDetail(s){
     g("Gerçekleşen R",s.r_multiple==null?"—":(s.r_multiple>0?"+":"")+num(s.r_multiple),
       s.r_multiple>0?"pos":s.r_multiple<0?"neg":"")+
     g("Kapanış",s.closed_utc?fmtTs(s.closed_utc)+" UTC":"—")+
-    g("Setup / Güven",(s.setup_type||"—")+" / "+(s.confidence||"—"))+"</div>";
+    g("Setup / Güven",(s.setup_type||"—")+" / "+(s.confidence||"—"))+
+    g("Net R (maliyet v0)",s.r_net!=null?((s.r_net>0?"+":"")+num(s.r_net)):"—")+"</div>";
   const live=LAST_STATUS&&LAST_STATUS.results&&LAST_STATUS.results[s.pair];
   if(live&&live.decision==="SIGNAL"){
     html+=`<div class="note"><b>Son taramada aktif plan:</b> ${live.setup_type||""} · güven ${live.confidence||""}<br>
@@ -1123,7 +1125,7 @@ function renderFooter(backup,healthy,ms,perf){
     `<span>veri <b>${new Date().toLocaleTimeString("tr-TR")}</b></span><span class="sep">|</span>`+
     `<span>${gist}</span><span class="sep">|</span>`+
     `<span>yanıt <b>${ms} ms</b></span><span class="sep">|</span>`+
-    `<span>v3.3</span>`+
+    `<span>v3.5</span>`+
     `<span class="right">gölge muhasebe · geçmiş performans garanti değildir · yatırım tavsiyesi değildir</span>`;
   if(perf&&perf.total_r_multiple!=null){
     const tr=perf.total_r_multiple;
