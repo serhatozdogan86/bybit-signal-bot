@@ -319,6 +319,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <option value="300000">5 dk</option>
       </select>
       <button id="refresh" class="icon" title="Şimdi yenile">⟳</button>
+      <button id="calcBtn" class="icon" title="Pozisyon Hesaplayıcı">🧮</button>
       <button id="howtoBtn" class="icon" title="Nasıl okunur?">⚙</button>
     </div>
   </header>
@@ -413,6 +414,31 @@ DASHBOARD_HTML = r"""<!doctype html>
   </div>
 </div>
 
+<div id="calc" class="ovl">
+  <div class="sheet" style="max-width:560px">
+    <h3><span class="tipwrap" tabindex="0" data-tip="Risk-first hesap: önce kaç $ riske atacağın belirlenir (bakiye × risk %), pozisyon büyüklüğü buradan TÜRETİLİR: miktar = risk$ / |entry − stop|. Kaldıraç kârı değil yalnızca bağlanan marjini değiştirir — stop'taki kayıp her kaldıraçta aynı risk$'dır. Likidasyon kontrolü, seçtiğin kaldıraçta likidasyonun stop'tan ÖNCE gelip gelmeyeceğini sınar (yaklaşık, izole marjin varsayımı). Değerler yaklaşıktır; yatırım tavsiyesi değildir.">Pozisyon Hesaplayıcı <span class="i">ⓘ</span></span></h3>
+    <div class="pf" style="font-size:12px">
+      <div class="inputs" style="margin-bottom:8px">
+        <label>Sinyal <select id="cSig" style="max-width:170px"><option value="">— manuel —</option></select></label>
+      </div>
+      <div class="inputs">
+        <label>Bakiye $ <input type="number" id="cBal" min="1" step="100"></label>
+        <label>Risk % <input type="number" id="cRisk" min="0.1" max="10" step="0.1" style="width:52px"></label>
+        <label>Kaldıraç <input type="number" id="cLev" min="1" max="50" step="1" value="5" style="width:52px"></label>
+        <label>Yön <select id="cDir"><option>LONG</option><option>SHORT</option></select></label>
+      </div>
+      <div class="inputs" style="margin-top:6px">
+        <label>Entry <input type="number" id="cEntry" step="any"></label>
+        <label>Stop <input type="number" id="cStop" step="any"></label>
+        <label>TP1 <input type="number" id="cTp1" step="any"></label>
+        <label>TP2 <input type="number" id="cTp2" step="any"></label>
+      </div>
+      <div id="cOut" style="margin-top:10px"></div>
+    </div>
+    <div style="text-align:right;margin-top:12px"><button id="calcClose">Kapat</button></div>
+  </div>
+</div>
+
 <div id="modal" class="ovl">
   <div class="sheet">
     <h3 id="modalTitle"></h3>
@@ -456,14 +482,21 @@ function openModal(title,html){
   $("modalTitle").innerHTML=title;$("modalBody").innerHTML=html;
   $("modal").classList.add("show");
 }
-["overlay","modal"].forEach(id=>{
+["overlay","modal","calc"].forEach(id=>{
   $(id).addEventListener("click",e=>{if(e.target.id===id)$(id).classList.remove("show");});
 });
 $("modalClose").addEventListener("click",()=>$("modal").classList.remove("show"));
+$("calcClose").addEventListener("click",()=>$("calc").classList.remove("show"));
+$("calcBtn").addEventListener("click",()=>openCalc(null));
+["cBal","cRisk","cLev","cDir","cEntry","cStop","cTp1","cTp2"].forEach(id=>
+  $(id).addEventListener("input",calcRun));
+$("cSig").addEventListener("change",()=>{
+  const s=SIGNALS.find(x=>String(x.id)===$("cSig").value);
+  if(s)calcFill(s);});
 $("howtoBtn").addEventListener("click",()=>$("overlay").classList.add("show"));
 $("howtoClose").addEventListener("click",()=>$("overlay").classList.remove("show"));
 document.addEventListener("keydown",e=>{
-  if(e.key==="Escape"){$("overlay").classList.remove("show");$("modal").classList.remove("show");}});
+  if(e.key==="Escape"){$("overlay").classList.remove("show");$("modal").classList.remove("show");$("calc").classList.remove("show");}});
 
 /* ---------- header ---------- */
 function renderHeader(perf,status){
@@ -727,6 +760,7 @@ function signalDetail(s){
       <b>Confluence:</b> ${(live.indicator_confluence||[]).join(", ")||"—"}</div>`;
   }
   html+='<div class="note">Gölge muhasebe: varsayımsal giriş, kayma/komisyon yok; yatırım tavsiyesi değildir.</div>';
+  html+=`<div style="margin-top:10px"><button onclick='window.__calcSig(${s.id})'>🧮 Bu sinyalle pozisyon hesapla</button></div>`;
   openModal(s.pair,html);
 }
 function renderSignals(){
@@ -881,6 +915,73 @@ function renderPortfolio(signals){
     row("7 gün",at.hafta,cnt.hafta)+
     row("30 gün",at.ay,cnt.ay)+
     `<div class="foot">Simülasyon: her işlemde bakiyenin %${(riskPct*100).toFixed(1)}'i riske atılır, sonuç R×risk olarak bileşik işler. Kayma/komisyon yok; gölge muhasebedir, gerçek para değildir. Günler UTC'dir.</div>`;
+}
+window.__calcSig=id=>{const s=SIGNALS.find(x=>x.id===id);if(s)openCalc(s);};
+/* ---------- pozisyon hesaplayici ---------- */
+const money2=v=>"$"+Number(v).toLocaleString("en-US",{maximumFractionDigits:2});
+function calcFill(s){
+  $("cDir").value=s.direction;
+  $("cEntry").value=s.direction==="LONG"?s.entry_max:s.entry_min;
+  $("cStop").value=s.stop_loss;
+  $("cTp1").value=s.tp1;
+  $("cTp2").value=s.tp2??"";
+  calcRun();
+}
+function calcPopulate(){
+  const sel=$("cSig");
+  const open=SIGNALS.filter(x=>["PENDING","FILLED"].includes(OUT(x)));
+  const rest=SIGNALS.filter(x=>!["PENDING","FILLED"].includes(OUT(x))).slice(0,20);
+  sel.innerHTML='<option value="">— manuel —</option>'+
+    [...open,...rest].map(x=>`<option value="${x.id}">#${x.id} ${x.pair} ${x.direction} (${OUT(x)})</option>`).join("");
+}
+function openCalc(sig){
+  calcPopulate();
+  try{
+    $("cBal").value=localStorage.getItem("pf_capital")||$("pfCap").value||10000;
+    $("cRisk").value=localStorage.getItem("pf_risk")||$("pfRisk").value||1;
+    $("cLev").value=localStorage.getItem("calc_lev")||5;
+  }catch(e){}
+  if(sig){$("cSig").value=String(sig.id);calcFill(sig);}
+  else calcRun();
+  $("modal").classList.remove("show");
+  $("calc").classList.add("show");
+}
+function calcRun(){
+  const bal=Number($("cBal").value)||0, riskP=(Number($("cRisk").value)||0)/100;
+  const lev=Math.max(1,Number($("cLev").value)||1);
+  const dir=$("cDir").value;
+  const e=Number($("cEntry").value), st=Number($("cStop").value);
+  const t1=Number($("cTp1").value), t2=Number($("cTp2").value);
+  const out=$("cOut");
+  try{localStorage.setItem("calc_lev",String(lev));}catch(x){}
+  if(!bal||!riskP||!e||!st){out.innerHTML='<div class="empty">bakiye, risk, entry ve stop girin…</div>';return;}
+  const dist=dir==="LONG"?e-st:st-e;
+  if(dist<=0){out.innerHTML='<div class="note" style="border-left:3px solid var(--red)">Stop, yön ile tutarsız: LONG için stop &lt; entry, SHORT için stop &gt; entry olmalı.</div>';return;}
+  const riskUsd=bal*riskP;
+  const qty=riskUsd/dist, notional=qty*e, margin=notional/lev;
+  const distP=100*dist/e;
+  // yaklasik likidasyon (izole; ~%5 bakim payi)
+  const liq=dir==="LONG"?e*(1-0.95/lev):e*(1+0.95/lev);
+  const liqSafe=dir==="LONG"?liq<st:liq>st;
+  const maxLev=Math.max(1,Math.min(50,Math.floor(0.95/(dist/e)*0.8)));
+  const fee=notional*0.00055*2, feeR=fee/riskUsd;
+  const g=(k,v,cls)=>`<span class="k">${k}</span><span class="v num ${cls||""}">${v}</span>`;
+  let rows=`<div class="kvgrid">`+
+    g("Riske atılan",money2(riskUsd)+` (${(riskP*100).toFixed(1)}%)`,"neg")+
+    g("Stop mesafesi",num(distP,2)+"%")+
+    g("Miktar",qty.toLocaleString("en-US",{maximumFractionDigits:4})+" coin")+
+    g("Pozisyon (notional)",money2(notional))+
+    g("Gerekli marjin",money2(margin)+` (${lev}x)`)+
+    g("Stop'ta kayıp","−"+money2(riskUsd),"neg");
+  if(t1){const gain=qty*Math.abs(t1-e);rows+=g("TP1 kazanç",`+${money2(gain)} (+${num(gain/riskUsd,2)}R)`,"pos");}
+  if(t2){const gain2=qty*Math.abs(t2-e);rows+=g("TP2 kazanç",`+${money2(gain2)} (+${num(gain2/riskUsd,2)}R)`,"pos");}
+  rows+=g("Tahmini komisyon","~"+money2(fee)+` (riskin %${num(feeR*100,1)}'i)`)+
+    g("Yaklaşık likidasyon",fmtPx(liq),liqSafe?"":"neg")+"</div>";
+  rows+=liqSafe?
+    `<div class="note" style="border-left:3px solid var(--green)"><b>Güvenli:</b> ${lev}x kaldıraçta likidasyon (${fmtPx(liq)}) stop'un (${fmtPx(st)}) ötesinde — plan stop'u çalışır. Bu paritede yaklaşık güvenli üst sınır ~${maxLev}x.</div>`:
+    `<div class="note" style="border-left:3px solid var(--red)"><b>⚠ Tehlike:</b> ${lev}x kaldıraçta likidasyon (${fmtPx(liq)}) stop'a ulaşmadan tetiklenir — planın stop'u değil borsa likidasyonu çalışır ve kayıp risk$'ı aşar. Kaldıracı ~${maxLev}x altına çek.</div>`;
+  rows+='<div class="note">Değerler yaklaşıktır (likidasyon borsanın marjin modeline göre değişir; komisyon taker %0.055×2 varsayımı). Yatırım tavsiyesi değildir.</div>';
+  out.innerHTML=rows;
 }
 function renderSys(uni,healthy){
   if(uni)$("stratUni").textContent=(uni.mode||"")+"-"+(uni.count||"");
