@@ -140,6 +140,24 @@ DASHBOARD_HTML = r"""<!doctype html>
   .kpi:focus-visible::after,.kpi:focus-visible::before{
     opacity:1;visibility:visible;transition-delay:.25s}
   .kpi:last-child::after{left:auto;right:0;transform:none}
+  /* kart basligi tooltip'i (sola hizali, genis) */
+  .tipwrap{position:relative;cursor:help}
+  .tipwrap .i{color:var(--blue);font-size:10px;vertical-align:1px}
+  .tipwrap::after{content:attr(data-tip);position:absolute;
+    top:calc(100% + 9px);left:0;transform:none;background:#2A241B;
+    color:#FBF8F2;padding:9px 12px;border-radius:9px;font-size:10.8px;
+    line-height:1.5;font-weight:400;width:max-content;max-width:310px;
+    white-space:normal;text-transform:none;letter-spacing:0;
+    opacity:0;visibility:hidden;pointer-events:none;z-index:40;
+    box-shadow:0 8px 24px rgba(42,36,27,.28);
+    transition:opacity .15s ease .25s,visibility 0s .4s}
+  .tipwrap::before{content:"";position:absolute;top:calc(100% + 3px);
+    left:16px;border:6px solid transparent;border-bottom-color:#2A241B;
+    opacity:0;visibility:hidden;z-index:41;
+    transition:opacity .15s ease .25s,visibility 0s .4s}
+  .tipwrap:hover::after,.tipwrap:hover::before,
+  .tipwrap:focus-visible::after,.tipwrap:focus-visible::before{
+    opacity:1;visibility:visible;transition-delay:.25s}
   /* ============ orta grafik satiri ============ */
   .midrow{display:grid;grid-template-columns:1.35fr 1fr;gap:10px;
           min-height:clamp(180px,26vh,300px)}
@@ -328,7 +346,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         </div>
       </div>
       <div class="card fill pf">
-        <div class="chead">Portföy Simülasyonu <span class="tag">gölge · bileşik</span></div>
+        <div class="chead"><span class="tipwrap" tabindex="0" data-tip="Gölge sinyalleri para yönetimi diline çevirir. Model: her kapanan işlemde bakiyenin, girdiğin Risk % kadarı riske atılır; sonuç bakiye × (1 + risk × R) olarak İŞLEM KAPANIŞ SIRASIYLA bileşik işler (örn. 10.000$ ve %1 riskte +2.2R kazanç = +220$, −1R kayıp = −100$). Bugün / 7 gün / 30 gün satırları, o pencerede kapanan işlemlerin bakiyeye net etkisidir; 'açılan' o gün üretilen sinyal sayısıdır (günler UTC). Başlangıç $ ve Risk % alanlarını buradan değiştirebilirsin — tarayıcında saklanır. Kayma/komisyon yoktur; simülasyondur, gerçek para değildir.">Portföy Simülasyonu <span class="i">ⓘ</span></span> <span class="tag">gölge · bileşik</span></div>
         <div class="cbody fill scroll" id="pf">
           <div class="inputs">
             <label>Başlangıç $ <input type="number" id="pfCap" min="1" step="100" value="10000"></label>
@@ -347,7 +365,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="cbody fill chartwrap curve" id="curveWrap"><canvas id="eqChart"></canvas></div>
         </div>
         <div class="card">
-          <div class="chead">Yön Bilançosu <span class="tag">tıkla → yön filtresi</span></div>
+          <div class="chead"><span class="tipwrap" tabindex="0" data-tip="Aynı motorun LONG ve SHORT taraflarının ayrı karnesi. Her yön için: sonuçlanan işlemlerin R toplamı (büyük rakam ve çubuk — 0 ekseninden sağa yeşil kâr, sola kırmızı zarar; ölçek iki yönün mutlak maksimumudur), W/L sayıları ve açık pozisyon adedi. Bir taraf sistematik eksideyse motor rejime ters işlem üretiyor demektir — v3.0 market gate tam olarak bu verinin üzerine inşa edildi. Bloğa tıklayınca sinyal tablosu o yönle filtrelenir.">Yön Bilançosu <span class="i">ⓘ</span></span> <span class="tag">tıkla → yön filtresi</span></div>
           <div class="cbody fill duel" id="duel"></div>
         </div>
       </div>
