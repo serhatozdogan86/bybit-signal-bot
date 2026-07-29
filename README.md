@@ -1,6 +1,18 @@
 # Bybit Signal Engine → Telegram Bot
 
 Conservative swing, structure-first, volume-confirmed, risk-first kripto futures sinyal motoru.
+
+## v3.0 — Veriyle kazanılmış filtreler
+İlk 49 sonuçlanmış gölge sinyalin kanıtlarıyla eklendi:
+- **Market gate:** BTC 4H EMA200 rejimi karşıtı sinyaller bloklanır
+  (`MARKET_GATE_ENABLED`, varsayılan açık; ±%0.25 nötr bant; BTC verisi
+  alınamazsa fail-open). Gerekçe: ayı rejiminde LONG 4W/16L (−6.99R) vs
+  SHORT 16W/13L (+28.75R).
+- **RR tavanı:** plan RR > `RISK_REWARD_MAX` (varsayılan 6.0) → NO_TRADE
+  "stop too tight". Gerekçe: RR≥6 planlı 4 sinyalin 4'ü de LOSS.
+- **Orphan eval:** günlük evren yenilemesinde liste dışına düşen paritelerin
+  açık sinyalleri her tur sonunda ayrıca değerlendirilir (zombi-PENDING
+  vakası düzeltmesi).
 Bybit v5 public API'den veri çeker, sabit filtre hattından geçirir; yalnızca geçerli setup'larda
 Telegram'a **SIGNAL** gönderir, aksi halde **NO_TRADE** veya **DATA_MISSING** üretir.
 
