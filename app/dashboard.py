@@ -390,11 +390,13 @@ DASHBOARD_HTML = r"""<!doctype html>
         </div>
       </div>
       <div class="card fill pf">
-        <div class="chead"><span class="tipwrap" tabindex="0" data-tip="Gölge sinyalleri para yönetimi diline çevirir. Model: her kapanan işlemde bakiyenin, girdiğin Risk % kadarı riske atılır; sonuç bakiye × (1 + risk × R) olarak İŞLEM KAPANIŞ SIRASIYLA bileşik işler (örn. 10.000$ ve %1 riskte +2.2R kazanç = +220$, −1R kayıp = −100$). Bugün / 7 gün / 30 gün satırları, o pencerede kapanan işlemlerin bakiyeye net etkisidir; 'açılan' o gün üretilen sinyal sayısıdır (günler UTC). Başlangıç $ ve Risk % alanlarını buradan değiştirebilirsin — tarayıcında saklanır. Kayma/komisyon yoktur; simülasyondur, gerçek para değildir.">Portföy Simülasyonu <span class="i">ⓘ</span></span> <span class="tag">gölge · bileşik</span></div>
+        <div class="chead"><span class="tipwrap" tabindex="0" data-tip="Gölge sinyalleri para yönetimi diline çevirir. Model: her kapanan işlemde bakiyenin, girdiğin Risk % kadarı riske atılır; sonuç bakiye × (1 + risk × R) olarak İŞLEM KAPANIŞ SIRASIYLA bileşik işler (örn. 10.000$ ve %1 riskte +2.2R kazanç = +220$, −1R kayıp = −100$). Bugün / 7 gün / 30 gün satırları, o pencerede kapanan işlemlerin bakiyeye net etkisidir; 'açılan' o gün üretilen sinyal sayısıdır (günler UTC). Başlangıç $ ve Risk % alanlarını buradan değiştirebilirsin — tarayıcında saklanır. Kayma/komisyon yoktur; simülasyondur, gerçek para değildir. KAPASİTE MODU: Slot ve Kaldıraç alanları gerçek sermaye kısıtını modeller — sermaye slotlara bölünür, defter doluyken gelen sinyal atlanır (atlanan sayısı gösterilir); 'sınırsız varsayım' satırı kısıtsız teorik bakiyeyi kıyas için verir.">Portföy Simülasyonu <span class="i">ⓘ</span></span> <span class="tag">gölge · bileşik</span></div>
         <div class="cbody fill scroll" id="pf">
           <div class="inputs">
             <label>Başlangıç $ <input type="number" id="pfCap" min="1" step="100" value="10000"></label>
             <label>Risk % <input type="number" id="pfRisk" min="0.1" max="10" step="0.1" value="1.0" style="width:52px"></label>
+            <label>Slot <input type="number" id="pfSlots" min="1" max="30" step="1" value="5" style="width:46px"></label>
+            <label>Kald. <input type="number" id="pfLev" min="1" max="25" step="1" value="3" style="width:46px"></label>
           </div>
           <div id="pfBody"><div class="empty">hesaplanıyor…</div></div>
         </div>
@@ -936,43 +938,74 @@ function renderNews(n){
 function pfLoad(){
   try{
     const c=localStorage.getItem("pf_capital"),r=localStorage.getItem("pf_risk");
+    const sl=localStorage.getItem("pf_slots"),lv=localStorage.getItem("pf_lev");
     if(c)$("pfCap").value=c;
     if(r)$("pfRisk").value=r;
+    if(sl)$("pfSlots").value=sl;
+    if(lv)$("pfLev").value=lv;
   }catch(e){}
 }
 function pfSave(){
   try{
     localStorage.setItem("pf_capital",$("pfCap").value);
     localStorage.setItem("pf_risk",$("pfRisk").value);
+    localStorage.setItem("pf_slots",$("pfSlots").value);
+    localStorage.setItem("pf_lev",$("pfLev").value);
   }catch(e){}
 }
 function renderPortfolio(signals){
   const cap0=Math.max(1,Number($("pfCap").value)||10000);
   const riskPct=Math.min(10,Math.max(.1,Number($("pfRisk").value)||1))/100;
-  const done=(signals||[]).filter(s=>["WIN","LOSS"].includes(OUT(s))&&s.closed_utc)
-    .sort((a,b)=>a.closed_utc.localeCompare(b.closed_utc));
+  const K=Math.min(30,Math.max(1,Math.round(Number($("pfSlots").value)||5)));
+  const L=Math.min(25,Math.max(1,Number($("pfLev").value)||3));
+  const T0=Date.parse;
+  const ts=s=>T0((s||"").endsWith("Z")?s:(s||"")+"Z");
   const now=Date.now();
   const dayStart=new Date();dayStart.setUTCHours(0,0,0,0);
   const T={gun:dayStart.getTime(),hafta:now-7*864e5,ay:now-30*864e5};
-  // bilesik yurutme: her kapanista capital *= 1 + riskPct * R
-  let cap=cap0;const at={gun:cap0,hafta:cap0,ay:cap0};const cnt={gun:0,hafta:0,ay:0};
-  const seen={gun:false,hafta:false,ay:false};
-  for(const s of done){
-    const t=Date.parse(s.closed_utc.endsWith("Z")?s.closed_utc:s.closed_utc+"Z");
-    for(const k of ["gun","hafta","ay"]){
-      if(!seen[k]&&t>=T[k]){at[k]=cap;seen[k]=true;}
-      if(t>=T[k])cnt[k]++;
-    }
-    cap=cap*(1+riskPct*(s.r_multiple||0));
+  /* olay listesi: dogum + kapanis */
+  const evs=[];
+  for(const s of (signals||[])){
+    if(!s.created_utc)continue;
+    evs.push([ts(s.created_utc),0,s]);
+    if(s.closed_utc)evs.push([ts(s.closed_utc),1,s]);
   }
-  for(const k of ["gun","hafta","ay"])if(!seen[k])at[k]=cap; // pencerede islem yok
-  const openedToday=(signals||[]).filter(s=>{
-    const t=Date.parse((s.created_utc||"").endsWith("Z")?s.created_utc:(s.created_utc||"")+"Z");
-    return t>=T.gun;}).length;
+  evs.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+  /* kapasite-kisitli yurutme */
+  let eq=cap0,taken=0,skipped=0;const book={};
+  const at={gun:cap0,hafta:cap0,ay:cap0},cnt={gun:0,hafta:0,ay:0},
+        seen={gun:false,hafta:false,ay:false};
+  for(const [t,kind,s] of evs){
+    if(kind===0){
+      if(Object.keys(book).length>=K){skipped++;continue;}
+      const e=s.direction==="LONG"?s.entry_max:s.entry_min;
+      const d=e?Math.abs(e-s.stop_loss)/e:0;
+      if(d<=0)continue;
+      let r=eq*riskPct;const n=r/d,capN=eq/K*L;
+      if(n>capN)r*=capN/n;
+      book[s.id]=r;taken++;
+    }else{
+      const r=book[s.id];if(r==null)continue;delete book[s.id];
+      if(s.outcome==="WIN"||s.outcome==="LOSS"){
+        for(const k of ["gun","hafta","ay"]){
+          if(!seen[k]&&t>=T[k]){at[k]=eq;seen[k]=true;}
+          if(t>=T[k])cnt[k]++;
+        }
+        eq+=r*(s.r_multiple||0);
+      }
+    }
+  }
+  for(const k of ["gun","hafta","ay"])if(!seen[k])at[k]=eq;
+  /* sinirsiz referans (eski model) */
+  let ref=cap0;
+  (signals||[]).filter(s=>(s.outcome==="WIN"||s.outcome==="LOSS")&&s.closed_utc)
+    .sort((a,b)=>a.closed_utc.localeCompare(b.closed_utc))
+    .forEach(s=>{ref*=1+riskPct*(s.r_multiple||0);});
+  const openedToday=(signals||[]).filter(s=>ts(s.created_utc||"")>=T.gun).length;
   const money=v=>"$"+v.toLocaleString("en-US",{maximumFractionDigits:0});
-  const totPct=100*(cap-cap0)/cap0;
+  const totPct=100*(eq-cap0)/cap0, refPct=100*(ref-cap0)/cap0;
   const row=(lbl,base,n,extra)=>{
-    const d=cap-base,p=base?100*d/base:0;
+    const d=eq-base,p=base?100*d/base:0;
     const cls=d>0?"pos":d<0?"neg":"";
     const sign=d>=0?"+":"−";
     return `<div class="prow"><span class="w">${lbl}</span>
@@ -981,13 +1014,15 @@ function renderPortfolio(signals){
   };
   $("pfBody").innerHTML=
     `<div class="bal"><div style="display:flex;justify-content:space-between;align-items:baseline">
-       <span class="b num">${money(cap)}</span>
+       <span class="b num">${money(eq)}</span>
        <span class="p num ${totPct>0?"pos":totPct<0?"neg":""}">${(totPct>0?"+":"")+num(totPct,2)}%</span></div>
-       <div class="c" style="font-size:9.8px;color:var(--muted)">güncel bakiye · ${done.length} işlem · başlangıç ${money(cap0)}</div></div>`+
+       <div class="c" style="font-size:9.8px;color:var(--muted)">kapasite-kısıtlı · ${taken} alınan / ${skipped} atlanan · ${Object.keys(book).length} açık slot</div></div>`+
+    `<div class="prow"><span class="w" style="width:auto">sınırsız varsayım</span>
+      <span class="d num ${refPct>0?"pos":refPct<0?"neg":""}" style="font-weight:500">${money(ref)} (${(refPct>0?"+":"")+num(refPct,1)}%)</span><span class="c"></span></div>`+
     row("Bugün",at.gun,cnt.gun," / "+openedToday+" açılan")+
     row("7 gün",at.hafta,cnt.hafta)+
     row("30 gün",at.ay,cnt.ay)+
-    `<div class="foot">Simülasyon: her işlemde bakiyenin %${(riskPct*100).toFixed(1)}'i riske atılır, sonuç R×risk olarak bileşik işler. Kayma/komisyon yok; gölge muhasebedir, gerçek para değildir. Günler UTC'dir.</div>`;
+    `<div class="foot">Kapasite modeli: sermaye ${K} slota bölünür (slot marjini × ${L}x kaldıraç tavanı); defter doluyken gelen sinyal ATLANIR; risk %${(riskPct*100).toFixed(1)}, işlem kapanış sırasıyla bileşik. Kayma/komisyon yok; gölge simülasyondur, gerçek para değildir. Günler UTC.</div>`;
 }
 let tipTimer=null;
 function showTip(el){
@@ -1088,7 +1123,7 @@ function renderFooter(backup,healthy,ms,perf){
     `<span>veri <b>${new Date().toLocaleTimeString("tr-TR")}</b></span><span class="sep">|</span>`+
     `<span>${gist}</span><span class="sep">|</span>`+
     `<span>yanıt <b>${ms} ms</b></span><span class="sep">|</span>`+
-    `<span>v3.2</span>`+
+    `<span>v3.3</span>`+
     `<span class="right">gölge muhasebe · geçmiş performans garanti değildir · yatırım tavsiyesi değildir</span>`;
   if(perf&&perf.total_r_multiple!=null){
     const tr=perf.total_r_multiple;
@@ -1100,7 +1135,7 @@ function renderFooter(backup,healthy,ms,perf){
 async function refresh(){
   const t0=performance.now();
   const [perf,signals,status,uni,comments,market,news,px,backup]=await Promise.all([
-    j("/performance"),j("/signals?limit=200"),j("/status"),j("/universe"),
+    j("/performance"),j("/signals?limit=500"),j("/status"),j("/universe"),
     j("/commentary?limit=4"),j("/market"),j("/news"),j("/prices"),
     j("/backup/info")]);
   const fetchMs=Math.round(performance.now()-t0);
@@ -1140,7 +1175,7 @@ $("fs").addEventListener("change",()=>{
   applyZoom($("fs").value);
   try{localStorage.setItem("ui_zoom",$("fs").value);}catch(e){}});
 pfLoad();
-["pfCap","pfRisk"].forEach(id=>$(id).addEventListener("input",()=>{
+["pfCap","pfRisk","pfSlots","pfLev"].forEach(id=>$(id).addEventListener("input",()=>{
   pfSave();renderPortfolio(SIGNALS);}));
 refresh();schedule();
 </script>
