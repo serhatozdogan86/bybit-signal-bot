@@ -46,6 +46,7 @@ class Scheduler:
         self._tracker = tracker      # None -> golge takip kapali
         self._gist = gist_backup     # None -> gist sync kapali
         self._commentary = commentary  # None -> saatlik yorum kapali
+        self._market_bias = "neutral"   # v3.0: her tam taramada guncellenir
         self._universe = universe    # None -> static SYMBOLS
         self._params = settings.strategy_params
 
@@ -58,7 +59,8 @@ class Scheduler:
     def scan_symbol(self, symbol: str) -> Decision:
         htf = self._md.get_series(symbol, self._settings.HTF)
         ltf = self._md.get_series(symbol, self._settings.LTF)
-        decision = signal_engine.evaluate(symbol, htf, ltf, self._params)
+        decision = signal_engine.evaluate(symbol, htf, ltf, self._params,
+                                          market_bias=self._market_bias)
 
         if decision.decision is DecisionType.SIGNAL and self._settings.ORDERBOOK_ENRICH:
             self._enrich_with_orderbook(decision)
@@ -95,7 +97,9 @@ class Scheduler:
             log.exception(kv(event="shadow_error", symbol=decision.pair))
 
     def scan_all(self, send_telegram: bool = True) -> list[Decision]:
+        self._market_bias = self._compute_market_bias()
         results: list[Decision] = []
+        scanned: set[str] = set()
         for symbol in self.symbols():
             try:
                 decision = self.scan_symbol(symbol)
@@ -103,14 +107,62 @@ class Scheduler:
                 log.exception(kv(event="scan_error", symbol=symbol))
                 continue
             results.append(decision)
+            scanned.add(symbol)
             self._store.save_result(symbol, decision.contract_dict())
             if send_telegram:
                 self._dispatch(decision)
             time.sleep(self._settings.SYMBOL_PAUSE_SEC)
 
+        if self._tracker is not None:
+            self._evaluate_orphans(scanned)
         self._store.record_scan(
             datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
         return results
+
+    # ---------------------------------------------------- v3.0 yardimcilar
+    def _compute_market_bias(self) -> str:
+        """BTC 4H kapanisinin EMA200'e konumu -> bull / bear / neutral.
+
+        Motorun yon kapisi (market gate) icin tek referans. Veri yoksa veya
+        yetersizse "neutral" doner (fail-open: kapi kimseyi bloklamaz).
+        Notr bant +-%0.25: EMA uzerinde surtunen fiyatta kapi titremesin.
+        """
+        try:
+            series = self._md.get_series("BTCUSDT", self._settings.HTF)
+            if series is None or len(series) < 120:
+                return "neutral"
+            close = series.to_dataframe()["close"]
+            ema = close.ewm(span=200, adjust=False).mean().iloc[-1]
+            diff = close.iloc[-1] / ema - 1
+            bias = "bull" if diff > 0.0025 else "bear" if diff < -0.0025 else "neutral"
+            log.info(kv(event="market_bias", bias=bias, diff=f"{diff:+.4f}"))
+            return bias
+        except Exception:
+            log.exception(kv(event="market_bias_error"))
+            return "neutral"
+
+    def _evaluate_orphans(self, scanned: set[str]) -> None:
+        """Evren disina dusen paritelerin acik sinyallerini yasat (v3.0).
+
+        IONQ vakasi: parite top-N listesinden cikinca taranmiyor, acik
+        sinyali sonsuza dek PENDING kaliyordu. Artik her tur sonunda,
+        taranmamis acik-sinyalli pariteler icin mum cekilir ve
+        degerlendirme calistirilir.
+        """
+        try:
+            pairs = [p for p in self._tracker.open_pairs() if p not in scanned]
+        except Exception:
+            log.exception(kv(event="orphan_list_error"))
+            return
+        for pair in pairs:
+            try:
+                ltf = self._md.get_series(pair, self._settings.LTF)
+                if ltf is not None and len(ltf):
+                    self._tracker.record_candles(ltf)
+                self._tracker.evaluate_open(pair)
+                log.info(kv(event="orphan_eval", pair=pair))
+            except Exception:
+                log.exception(kv(event="orphan_eval_error", pair=pair))
 
     # ------------------------------------------------------------ dispatch
     def _render(self, d: Decision) -> str:

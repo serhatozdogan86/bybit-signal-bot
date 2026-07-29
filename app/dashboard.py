@@ -297,7 +297,8 @@ DASHBOARD_HTML = r"""<!doctype html>
           <p><b>Conservative swing.</b> Yapı önce gelir; indikatörler yalnız teyittir. Kenar net değilse karar <b>NO_TRADE</b>.</p>
           <div class="srow"><span>Zaman dilimi</span><b>4H → 15m</b></div>
           <div class="srow"><span>Hacim teyidi</span><b>≥ 1.5× ort.</b></div>
-          <div class="srow"><span>Min risk/ödül</span><b>2.0</b></div>
+          <div class="srow"><span>Risk/ödül bandı</span><b>2.0 – 6.0</b></div>
+          <div class="srow"><span>Yön kapısı</span><b>BTC 4H rejimi</b></div>
           <div class="srow"><span>Setup</span><b>retest · sweep</b></div>
           <div class="srow"><span>Evren</span><b id="stratUni">top-150</b></div>
         </div>
@@ -572,7 +573,8 @@ const STEPS=[
   ["HTF STRUCTURE","4H yapı çelişkili","HTF structure unclear","#F59E0B"],
   ["LTF SETUP","Doğrulanmış retest/sweep yok","no valid LTF setup","#D3B411"],
   ["VOLUME","Tetik hacmi <1.5× ort.","no volume confirmation","#84CC16"],
-  ["RISK/REWARD","Plan RR < 2.0","RR ","#16A34A"],
+  ["MARKET GATE","Rejim karşıtı yön bloklandı","counter-regime","#0EA5A4"],
+  ["RISK/REWARD","Plan RR bandı dışı (<2 / >6)","RR ","#16A34A"],
 ];
 function stageOf(d){
   if(d.decision==="SIGNAL")return "SIGNAL";

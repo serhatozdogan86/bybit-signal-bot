@@ -33,7 +33,8 @@ def _fmt(v: float) -> str:
 
 
 def evaluate(pair: str, htf_series: KlineSeries | None, ltf_series: KlineSeries | None,
-             params: StrategyParams, now: datetime | None = None) -> Decision:
+             params: StrategyParams, now: datetime | None = None,
+             market_bias: str = "neutral") -> Decision:
     d = Decision.base(pair, params.htf, params.ltf, now)
 
     # 1. DATA
@@ -94,6 +95,18 @@ def evaluate(pair: str, htf_series: KlineSeries | None, ltf_series: KlineSeries 
     conf = indicator_confluence.collect(ltf, htf, direction)
     d.indicator_confluence = conf
 
+    # 6.5 MARKET GATE (v3.0): piyasa rejimi karsiti sinyaller bloklanir.
+    # Gerekce (n=49 golge verisi): ayi rejiminde LONG 4W/16L (-6.99R),
+    # SHORT 16W/13L (+28.75R). Karsi-trend taraf sistematik kanama.
+    if params.market_gate and (
+            (market_bias == "bear" and direction is Direction.LONG)
+            or (market_bias == "bull" and direction is Direction.SHORT)):
+        d.failed_filters = ["MARKET_GATE"]
+        d.reject_reason = (f"counter-regime {direction.value.lower()} blocked "
+                           f"(market gate: BTC {market_bias})")
+        d.watch_condition = "market regime alignment or neutral BTC bias"
+        return d
+
     # 7. RISK / REWARD
     plan = build_trade_plan(ltf, htf, direction, setup.level, params)
     if plan is None or plan.rr < params.min_rr:
@@ -101,6 +114,14 @@ def evaluate(pair: str, htf_series: KlineSeries | None, ltf_series: KlineSeries 
         d.failed_filters = ["RISK_REWARD"]
         d.reject_reason = f"RR {rr_txt} < min {params.min_rr:.1f}"
         d.watch_condition = "deeper retest for better entry location"
+        return d
+    if plan.rr > params.rr_max:
+        # v3.0: asiri yuksek plan RR = fiyatin dibine sikismis stop.
+        # Golge veri: RR>=6 planli 4 sinyalin 4'u de LOSS (gurultu stopu).
+        d.failed_filters = ["RISK_REWARD_MAX"]
+        d.reject_reason = (f"RR {plan.rr:.2f} > max {params.rr_max:.1f} "
+                           "(stop too tight for noise)")
+        d.watch_condition = "wider structural stop / ATR-based placement"
         return d
 
     # 8. SIGNAL

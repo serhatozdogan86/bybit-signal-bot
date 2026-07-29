@@ -21,6 +21,8 @@ class StrategyParams(BaseModel):
     pivot_lookback: int = 3
     atr_stop_mult: float = 1.2
     min_bars: int = 60
+    rr_max: float = 6.0        # v3.0: plan RR tavani (asiri dar stop filtresi)
+    market_gate: bool = True   # v3.0: rejim karsiti sinyalleri blokla
 
 
 class Settings(BaseSettings):
@@ -58,6 +60,8 @@ class Settings(BaseSettings):
 
     # Strateji
     RISK_REWARD_MIN: float = 2.0
+    RISK_REWARD_MAX: float = 6.0
+    MARKET_GATE_ENABLED: bool = True
     ADX_CHOP: float = 20.0
     VOLUME_MULT: float = 1.5
     PIVOT_LOOKBACK: int = 3
@@ -103,6 +107,8 @@ class Settings(BaseSettings):
             volume_mult=self.VOLUME_MULT,
             pivot_lookback=self.PIVOT_LOOKBACK,
             atr_stop_mult=self.ATR_STOP_MULT,
+            rr_max=self.RISK_REWARD_MAX,
+            market_gate=self.MARKET_GATE_ENABLED,
         )
 
 

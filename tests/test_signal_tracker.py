@@ -119,3 +119,23 @@ def test_dataset_accumulation(tmp_path):
     # ayni mumlar tekrar yazilirsa cogaltilmaz (INSERT OR IGNORE)
     _feed(tracker, closes=[100.0, 101.0, 102.0])
     assert tracker.stats()["dataset"]["candles_archived"] == 3
+
+
+def test_open_pairs_lists_unclosed(tmp_path):
+    from app.services.database import Database as _DB
+    tracker = SignalTracker(_DB(str(tmp_path / "op.db")), ltf_interval="15")
+    tracker.import_signals([
+        {"pair": "AAAUSDT", "direction": "LONG", "created_utc": "x",
+         "entry_candle_ts": 1, "entry_min": 1, "entry_max": 1.1,
+         "stop_loss": .9, "tp1": 2, "tp2": 3, "rr": 2.0,
+         "status": "PENDING", "outcome": None, "fill_price": None,
+         "exit_price": None, "r_multiple": None, "closed_utc": None,
+         "contract_json": "{}"},
+        {"pair": "BBBUSDT", "direction": "SHORT", "created_utc": "x",
+         "entry_candle_ts": 1, "entry_min": 1, "entry_max": 1.1,
+         "stop_loss": 1.2, "tp1": .8, "tp2": .7, "rr": 2.0,
+         "status": "CLOSED", "outcome": "WIN", "fill_price": 1,
+         "exit_price": .8, "r_multiple": 2.0, "closed_utc": "y",
+         "contract_json": "{}"},
+    ])
+    assert tracker.open_pairs() == ["AAAUSDT"]

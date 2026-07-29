@@ -99,3 +99,33 @@ def test_contract_dict_field_names_are_stable():
     }
     assert set(c.keys()) == expected
     assert c["schema_version"] == "1.1"
+
+
+# ------------------------------------------------------------- v3.0
+def test_market_gate_blocks_counter_regime_long():
+    htf, ltf = _long_scenario()
+    d = signal_engine.evaluate("GATEUSDT", htf, ltf, PARAMS, market_bias="bear")
+    assert d.decision is DecisionType.NO_TRADE
+    assert "MARKET_GATE" in d.failed_filters
+    assert "counter-regime long" in d.reject_reason
+    # ayni senaryo bull/neutral bias'ta SIGNAL olmali (kapi tek tarafli)
+    assert signal_engine.evaluate("GATEUSDT", htf, ltf, PARAMS,
+                                  market_bias="bull").decision is DecisionType.SIGNAL
+    assert signal_engine.evaluate("GATEUSDT", htf, ltf, PARAMS,
+                                  market_bias="neutral").decision is DecisionType.SIGNAL
+
+
+def test_market_gate_disabled_passes():
+    htf, ltf = _long_scenario()
+    p = PARAMS.model_copy(update={"market_gate": False})
+    d = signal_engine.evaluate("GATEUSDT", htf, ltf, p, market_bias="bear")
+    assert d.decision is DecisionType.SIGNAL
+
+
+def test_rr_max_rejects_tight_stop_plans():
+    htf, ltf = _long_scenario()
+    p = PARAMS.model_copy(update={"rr_max": 0.5})   # her plani tavana takar
+    d = signal_engine.evaluate("TIGHTUSDT", htf, ltf, p)
+    assert d.decision is DecisionType.NO_TRADE
+    assert "RISK_REWARD_MAX" in d.failed_filters
+    assert "max" in d.reject_reason

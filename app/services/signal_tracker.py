@@ -192,6 +192,12 @@ class SignalTracker:
             "SELECT ts,open,high,low,close,volume FROM candles "
             "WHERE symbol=? AND interval=? ORDER BY ts ASC", (symbol, interval))
 
+    def open_pairs(self) -> list[str]:
+        """Acik (PENDING/FILLED) sinyali olan pariteler - orphan eval icin."""
+        rows = self._db.query(
+            "SELECT DISTINCT pair FROM signals WHERE status!='CLOSED'")
+        return [r["pair"] for r in rows]
+
     def signal_pairs(self) -> list[str]:
         """Sinyal kaydi olan pariteler (gist candle_mode=signals icin)."""
         return [r["pair"] for r in
