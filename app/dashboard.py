@@ -36,6 +36,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     --amber:#D97706; --amber-bg:#FBEFD4; --amber-ink:#78350F;
     --blue:#2563EB;  --blue-bg:#E3EBFA;  --blue-ink:#1E3A8A;
     --grey:#98907F;  --grey-bg:#F0EBDF;
+    --head:#4A4132;
     --sans:Inter,Roboto,-apple-system,"SF Pro Text","Segoe UI",sans-serif;
     --shadow:0 1px 2px rgba(88,70,38,.06),0 5px 14px rgba(88,70,38,.05);
     --shadow-hi:0 2px 4px rgba(88,70,38,.08),0 10px 24px rgba(88,70,38,.09);
@@ -80,8 +81,8 @@ DASHBOARD_HTML = r"""<!doctype html>
   .col{display:flex;flex-direction:column;gap:10px;min-height:0}
   .card{background:var(--card);border:1px solid var(--line);border-radius:11px;
         box-shadow:var(--shadow);display:flex;flex-direction:column;min-height:0}
-  .chead{padding:var(--pad) 14px 0;font-size:11px;font-weight:600;
-         letter-spacing:.04em;text-transform:uppercase;color:var(--muted);
+  .chead{padding:var(--pad) 14px 0;font-size:11px;font-weight:700;
+         letter-spacing:.04em;text-transform:uppercase;color:var(--head);
          display:flex;align-items:baseline;gap:8px}
   .chead .tag{margin-left:auto;font-weight:400;font-size:10.5px;
               text-transform:none;letter-spacing:0}
@@ -119,7 +120,7 @@ DASHBOARD_HTML = r"""<!doctype html>
   .kpi{background:var(--card);border:1px solid var(--line);border-radius:11px;
        box-shadow:var(--shadow);padding:8px 14px 7px;position:relative}
   .kpi .lbl{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
-            color:var(--muted);font-weight:600}
+            color:var(--head);font-weight:700}
   .kpi .val{font-size:clamp(19px,2.4vh,24px);font-weight:600;margin-top:1px}
   .kpi .sub{font-size:11px;color:var(--muted);white-space:nowrap;
             overflow:hidden;text-overflow:ellipsis}
@@ -181,7 +182,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         color:var(--muted);border-top:1px dashed var(--line);padding-top:4px}
   /* ============ tablo/badge ============ */
   table{width:100%;border-collapse:collapse;font-size:12.5px}
-  th{color:var(--muted);text-align:left;font-weight:600;font-size:10.5px;
+  th{color:var(--head);text-align:left;font-weight:700;font-size:10.5px;
      letter-spacing:.05em;text-transform:uppercase;padding:7px 10px;
      border-bottom:1px solid var(--line);background:var(--card2);
      position:sticky;top:0;z-index:1}
@@ -227,7 +228,7 @@ DASHBOARD_HTML = r"""<!doctype html>
   .breadth{font-size:11.5px;color:var(--muted);margin-top:6px}
   .movers{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:7px;
           font-size:11.5px}
-  .movers h4{font-size:10px;color:var(--muted);letter-spacing:.05em;
+  .movers h4{font-size:10px;color:var(--head);letter-spacing:.05em;
              font-weight:600;margin-bottom:2px;text-transform:uppercase}
   .movers a{display:flex;justify-content:space-between;color:var(--text);
             text-decoration:none;padding:1px 0}
@@ -291,6 +292,12 @@ DASHBOARD_HTML = r"""<!doctype html>
         border-radius:7px;padding:7px 10px;color:var(--muted)}
   .note b{color:var(--text)}
   a{color:var(--blue)}
+  /* buyuk yazi modu: tek-ekran kilidi kalkar, sayfa kayar; uzun listeler
+     yine kendi icinde kayar (55vh tavan) */
+  body.zoomed{overflow:auto}
+  body.zoomed .app{height:auto;min-height:100vh}
+  body.zoomed .scroll{max-height:55vh}
+  body.zoomed .midrow{min-height:280px}
   @media (max-height:940px){
     :root{--pad:7px}
     body{font-size:12.5px}
@@ -1021,7 +1028,10 @@ function schedule(){
 }
 $("iv").addEventListener("change",schedule);
 $("refresh").addEventListener("click",refresh);
-function applyZoom(v){document.body.style.zoom=v;}
+function applyZoom(v){
+  document.body.style.zoom=v;
+  document.body.classList.toggle("zoomed",Number(v)>1);
+}
 try{
   const z=localStorage.getItem("ui_zoom")||"1";
   $("fs").value=z;applyZoom(z);
