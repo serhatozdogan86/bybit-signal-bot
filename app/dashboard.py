@@ -44,7 +44,7 @@ DASHBOARD_HTML = r"""<!doctype html>
   *{box-sizing:border-box;margin:0}
   html,body{height:100%}
   body{background:var(--bg);color:var(--text);font-family:var(--sans);
-       font-size:12px;line-height:1.45;overflow:hidden;
+       font-size:13px;line-height:1.45;overflow:hidden;
        font-variant-numeric:tabular-nums}
   .num{font-variant-numeric:tabular-nums;letter-spacing:-.01em}
   .app{display:grid;grid-template-rows:56px minmax(0,1fr);height:100vh;
@@ -63,14 +63,14 @@ DASHBOARD_HTML = r"""<!doctype html>
     .dot{animation:pulse 2.4s ease-in-out infinite}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
   }
-  .hsum{flex:1;text-align:center;color:var(--muted);font-size:12.5px;
+  .hsum{flex:1;text-align:center;color:var(--muted);font-size:13.5px;
         overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .hsum b{color:var(--text);font-weight:600}
-  .hsum .t{font-size:11.5px;margin-right:8px}
+  .hsum .t{font-size:12.5px;margin-right:8px}
   .hctl{display:flex;gap:8px;align-items:center}
   select,button{background:var(--card);color:var(--text);
     border:1px solid var(--line);border-radius:8px;padding:5px 10px;
-    font-family:var(--sans);font-size:11.5px;cursor:pointer}
+    font-family:var(--sans);font-size:12.5px;cursor:pointer}
   button:hover,select:hover{border-color:var(--blue)}
   :focus-visible{outline:2px solid var(--blue);outline-offset:2px}
   .icon{width:30px;padding:5px 0;text-align:center}
@@ -83,15 +83,15 @@ DASHBOARD_HTML = r"""<!doctype html>
   .chead{padding:var(--pad) 14px 0;font-size:11px;font-weight:600;
          letter-spacing:.04em;text-transform:uppercase;color:var(--muted);
          display:flex;align-items:baseline;gap:8px}
-  .chead .tag{margin-left:auto;font-weight:400;font-size:10px;
+  .chead .tag{margin-left:auto;font-weight:400;font-size:10.5px;
               text-transform:none;letter-spacing:0}
   .cbody{padding:6px 14px var(--pad);min-height:0}
   .scroll{overflow-y:auto;scrollbar-width:thin}
   .fill{flex:1}
-  .empty{color:var(--muted);font-size:11px;padding:6px 0}
+  .empty{color:var(--muted);font-size:12px;padding:6px 0}
   .pos{color:var(--green)} .neg{color:var(--red)} .amb{color:var(--amber)}
   /* ============ SOL ============ */
-  .strat{font-size:11.5px;color:var(--muted)}
+  .strat{font-size:12.5px;color:var(--muted)}
   .strat p{margin-bottom:6px}
   .strat b{color:var(--text);font-weight:600}
   .srow{display:flex;justify-content:space-between;padding:2px 0;
@@ -102,32 +102,32 @@ DASHBOARD_HTML = r"""<!doctype html>
   .step{padding:5px 6px;margin:0 -6px;border-radius:8px;cursor:pointer;
         transition:background .12s}
   .step:hover{background:var(--card2)}
-  .step .h{display:flex;justify-content:space-between;font-size:11px;
+  .step .h{display:flex;justify-content:space-between;font-size:12px;
            font-weight:600}
   .step .h .n{color:var(--muted);font-weight:500}
-  .step .d{font-size:10px;color:var(--muted);line-height:1.3}
+  .step .d{font-size:10.5px;color:var(--muted);line-height:1.3}
   .step .g{height:5px;border-radius:3px;background:var(--grey-bg);
            margin-top:3px;overflow:hidden}
   .step .g div{height:100%;border-radius:3px}
   .psummary .bar{display:flex;height:12px;border-radius:6px;overflow:hidden;
                  border:1px solid var(--line)}
   .psummary .bar div{height:100%}
-  .psummary .lbl{font-size:9.5px;color:var(--muted);margin-top:3px;
+  .psummary .lbl{font-size:10px;color:var(--muted);margin-top:3px;
                  display:flex;justify-content:space-between}
   /* ============ KPI ============ */
   .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
   .kpi{background:var(--card);border:1px solid var(--line);border-radius:11px;
        box-shadow:var(--shadow);padding:8px 14px 7px;position:relative}
-  .kpi .lbl{font-size:10px;letter-spacing:.05em;text-transform:uppercase;
+  .kpi .lbl{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
             color:var(--muted);font-weight:600}
-  .kpi .val{font-size:clamp(18px,2.2vh,22px);font-weight:600;margin-top:1px}
-  .kpi .sub{font-size:10.5px;color:var(--muted);white-space:nowrap;
+  .kpi .val{font-size:clamp(19px,2.4vh,24px);font-weight:600;margin-top:1px}
+  .kpi .sub{font-size:11px;color:var(--muted);white-space:nowrap;
             overflow:hidden;text-overflow:ellipsis}
   .kpi .tr{position:absolute;top:8px;right:12px;font-size:12px}
   /* KPI tooltip balonu */
   .kpi::after{content:attr(data-tip);position:absolute;top:calc(100% + 8px);
     left:50%;transform:translateX(-50%);background:#2A241B;color:#FBF8F2;
-    padding:8px 11px;border-radius:9px;font-size:10.8px;line-height:1.45;
+    padding:8px 11px;border-radius:9px;font-size:11.8px;line-height:1.45;
     font-weight:400;width:max-content;max-width:250px;white-space:normal;
     opacity:0;visibility:hidden;pointer-events:none;z-index:40;
     box-shadow:0 8px 24px rgba(42,36,27,.28);
@@ -145,7 +145,7 @@ DASHBOARD_HTML = r"""<!doctype html>
   .tipwrap .i{color:var(--blue);font-size:10px;vertical-align:1px}
   .tipwrap::after{content:attr(data-tip);position:absolute;
     top:calc(100% + 9px);left:0;transform:none;background:#2A241B;
-    color:#FBF8F2;padding:9px 12px;border-radius:9px;font-size:10.8px;
+    color:#FBF8F2;padding:9px 12px;border-radius:9px;font-size:11.8px;
     line-height:1.5;font-weight:400;width:max-content;max-width:310px;
     white-space:normal;text-transform:none;letter-spacing:0;
     opacity:0;visibility:hidden;pointer-events:none;z-index:40;
@@ -170,18 +170,18 @@ DASHBOARD_HTML = r"""<!doctype html>
         transition:background .12s}
   .drow:hover{background:var(--card2)}
   .drow.on{background:var(--blue-bg)}
-  .drow .top{display:flex;justify-content:space-between;font-size:11px;
+  .drow .top{display:flex;justify-content:space-between;font-size:12px;
              margin-bottom:3px}
   .drow .top b{font-weight:700}
   .drow .track{display:flex;height:16px;border-radius:8px;overflow:hidden;
                background:var(--grey-bg);border:1px solid var(--line)}
   .drow .track div{height:100%}
-  .dstat{font-size:10.5px;color:var(--muted);margin-top:2px}
-  .axis{display:flex;justify-content:space-between;font-size:10px;
+  .dstat{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .axis{display:flex;justify-content:space-between;font-size:10.5px;
         color:var(--muted);border-top:1px dashed var(--line);padding-top:4px}
   /* ============ tablo/badge ============ */
-  table{width:100%;border-collapse:collapse;font-size:11.5px}
-  th{color:var(--muted);text-align:left;font-weight:600;font-size:10px;
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{color:var(--muted);text-align:left;font-weight:600;font-size:10.5px;
      letter-spacing:.05em;text-transform:uppercase;padding:7px 10px;
      border-bottom:1px solid var(--line);background:var(--card2);
      position:sticky;top:0;z-index:1}
@@ -191,7 +191,7 @@ DASHBOARD_HTML = r"""<!doctype html>
   tr:last-child td{border-bottom:0}
   tr.dim td{opacity:.55}
   .badge{display:inline-block;padding:1px 9px;border-radius:99px;
-         font-size:10px;font-weight:600}
+         font-size:11px;font-weight:600}
   .b-LONG{background:var(--green-bg);color:var(--green-ink)}
   .b-SHORT{background:var(--red-bg);color:var(--red-ink)}
   .b-WIN{background:var(--green-bg);color:var(--green-ink)}
@@ -199,11 +199,11 @@ DASHBOARD_HTML = r"""<!doctype html>
   .b-PENDING,.b-FILLED{background:var(--amber-bg);color:var(--amber-ink)}
   .b-NOT_FILLED,.b-EXPIRED{background:var(--grey-bg);color:#5B5344}
   .b-AMBIGUOUS{background:var(--blue-bg);color:var(--blue-ink)}
-  .age{font-size:9.5px;color:var(--muted)}
+  .age{font-size:10px;color:var(--muted)}
   .chips{display:flex;gap:6px;align-items:center}
   .chip{background:var(--card2);border:1px solid var(--line);
-        color:var(--muted);border-radius:99px;padding:1px 9px;
-        font-size:10px;cursor:pointer;font-weight:500}
+        color:var(--muted);border-radius:99px;padding:1.5px 10px;
+        font-size:11px;cursor:pointer;font-weight:500}
   .chip.on{border-color:var(--blue);color:var(--blue);background:var(--blue-bg)}
   .chip.dir{border-color:var(--amber);color:var(--amber-ink);
             background:var(--amber-bg)}
@@ -211,11 +211,11 @@ DASHBOARD_HTML = r"""<!doctype html>
   .majors{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .mj{background:var(--card2);border:1px solid var(--line);border-radius:9px;
       padding:5px 10px}
-  .mj .sym{font-size:10px;color:var(--muted);font-weight:600}
-  .mj .px{font-size:15px;font-weight:600}
-  .mj .row{font-size:10.5px}
+  .mj .sym{font-size:11px;color:var(--muted);font-weight:600}
+  .mj .px{font-size:16.5px;font-weight:600}
+  .mj .row{font-size:11.5px}
   .fng{margin-top:8px}
-  .fng .lbl{display:flex;justify-content:space-between;font-size:10.5px;
+  .fng .lbl{display:flex;justify-content:space-between;font-size:11.5px;
             color:var(--muted)}
   .fng .lbl b{color:var(--text)}
   .fng .track{position:relative;height:10px;border-radius:5px;margin-top:4px;
@@ -224,52 +224,52 @@ DASHBOARD_HTML = r"""<!doctype html>
     border:1px solid var(--line)}
   .fng .mark{position:absolute;top:-3px;width:3px;height:16px;
              background:var(--text);border-radius:2px}
-  .breadth{font-size:10.5px;color:var(--muted);margin-top:6px}
+  .breadth{font-size:11.5px;color:var(--muted);margin-top:6px}
   .movers{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:7px;
-          font-size:10.5px}
-  .movers h4{font-size:9.5px;color:var(--muted);letter-spacing:.05em;
+          font-size:11.5px}
+  .movers h4{font-size:10px;color:var(--muted);letter-spacing:.05em;
              font-weight:600;margin-bottom:2px;text-transform:uppercase}
   .movers a{display:flex;justify-content:space-between;color:var(--text);
             text-decoration:none;padding:1px 0}
   .movers a:hover{color:var(--blue)}
-  .pulse{margin-top:7px;font-size:11px;background:var(--blue-bg);
+  .pulse{margin-top:7px;font-size:12px;background:var(--blue-bg);
          border-left:3px solid var(--blue);border-radius:7px;padding:6px 9px}
-  .pulse .tg{font-size:9.5px;color:var(--muted)}
-  .review{font-size:11.5px}
-  .review .rts{font-size:10px;color:var(--muted)}
+  .pulse .tg{font-size:10px;color:var(--muted)}
+  .review{font-size:12.5px}
+  .review .rts{font-size:10.5px;color:var(--muted)}
   .review .txt{display:-webkit-box;-webkit-line-clamp:6;
                -webkit-box-orient:vertical;overflow:hidden;margin:3px 0}
   .review.open .txt{display:block;-webkit-line-clamp:unset;overflow:visible}
   .review .txt p{margin-bottom:5px}
   .review .warnline{border-left:3px solid var(--red);padding-left:7px;
                     background:var(--red-bg);border-radius:4px}
-  .more{color:var(--blue);font-size:10.5px;cursor:pointer;font-weight:500}
+  .more{color:var(--blue);font-size:11.5px;cursor:pointer;font-weight:500}
   /* portfoy simulasyonu */
-  .pf .inputs{display:flex;gap:8px;align-items:center;font-size:10.5px;
+  .pf .inputs{display:flex;gap:8px;align-items:center;font-size:11.5px;
               color:var(--muted);flex-wrap:wrap}
-  .pf input{width:74px;background:var(--card2);border:1px solid var(--line);
+  .pf input{width:78px;background:var(--card2);border:1px solid var(--line);
             border-radius:7px;padding:3px 7px;font-family:var(--sans);
-            font-size:11.5px;color:var(--text);
+            font-size:12.5px;color:var(--text);
             font-variant-numeric:tabular-nums}
   .pf input:focus{border-color:var(--blue);outline:none}
   .pf .bal{margin-top:7px;background:var(--card2);border:1px solid var(--line);
            border-radius:9px;padding:6px 10px}
-  .pf .bal .b{font-size:19px;font-weight:700}
+  .pf .bal .b{font-size:20px;font-weight:700}
   .pf .bal .p{font-size:11px;font-weight:600}
   .pf .prow{display:flex;justify-content:space-between;align-items:baseline;
             padding:3.5px 0;border-bottom:1px dashed var(--line);
-            font-size:11px}
+            font-size:12px}
   .pf .prow:last-of-type{border-bottom:0}
   .pf .prow .w{color:var(--muted);font-weight:600;width:48px}
   .pf .prow .d{font-weight:700}
   .pf .prow .c{color:var(--muted);font-size:9.8px}
-  .pf .foot{font-size:9.5px;color:var(--muted);margin-top:4px}
+  .pf .foot{font-size:10px;color:var(--muted);margin-top:4px}
   .news li{list-style:none;padding:5px 0;border-bottom:1px solid var(--card2)}
   .news li:last-child{border-bottom:0}
-  .news a{color:var(--text);text-decoration:none;font-size:11.5px;
+  .news a{color:var(--text);text-decoration:none;font-size:12.5px;
           line-height:1.35;display:block}
   .news a:hover{color:var(--blue)}
-  .news .src{font-size:9.5px;color:var(--muted)}
+  .news .src{font-size:10px;color:var(--muted)}
   /* ============ overlay & modal ============ */
   .ovl{position:fixed;inset:0;background:rgba(42,36,27,.45);display:none;
        align-items:center;justify-content:center;z-index:50;padding:20px}
@@ -283,7 +283,7 @@ DASHBOARD_HTML = r"""<!doctype html>
   .sheet .warn{margin-top:12px;padding:9px 12px;border-left:3px solid var(--red);
                background:var(--red-bg);border-radius:7px;font-size:12px}
   .kvgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;
-          font-size:12px;margin-top:6px}
+          font-size:13px;margin-top:6px}
   .kvgrid .k{color:var(--muted)}
   .kvgrid .v{text-align:right;font-weight:600}
   .taglist{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
@@ -293,7 +293,7 @@ DASHBOARD_HTML = r"""<!doctype html>
   a{color:var(--blue)}
   @media (max-height:940px){
     :root{--pad:7px}
-    body{font-size:11.5px}
+    body{font-size:12.5px}
     .kpi .val{font-size:17px}
     .midrow{min-height:clamp(160px,24vh,240px)}
     .step .d{display:none}
@@ -313,6 +313,11 @@ DASHBOARD_HTML = r"""<!doctype html>
     <div class="logo"><span class="dot" id="dot"></span>signal<b>-engine</b></div>
     <div class="hsum"><span class="t" id="updated">--:--:--</span><span id="hsum">yükleniyor…</span></div>
     <div class="hctl">
+      <select id="fs" title="yazı boyutu">
+        <option value="1">Yazı: Normal</option>
+        <option value="1.15">Büyük</option>
+        <option value="1.3">Çok Büyük</option>
+      </select>
       <select id="iv" title="yenileme aralığı">
         <option value="30000">30 sn</option>
         <option value="60000" selected>60 sn</option>
@@ -1016,6 +1021,14 @@ function schedule(){
 }
 $("iv").addEventListener("change",schedule);
 $("refresh").addEventListener("click",refresh);
+function applyZoom(v){document.body.style.zoom=v;}
+try{
+  const z=localStorage.getItem("ui_zoom")||"1";
+  $("fs").value=z;applyZoom(z);
+}catch(e){}
+$("fs").addEventListener("change",()=>{
+  applyZoom($("fs").value);
+  try{localStorage.setItem("ui_zoom",$("fs").value);}catch(e){}});
 pfLoad();
 ["pfCap","pfRisk"].forEach(id=>$(id).addEventListener("input",()=>{
   pfSave();renderPortfolio(SIGNALS);}));
