@@ -91,7 +91,13 @@ class Scheduler:
                 self._tracker.record_candles(ltf)
             self._tracker.record_decision(decision)
             if decision.decision is DecisionType.SIGNAL and ltf is not None:
-                self._tracker.maybe_track(decision, ltf)
+                from app.services.signal_tracker import _cluster_id
+                heat = self._tracker.heat_check(
+                    decision.direction.value, _cluster_id(decision, ltf))
+                if heat is None:
+                    self._tracker.maybe_track(decision, ltf)
+                else:
+                    self._tracker.track_portfolio_blocked(decision, ltf, heat)
             elif ("MARKET_GATE" in (decision.failed_filters or [])
                   and "counter-regime" in (decision.reject_reason or "")
                   and ltf is not None):

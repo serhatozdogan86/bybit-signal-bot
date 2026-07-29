@@ -98,18 +98,20 @@ class SignalTracker:
         self._ltf = ltf_interval
         self._fill_window = fill_window_bars
         self._max_track = max_track_bars
+        self._migrate()
 
     # ------------------------------------------------------ veri birikimi
     def _migrate(self) -> None:
         """v3.3: eski DB'lere confidence/setup_type kolonlarini ekle."""
         for ddl in ("confidence TEXT", "setup_type TEXT",
                     "blocked INTEGER NOT NULL DEFAULT 0",
-                    "cluster_id TEXT", "engine_sha TEXT"):
+                    "cluster_id TEXT", "engine_sha TEXT",
+                    "block_reason TEXT", "ambiguous INTEGER DEFAULT 0",
+                    "hypo_r REAL", "hypo_done INTEGER DEFAULT 0"):
             try:
                 self._db.execute(f"ALTER TABLE signals ADD COLUMN {ddl}")
             except Exception:
                 pass  # kolon zaten var
-        self._migrate()
 
     def record_candles(self, series: KlineSeries) -> None:
         """Kapanmis mumlari arsivle. Son bar henuz olusuyor -> atlanir."""
@@ -152,6 +154,46 @@ class SignalTracker:
         log.info(kv(event="shadow_track", pair=d.pair, direction=d.direction.value))
         return True
 
+    # -------- v3.5-P1: portfoy isi motoru (konsey 4/4 "en acil") --------
+    HEAT_SAME_DIR = 4     # ayni yonde en fazla 4 acik gercek sinyal (4R)
+    HEAT_CLUSTER = 2      # ayni kume (yon+4H penceresi) en fazla 2
+    HEAT_TOTAL = 8        # eszamanli acik gercek sinyal tavani
+
+    def heat_check(self, direction: str, cluster_id: str) -> str | None:
+        """Yeni sinyal kabul edilirse isi limitleri asilir mi? Asilirsa neden."""
+        q = lambda sql, p=(): self._db.query_one(sql, p)["n"]
+        if q("SELECT COUNT(*) n FROM signals WHERE status!='CLOSED' "
+             "AND blocked=0 AND direction=?", (direction,)) >= self.HEAT_SAME_DIR:
+            return f"direction heat: >={self.HEAT_SAME_DIR} open {direction}"
+        if q("SELECT COUNT(*) n FROM signals WHERE status!='CLOSED' "
+             "AND blocked=0 AND cluster_id=?", (cluster_id,)) >= self.HEAT_CLUSTER:
+            return f"cluster cap: >={self.HEAT_CLUSTER} open in {cluster_id}"
+        if q("SELECT COUNT(*) n FROM signals WHERE status!='CLOSED' "
+             "AND blocked=0") >= self.HEAT_TOTAL:
+            return f"concurrent cap: >={self.HEAT_TOTAL} open total"
+        return None
+
+    def track_portfolio_blocked(self, d: Decision, ltf: KlineSeries,
+                                reason: str) -> bool:
+        """Isi limitine takilan SIGNAL -> blocked=2 kohortu (skora karismaz)."""
+        existing = self._db.query_one(
+            "SELECT id FROM signals WHERE pair=? AND direction=? "
+            "AND status!='CLOSED' AND blocked=2", (d.pair, d.direction.value))
+        if existing:
+            return False
+        self._db.execute(
+            "INSERT INTO signals(pair,direction,created_utc,entry_candle_ts,"
+            "entry_min,entry_max,stop_loss,tp1,tp2,rr,contract_json,"
+            "confidence,setup_type,blocked,cluster_id,engine_sha,block_reason) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,2,?,?,?)",
+            (d.pair, d.direction.value, d.timestamp_utc, ltf.candles[-1].ts,
+             d.entry_zone.min, d.entry_zone.max, d.stop_loss,
+             d.targets.tp1, d.targets.tp2, d.rr, json.dumps(d.contract_dict()),
+             d.confidence.value, d.setup_type.value,
+             _cluster_id(d, ltf), _ENGINE_SHA, reason))
+        log.info(kv(event="portfolio_heat_block", pair=d.pair, reason=reason))
+        return True
+
     def track_blocked(self, d: Decision, ltf: KlineSeries) -> bool:
         """v3.4 karsi-olgu: market gate'in blokladigi karari blocked=1 ile izle.
 
@@ -169,8 +211,8 @@ class SignalTracker:
         self._db.execute(
             "INSERT INTO signals(pair,direction,created_utc,entry_candle_ts,"
             "entry_min,entry_max,stop_loss,tp1,tp2,rr,contract_json,"
-            "confidence,setup_type,blocked,cluster_id,engine_sha) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)",
+            "confidence,setup_type,blocked,cluster_id,engine_sha,block_reason) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,'counter-regime')",
             (d.pair, d.direction.value, d.timestamp_utc, ltf.candles[-1].ts,
              d.entry_zone.min, d.entry_zone.max, d.stop_loss,
              d.targets.tp1, d.targets.tp2, d.rr, json.dumps(d.contract_dict()),
@@ -190,6 +232,53 @@ class SignalTracker:
                 "ORDER BY ts ASC", (pair, self._ltf, sig["entry_candle_ts"]))
             if candles:
                 self._evaluate_signal(sig, candles)
+        # v3.5-P1: NOT_FILLED hayalet degerlendirme (teshis verisi;
+        # "dolmayanlar en iyi islemler miydi?" sorusuna sayisal cevap)
+        ghosts = self._db.query(
+            "SELECT * FROM signals WHERE pair=? AND outcome='NOT_FILLED' "
+            "AND hypo_done=0", (pair,))
+        for sig in ghosts:
+            candles = self._db.query(
+                "SELECT * FROM candles WHERE symbol=? AND interval=? AND ts>=? "
+                "ORDER BY ts ASC", (pair, self._ltf, sig["entry_candle_ts"]))
+            if candles:
+                self._evaluate_hypo(sig, candles)
+
+    def _evaluate_hypo(self, sig: dict, candles: list[dict]) -> None:
+        """NOT_FILLED sinyali 'kenardan dolmus' varsayip hayalet R hesaplar.
+
+        Fill penceresi bitiminden itibaren ayni kurallar: once stop -> -1,
+        once TP -> +R, ayni mum -> -1 (muhafazakar), 48s -> son kapanisla.
+        Sonuc hypo_r kolonuna yazilir; skora ASLA karismaz.
+        """
+        is_long = sig["direction"] == Direction.LONG.value
+        entry = sig["entry_max"] if is_long else sig["entry_min"]
+        risk = (entry - sig["stop_loss"]) if is_long else (sig["stop_loss"] - entry)
+        if risk <= 0:
+            self._db.execute("UPDATE signals SET hypo_done=1 WHERE id=?",
+                             (sig["id"],))
+            return
+        window = candles[self._fill_window:]
+        for i, c in enumerate(window):
+            hit_stop = (c["low"] <= sig["stop_loss"] if is_long
+                        else c["high"] >= sig["stop_loss"])
+            hit_tp = (c["high"] >= sig["tp1"] if is_long
+                      else c["low"] <= sig["tp1"])
+            if hit_stop:
+                r = -1.0
+            elif hit_tp:
+                reward = (sig["tp1"] - entry) if is_long else (entry - sig["tp1"])
+                r = round(reward / risk, 2)
+            elif i >= self._max_track:
+                pnl = (c["close"] - entry) if is_long else (entry - c["close"])
+                r = round(pnl / risk, 2)
+            else:
+                continue
+            self._db.execute(
+                "UPDATE signals SET hypo_r=?, hypo_done=1 WHERE id=?",
+                (r, sig["id"]))
+            log.info(kv(event="hypo_eval", pair=sig["pair"], hypo_r=r))
+            return
 
     def _evaluate_signal(self, sig: dict, candles: list[dict]) -> None:
         is_long = sig["direction"] == Direction.LONG.value
@@ -222,7 +311,11 @@ class SignalTracker:
             hit_tp = (c["high"] >= sig["tp1"] if is_long
                       else c["low"] <= sig["tp1"])
             if hit_stop and hit_tp:
-                self._close(sig["id"], "AMBIGUOUS", fill_price, 0.0)
+                # v3.5-P1 (konsey): ayni mumda yol bilinemez -> muhafazakar
+                # kural LOSS sayar; ambiguous=1 ile ayrica raporlanabilir.
+                self._db.execute(
+                    "UPDATE signals SET ambiguous=1 WHERE id=?", (sig["id"],))
+                self._close(sig["id"], "LOSS", sig["stop_loss"], -1.0)
                 return
             if hit_stop:
                 self._close(sig["id"], "LOSS", sig["stop_loss"], -1.0)
@@ -278,6 +371,13 @@ class SignalTracker:
         total_r_net = round(sum(net_vals), 2) if net_vals else None
         clusters = len({r["cluster_id"] for r in closed_rows
                         if r.get("cluster_id")}) or None
+        heat = self._db.query_one(
+            "SELECT SUM(CASE WHEN blocked=1 THEN 1 ELSE 0 END) g,"
+            "SUM(CASE WHEN blocked=2 THEN 1 ELSE 0 END) h,"
+            "SUM(CASE WHEN outcome='NOT_FILLED' AND hypo_r IS NOT NULL "
+            "THEN hypo_r ELSE 0 END) hr,"
+            "SUM(CASE WHEN outcome='NOT_FILLED' AND hypo_r IS NOT NULL "
+            "THEN 1 ELSE 0 END) hn FROM signals")
         return {
             "note": "Shadow accounting: estimated fills, no slippage. Not real trading results.",
             "open_signals": open_row["n"] if open_row else 0,
@@ -290,6 +390,11 @@ class SignalTracker:
                                if net_vals else None),
             "cost_model": "v0: 2x taker 0.055% + stop slip 5bps + funding 0.01%/8h signed",
             "clusters_closed": clusters,
+            "cohorts": {"gate_blocked": (heat["g"] or 0),
+                        "heat_blocked": (heat["h"] or 0)},
+            "not_filled_hypo": {"n": (heat["hn"] or 0),
+                                "sum_r": round(heat["hr"] or 0, 2),
+                                "note": "teshis verisi; pismanlik sayaci degil"},
             "per_pair": per_pair,
             "dataset": {"decisions_recorded": counts["d"], "candles_archived": counts["c"]},
         }
@@ -313,8 +418,8 @@ class SignalTracker:
             "SELECT id,pair,direction,created_utc,entry_candle_ts,status,outcome,"
             "entry_min,entry_max,stop_loss,tp1,tp2,rr,fill_price,exit_price,"
             "r_multiple,closed_utc,confidence,setup_type,blocked,"
-            "cluster_id,engine_sha "
-            "FROM signals WHERE blocked=1 ORDER BY id DESC LIMIT ?", (limit,))
+            "cluster_id,engine_sha,block_reason "
+            "FROM signals WHERE blocked>=1 ORDER BY id DESC LIMIT ?", (limit,))
 
     def recent_decisions(self, limit: int = 2000) -> list[dict]:
         return self._db.query(
@@ -364,8 +469,9 @@ class SignalTracker:
                 "INSERT INTO signals(pair,direction,created_utc,entry_candle_ts,"
                 "entry_min,entry_max,stop_loss,tp1,tp2,rr,status,outcome,"
                 "fill_price,exit_price,r_multiple,closed_utc,confidence,"
-                "setup_type,blocked,cluster_id,engine_sha) "
-                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "setup_type,blocked,cluster_id,engine_sha,block_reason,"
+                "hypo_r,hypo_done) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (r.get("pair"), r.get("direction"), r.get("created_utc"),
                  r.get("entry_candle_ts"), r.get("entry_min"), r.get("entry_max"),
                  r.get("stop_loss"), r.get("tp1"), r.get("tp2"), r.get("rr"),
@@ -374,6 +480,7 @@ class SignalTracker:
                  r.get("r_multiple"), r.get("closed_utc"),
                  r.get("confidence"), r.get("setup_type"),
                  r.get("blocked", 0), r.get("cluster_id"),
-                 r.get("engine_sha")))
+                 r.get("engine_sha"), r.get("block_reason"),
+                 r.get("hypo_r"), r.get("hypo_done", 0)))
             imported += 1
         return imported

@@ -34,6 +34,30 @@ def create_app(store: StateStore, scheduler: Scheduler,
     def healthz():
         return jsonify({"status": "ok", **store.get_meta()})
 
+    @app.get("/health")
+    def health():
+        """v3.5-P1 dead-man's switch: son tarama 40 dk'dan eskiyse 503.
+
+        UptimeRobot bu rotayi 5 dk'da bir yoklar; 503 -> alarm. Yan fayda:
+        duzenli ping Render free katmanini uyanik tutar.
+        """
+        from datetime import datetime, timezone
+        meta = store.get_meta()
+        last = meta.get("last_scan_utc") or meta.get("last_scan")
+        age = None
+        ok = False
+        if last:
+            try:
+                t = datetime.strptime(last, "%Y-%m-%dT%H:%M:%SZ").replace(
+                    tzinfo=timezone.utc)
+                age = int((datetime.now(timezone.utc) - t).total_seconds())
+                ok = age < 2400
+            except ValueError:
+                pass
+        code = 200 if ok else 503
+        return jsonify({"ok": ok, "last_scan_utc": last,
+                        "age_sec": age}), code
+
     @app.get("/status")
     def status():
         payload = {"meta": store.get_meta(), "results": store.get_results()}

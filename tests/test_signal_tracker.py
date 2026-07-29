@@ -213,3 +213,36 @@ def test_cost_r_and_cluster(tmp_path):
     win = dict(row, outcome="WIN", r_multiple=2.5)
     cw = cost_r(win)
     assert cw is not None and cw < c    # kayma yalniz stop cikisinda
+
+
+def test_portfolio_heat_and_ambiguous(tmp_path):
+    """v3.5-P1: isi limitleri blocked=2 uretir; ayni-mum LOSS sayilir."""
+    from app.services.database import Database as _DB
+    from app.config.settings import StrategyParams
+    from app.strategies import signal_engine
+    from app.services.signal_tracker import _cluster_id
+    from tests import fixtures as fx
+
+    db = _DB(str(tmp_path / "heat.db"))
+    tracker = SignalTracker(db, ltf_interval="15")
+    htf = fx.make_series(fx.bullish_htf_closes(), interval="240", seed=3)
+    ltf = fx.make_series(fx.bullish_ltf_closes(), interval="15",
+                         volumes=fx.breakout_volumes(), seed=4)
+    params = StrategyParams()
+    # 4 farkli paritede ayni yon/kume gercek sinyal doldur
+    for i in range(4):
+        d = signal_engine.evaluate(f"H{i}USDT", htf, ltf, params)
+        assert d.decision.value == "SIGNAL"
+        if i < 2:
+            assert tracker.heat_check(d.direction.value,
+                                      _cluster_id(d, ltf)) is None
+            tracker.maybe_track(d, ltf)
+        else:
+            # kume tavani (2) yon tavanindan once devreye girer
+            reason = tracker.heat_check(d.direction.value, _cluster_id(d, ltf))
+            assert reason is not None and "cluster cap" in reason
+            tracker.track_portfolio_blocked(d, ltf, reason)
+    assert tracker.stats()["open_signals"] == 2          # skor izole
+    assert tracker.stats()["cohorts"]["heat_blocked"] == 2
+    blk = [b for b in tracker.blocked_signals(10) if b["blocked"] == 2]
+    assert len(blk) == 2 and "cluster cap" in blk[0]["block_reason"]
