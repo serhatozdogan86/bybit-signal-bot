@@ -47,9 +47,10 @@ class SignalTracker:
     # ------------------------------------------------------ veri birikimi
     def _migrate(self) -> None:
         """v3.3: eski DB'lere confidence/setup_type kolonlarini ekle."""
-        for col in ("confidence", "setup_type"):
+        for ddl in ("confidence TEXT", "setup_type TEXT",
+                    "blocked INTEGER NOT NULL DEFAULT 0"):
             try:
-                self._db.execute(f"ALTER TABLE signals ADD COLUMN {col} TEXT")
+                self._db.execute(f"ALTER TABLE signals ADD COLUMN {ddl}")
             except Exception:
                 pass  # kolon zaten var
         self._migrate()
@@ -77,7 +78,8 @@ class SignalTracker:
         if d.decision is not DecisionType.SIGNAL:
             return False
         existing = self._db.query_one(
-            "SELECT id FROM signals WHERE pair=? AND direction=? AND status!='CLOSED'",
+            "SELECT id FROM signals WHERE pair=? AND direction=? "
+            "AND status!='CLOSED' AND blocked=0",
             (d.pair, d.direction.value))
         if existing:
             return False
@@ -91,6 +93,33 @@ class SignalTracker:
              d.targets.tp1, d.targets.tp2, d.rr, json.dumps(d.contract_dict()),
              d.confidence.value, d.setup_type.value))
         log.info(kv(event="shadow_track", pair=d.pair, direction=d.direction.value))
+        return True
+
+    def track_blocked(self, d: Decision, ltf: KlineSeries) -> bool:
+        """v3.4 karsi-olgu: market gate'in blokladigi karari blocked=1 ile izle.
+
+        Skor tablosuna ASLA karismaz (stats/recent_signals blocked=0 filtreler);
+        ayni degerlendirme dongusunden gecer -> kapinin gercek etkisi olculur.
+        """
+        if not d.rr or d.entry_zone.min is None:
+            return False
+        existing = self._db.query_one(
+            "SELECT id FROM signals WHERE pair=? AND direction=? "
+            "AND status!='CLOSED' AND blocked=1",
+            (d.pair, d.direction.value))
+        if existing:
+            return False
+        self._db.execute(
+            "INSERT INTO signals(pair,direction,created_utc,entry_candle_ts,"
+            "entry_min,entry_max,stop_loss,tp1,tp2,rr,contract_json,"
+            "confidence,setup_type,blocked) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1)",
+            (d.pair, d.direction.value, d.timestamp_utc, ltf.candles[-1].ts,
+             d.entry_zone.min, d.entry_zone.max, d.stop_loss,
+             d.targets.tp1, d.targets.tp2, d.rr, json.dumps(d.contract_dict()),
+             d.confidence.value, d.setup_type.value))
+        log.info(kv(event="shadow_track_blocked", pair=d.pair,
+                    direction=d.direction.value))
         return True
 
     def evaluate_open(self, pair: str) -> None:
@@ -164,16 +193,17 @@ class SignalTracker:
         by_outcome = {r["outcome"]: {"count": r["n"], "sum_r": r["sum_r"] or 0.0}
                       for r in self._db.query(
                           "SELECT outcome, COUNT(*) n, SUM(r_multiple) sum_r "
-                          "FROM signals WHERE status='CLOSED' GROUP BY outcome")}
+                          "FROM signals WHERE status='CLOSED' AND blocked=0 GROUP BY outcome")}
         wins = by_outcome.get("WIN", {}).get("count", 0)
         losses = by_outcome.get("LOSS", {}).get("count", 0)
         decided = wins + losses
         total_r = round(sum(v["sum_r"] for v in by_outcome.values()), 2)
         open_row = self._db.query_one(
-            "SELECT COUNT(*) n FROM signals WHERE status!='CLOSED'")
+            "SELECT COUNT(*) n FROM signals WHERE status!='CLOSED' AND blocked=0")
         per_pair = self._db.query(
             "SELECT pair, outcome, COUNT(*) n, ROUND(SUM(r_multiple),2) sum_r "
-            "FROM signals WHERE status='CLOSED' GROUP BY pair, outcome ORDER BY pair")
+            "FROM signals WHERE status='CLOSED' AND blocked=0 "
+            "GROUP BY pair, outcome ORDER BY pair")
         counts = self._db.query_one(
             "SELECT (SELECT COUNT(*) FROM decisions) d, (SELECT COUNT(*) FROM candles) c")
         return {
@@ -192,7 +222,15 @@ class SignalTracker:
             "SELECT id,pair,direction,created_utc,entry_candle_ts,status,outcome,"
             "entry_min,entry_max,stop_loss,tp1,tp2,rr,fill_price,exit_price,"
             "r_multiple,closed_utc,confidence,setup_type "
-            "FROM signals ORDER BY id DESC LIMIT ?", (limit,))
+            "FROM signals WHERE blocked=0 ORDER BY id DESC LIMIT ?", (limit,))
+
+    def blocked_signals(self, limit: int = 300) -> list[dict]:
+        """Karsi-olgu kohortu: kapinin blokladigi, golgede izlenen kararlar."""
+        return self._db.query(
+            "SELECT id,pair,direction,created_utc,entry_candle_ts,status,outcome,"
+            "entry_min,entry_max,stop_loss,tp1,tp2,rr,fill_price,exit_price,"
+            "r_multiple,closed_utc,confidence,setup_type,blocked "
+            "FROM signals WHERE blocked=1 ORDER BY id DESC LIMIT ?", (limit,))
 
     def recent_decisions(self, limit: int = 2000) -> list[dict]:
         return self._db.query(
@@ -241,14 +279,16 @@ class SignalTracker:
             self._db.execute(
                 "INSERT INTO signals(pair,direction,created_utc,entry_candle_ts,"
                 "entry_min,entry_max,stop_loss,tp1,tp2,rr,status,outcome,"
-                "fill_price,exit_price,r_multiple,closed_utc,confidence,setup_type) "
-                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "fill_price,exit_price,r_multiple,closed_utc,confidence,"
+                "setup_type,blocked) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (r.get("pair"), r.get("direction"), r.get("created_utc"),
                  r.get("entry_candle_ts"), r.get("entry_min"), r.get("entry_max"),
                  r.get("stop_loss"), r.get("tp1"), r.get("tp2"), r.get("rr"),
                  r.get("status", "PENDING"), r.get("outcome"),
                  r.get("fill_price"), r.get("exit_price"),
                  r.get("r_multiple"), r.get("closed_utc"),
-                 r.get("confidence"), r.get("setup_type")))
+                 r.get("confidence"), r.get("setup_type"),
+                 r.get("blocked", 0)))
             imported += 1
         return imported

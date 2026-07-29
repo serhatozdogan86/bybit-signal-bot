@@ -108,6 +108,9 @@ def test_market_gate_blocks_counter_regime_long():
     assert d.decision is DecisionType.NO_TRADE
     assert "MARKET_GATE" in d.failed_filters
     assert "counter-regime long" in d.reject_reason
+    # v3.4: bloklanan karar tam plan seviyeleri tasimali (karsi-olgu takibi)
+    assert d.rr is not None and d.entry_zone.min is not None
+    assert d.stop_loss is not None and d.direction is Direction.LONG
     # ayni senaryo bull/neutral bias'ta SIGNAL olmali (kapi tek tarafli)
     assert signal_engine.evaluate("GATEUSDT", htf, ltf, PARAMS,
                                   market_bias="bull").decision is DecisionType.SIGNAL

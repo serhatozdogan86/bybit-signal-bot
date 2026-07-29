@@ -171,3 +171,31 @@ def test_confidence_and_setup_persisted(tmp_path):
     assert n == 1
     old = [r for r in tracker.recent_signals(5) if r["pair"] == "OLDUSDT"][0]
     assert old["confidence"] is None and old["setup_type"] is None
+
+
+def test_blocked_cohort_isolated(tmp_path):
+    """v3.4: bloklanan sinyal ayri kohorttadir; skor tablosuna karismaz."""
+    from app.services.database import Database as _DB
+    from app.config.settings import StrategyParams
+    from app.strategies import signal_engine
+    from tests import fixtures as fx
+
+    db = _DB(str(tmp_path / "blk.db"))
+    tracker = SignalTracker(db, ltf_interval="15")
+    htf = fx.make_series(fx.bullish_htf_closes(), interval="240", seed=3)
+    ltf = fx.make_series(fx.bullish_ltf_closes(), interval="15",
+                         volumes=fx.breakout_volumes(), seed=4)
+    d = signal_engine.evaluate("BLKUSDT", htf, ltf, StrategyParams(),
+                               market_bias="bear")   # LONG bloklanir
+    assert tracker.track_blocked(d, ltf) is True
+    assert tracker.track_blocked(d, ltf) is False    # tekrarsizlik
+    assert tracker.recent_signals(10) == []          # gercek kohort bos
+    blk = tracker.blocked_signals(10)
+    assert len(blk) == 1 and blk[0]["blocked"] == 1
+    assert blk[0]["rr"] is not None and blk[0]["confidence"] in (
+        "HIGH", "MEDIUM", "LOW")
+    assert tracker.stats()["open_signals"] == 0      # skor etkilenmez
+    # ayni pair icin GERCEK sinyal takibi hala mumkun (kohortlar bagimsiz)
+    d2 = signal_engine.evaluate("BLKUSDT", htf, ltf, StrategyParams())
+    assert tracker.maybe_track(d2, ltf) is True
+    assert tracker.stats()["open_signals"] == 1

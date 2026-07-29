@@ -95,18 +95,6 @@ def evaluate(pair: str, htf_series: KlineSeries | None, ltf_series: KlineSeries 
     conf = indicator_confluence.collect(ltf, htf, direction)
     d.indicator_confluence = conf
 
-    # 6.5 MARKET GATE (v3.0): piyasa rejimi karsiti sinyaller bloklanir.
-    # Gerekce (n=49 golge verisi): ayi rejiminde LONG 4W/16L (-6.99R),
-    # SHORT 16W/13L (+28.75R). Karsi-trend taraf sistematik kanama.
-    if params.market_gate and (
-            (market_bias == "bear" and direction is Direction.LONG)
-            or (market_bias == "bull" and direction is Direction.SHORT)):
-        d.failed_filters = ["MARKET_GATE"]
-        d.reject_reason = (f"counter-regime {direction.value.lower()} blocked "
-                           f"(market gate: BTC {market_bias})")
-        d.watch_condition = "market regime alignment or neutral BTC bias"
-        return d
-
     # 7. RISK / REWARD
     plan = build_trade_plan(ltf, htf, direction, setup.level, params)
     if plan is None or plan.rr < params.min_rr:
@@ -122,6 +110,28 @@ def evaluate(pair: str, htf_series: KlineSeries | None, ltf_series: KlineSeries 
         d.reject_reason = (f"RR {plan.rr:.2f} > max {params.rr_max:.1f} "
                            "(stop too tight for noise)")
         d.watch_condition = "wider structural stop / ATR-based placement"
+        return d
+
+    # 7.5 MARKET GATE (v3.0; v3.4'te boru hattinin sonuna tasindi).
+    # Gerekce (n=49): ayi rejiminde LONG -6.99R vs SHORT +28.75R.
+    # Sonda olmasinin nedeni: bloklanan karar TAM plan seviyeleri tasir ->
+    # golge defterde blocked=1 kohortu olarak izlenip kapinin gercek
+    # etkisi (koruma mi, firsat maliyeti mi) olculebilir.
+    if params.market_gate and (
+            (market_bias == "bear" and direction is Direction.LONG)
+            or (market_bias == "bull" and direction is Direction.SHORT)):
+        d.direction = direction
+        d.entry_zone = EntryZone(min=plan.entry_min, max=plan.entry_max)
+        d.stop_loss = plan.stop_loss
+        d.targets = Targets(tp1=plan.tp1, tp2=plan.tp2)
+        d.rr = plan.rr
+        d.confidence = (Confidence.HIGH if len(conf) >= 3
+                        else Confidence.MEDIUM if len(conf) == 2
+                        else Confidence.LOW)
+        d.failed_filters = ["MARKET_GATE"]
+        d.reject_reason = (f"counter-regime {direction.value.lower()} blocked "
+                           f"(market gate: BTC {market_bias})")
+        d.watch_condition = "market regime alignment or neutral BTC bias"
         return d
 
     # 8. SIGNAL

@@ -87,6 +87,7 @@ class GistBackup:
         files = {
             "0_performance.json": json.dumps(self._tracker.stats(), indent=2),
             "0_signals.json": json.dumps(self._tracker.recent_signals(500), indent=2),
+            "0_blocked.json": json.dumps(self._tracker.blocked_signals(300), indent=2),
             "0_decisions.json": json.dumps(self._tracker.recent_decisions(2000), indent=2),
             "0_commentary.json": json.dumps(
                 self._commentary.recent(6) if self._commentary else [],
@@ -176,6 +177,13 @@ class GistBackup:
                     json.loads(sig_file))
             except (json.JSONDecodeError, TypeError):
                 log.warning(kv(event="gist_restore_signals_parse_error"))
+        blk_file = files.get("0_blocked.json")
+        if blk_file:
+            try:
+                signals_total += self._tracker.import_signals(
+                    json.loads(blk_file))
+            except (json.JSONDecodeError, TypeError):
+                log.warning(kv(event="gist_restore_blocked_parse_error"))
         log.info(kv(event="gist_restore_ok", gist_id=self._gist_id,
                     candles=candles_total, signals=signals_total))
         return True

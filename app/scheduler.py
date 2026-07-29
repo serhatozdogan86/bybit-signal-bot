@@ -92,12 +92,17 @@ class Scheduler:
             self._tracker.record_decision(decision)
             if decision.decision is DecisionType.SIGNAL and ltf is not None:
                 self._tracker.maybe_track(decision, ltf)
+            elif ("MARKET_GATE" in (decision.failed_filters or [])
+                  and ltf is not None):
+                self._tracker.track_blocked(decision, ltf)  # v3.4 karsi-olgu
             self._tracker.evaluate_open(decision.pair)
         except Exception:
             log.exception(kv(event="shadow_error", symbol=decision.pair))
 
     def scan_all(self, send_telegram: bool = True) -> list[Decision]:
         self._market_bias = self._compute_market_bias()
+        if self._commentary is not None:
+            self._commentary.market_bias = self._market_bias
         results: list[Decision] = []
         scanned: set[str] = set()
         for symbol in self.symbols():

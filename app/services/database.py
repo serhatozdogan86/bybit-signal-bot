@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS signals(
   status TEXT NOT NULL DEFAULT 'PENDING',
   outcome TEXT, fill_price REAL, exit_price REAL, r_multiple REAL,
   closed_utc TEXT, contract_json TEXT,
-  confidence TEXT, setup_type TEXT
+  confidence TEXT, setup_type TEXT,
+  blocked INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS cooldowns(key TEXT PRIMARY KEY, ts REAL);
 CREATE TABLE IF NOT EXISTS results(pair TEXT PRIMARY KEY, json TEXT);

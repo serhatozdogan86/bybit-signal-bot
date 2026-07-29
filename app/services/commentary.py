@@ -52,6 +52,7 @@ class CommentaryService:
         self._tracker = tracker
         self._interval = interval_sec
         self._last = 0.0
+        self.market_bias = "neutral"   # scheduler her turda gunceller (v3.4)
         db.execute(_TABLE)
 
     # ------------------------------------------------------------ schedule
@@ -148,16 +149,19 @@ class CommentaryService:
         lw, ll, lr = side("LONG")
         sw, sl, sr = side("SHORT")
         if (lw + ll) or (sw + sl):
+            bias_tr = {"bull": "boga", "bear": "ayi",
+                       "neutral": "notr"}.get(self.market_bias, "notr")
             p.append(f"Yon bilancosu -> LONG {lw}W/{ll}L ({_fmt_r(lr)}) | "
-                     f"SHORT {sw}W/{sl}L ({_fmt_r(sr)}).")
-            if lr < -1 and sr > 1:
-                p.append("Ayi rejiminde karsi-yon LONG'lar bedel oduyor; "
-                         "piyasa-yonu filtresi ihtiyaci bu veriyle "
-                         "guclenmeye devam ediyor.")
-            elif sr < -1 and lr > 1:
-                p.append("Boga rejiminde karsi-yon SHORT'lar bedel oduyor; "
-                         "piyasa-yonu filtresi ihtiyaci bu veriyle "
-                         "guclenmeye devam ediyor.")
+                     f"SHORT {sw}W/{sl}L ({_fmt_r(sr)}). "
+                     f"Guncel rejim: BTC {bias_tr}.")
+            if self.market_bias == "bear":
+                p.append("Ayi rejiminde market gate yeni LONG uretimini "
+                         "blokluyor; bloklanan kararlar karsi-olgu "
+                         "kohortunda ayrica izleniyor.")
+            elif self.market_bias == "bull":
+                p.append("Boga rejiminde market gate yeni SHORT uretimini "
+                         "blokluyor; bloklanan kararlar karsi-olgu "
+                         "kohortunda ayrica izleniyor.")
 
         # 4) Giris isabeti
         filled = sum(1 for s in signals
