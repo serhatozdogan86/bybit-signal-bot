@@ -26,6 +26,10 @@ DASHBOARD_HTML = r"""<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>signal-engine // dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232563EB'/%3E%3Cpath d='M6 22l6-7 4 4 8-10' stroke='%23fff' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root{
@@ -37,7 +41,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     --blue:#2563EB;  --blue-bg:#E3EBFA;  --blue-ink:#1E3A8A;
     --grey:#98907F;  --grey-bg:#F0EBDF;
     --head:#4A4132;
-    --sans:Inter,Roboto,-apple-system,"SF Pro Text","Segoe UI",sans-serif;
+    --sans:"Inter",Roboto,-apple-system,"SF Pro Text","Segoe UI",sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
     --shadow:0 1px 2px rgba(88,70,38,.06),0 5px 14px rgba(88,70,38,.05);
     --shadow-hi:0 2px 4px rgba(88,70,38,.08),0 10px 24px rgba(88,70,38,.09);
     --pad:clamp(8px,1vh,14px);
@@ -47,9 +52,20 @@ DASHBOARD_HTML = r"""<!doctype html>
   body{background:var(--bg);color:var(--text);font-family:var(--sans);
        font-size:13px;line-height:1.45;overflow:hidden;
        font-variant-numeric:tabular-nums}
-  .num{font-variant-numeric:tabular-nums;letter-spacing:-.01em}
-  .app{display:grid;grid-template-rows:56px minmax(0,1fr);height:100vh;
-       gap:10px;padding:10px 12px;max-width:1920px;margin:0 auto}
+  .num{font-family:var(--mono);font-variant-numeric:tabular-nums;
+       font-size:.94em;letter-spacing:-.01em}
+  td.num{text-align:right}
+  th.r{text-align:right}
+  .app{display:grid;grid-template-rows:56px minmax(0,1fr) 24px;height:100vh;
+       gap:10px;padding:10px 12px 6px;max-width:1920px;margin:0 auto}
+  .statusbar{display:flex;align-items:center;gap:14px;font-family:var(--mono);
+       font-size:10.5px;color:var(--muted);padding:0 6px;white-space:nowrap;
+       overflow:hidden}
+  .statusbar b{color:var(--text);font-weight:500}
+  .statusbar .sep{color:var(--line)}
+  .statusbar .right{margin-left:auto;color:var(--muted);
+       overflow:hidden;text-overflow:ellipsis}
+  .statusbar a{color:var(--info,#2B66C4)}
   .clickable{cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}
   .clickable:hover{transform:translateY(-1px);box-shadow:var(--shadow-hi)}
   /* ============ HEADER ============ */
@@ -188,7 +204,12 @@ DASHBOARD_HTML = r"""<!doctype html>
      position:sticky;top:0;z-index:1}
   td{padding:5px 10px;border-bottom:1px solid var(--card2);white-space:nowrap}
   tbody tr{cursor:pointer}
+  tbody tr:nth-child(even) td{background:rgba(249,245,236,.55)}
   tbody tr:hover td{background:var(--card2)}
+  @keyframes tickU{0%{background:rgba(22,163,74,.28)}100%{background:transparent}}
+  @keyframes tickD{0%{background:rgba(220,38,38,.28)}100%{background:transparent}}
+  td.tick-up{animation:tickU 1.1s ease-out}
+  td.tick-down{animation:tickD 1.1s ease-out}
   tr:last-child td{border-bottom:0}
   tr.dim td{opacity:.55}
   .badge{display:inline-block;padding:1px 9px;border-radius:99px;
@@ -374,7 +395,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       <div class="kpis" id="kpis"></div>
       <div class="midrow">
         <div class="card">
-          <div class="chead">Kümülatif R (Equity) <span class="tag">yeşil WIN · kırmızı LOSS</span></div>
+          <div class="chead">Kümülatif R (Equity) <span class="tag" id="eqStats">yeşil WIN · kırmızı LOSS</span></div>
           <div class="cbody fill chartwrap curve" id="curveWrap"><canvas id="eqChart"></canvas></div>
         </div>
         <div class="card">
@@ -404,6 +425,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       </div>
     </div>
   </div>
+
+  <footer class="statusbar" id="statusbar">yükleniyor…</footer>
 </div>
 
 <div id="overlay" class="ovl">
@@ -478,7 +501,7 @@ async function j(url){
   catch(e){return null;}
 }
 const OUT=s=>s.outcome||s.status;
-let PRICES={};
+let PRICES={},PREV_PRICES={};
 const fmtPx=v=>v==null?"—":Number(v).toLocaleString("en-US",
   {maximumFractionDigits:v>=100?2:v>=1?4:6});
 const PREV={};
@@ -574,6 +597,15 @@ function renderCurve(signals){
   const wrap=$("curveWrap");
   if(!done.length){wrap.innerHTML='<div class="empty">henüz sonuçlanan sinyal yok</div>';eqChart=null;return;}
   let c=0;const data=done.map(s=>c+=(s.r_multiple||0));
+  // kurumsal metrikler: profit factor, beklenti, maks. drawdown
+  const gw=done.filter(s=>s.r_multiple>0).reduce((a,s)=>a+s.r_multiple,0);
+  const gl=Math.abs(done.filter(s=>s.r_multiple<0).reduce((a,s)=>a+s.r_multiple,0));
+  const pf=gl?gw/gl:null;
+  const exp=data[data.length-1]/done.length;
+  let peak=0,maxDD=0;
+  for(const v of data){peak=Math.max(peak,v);maxDD=Math.max(maxDD,peak-v);}
+  const st=$("eqStats");
+  if(st)st.innerHTML=`PF <b class="num">${pf==null?"∞":num(pf,2)}</b> · beklenti <b class="num">${(exp>0?"+":"")+num(exp,2)}R</b>/işlem · maksDD <b class="num neg">−${num(maxDD,2)}R</b>`;
   const labels=done.map((s,i)=>i+1);
   const ptCol=done.map(s=>OUT(s)==="WIN"?"#16A34A":"#DC2626");
   const tips=done.map(s=>`${s.pair} ${s.direction} ${OUT(s)} ${(s.r_multiple>0?"+":"")+num(s.r_multiple)}R`);
@@ -784,24 +816,26 @@ function renderSignals(){
     const open=o==="PENDING"||o==="FILLED";
     const age=open?`<div class="age">${fmtAge(s.created_utc)} / ${o==="PENDING"?"6 sa":"48 sa"}</div>`:"";
     const px=PRICES[s.pair];
+    const ppx=PREV_PRICES[s.pair];
+    const tick=(px!=null&&ppx!=null&&px!==ppx)?(px>ppx?" tick-up":" tick-down"):"";
     let pxCell;
     if(px==null){pxCell='<td class="num" style="color:var(--grey)">—</td>';}
     else if(o==="FILLED"&&s.fill_price!=null){
       const risk=s.direction==="LONG"?(s.fill_price-s.stop_loss):(s.stop_loss-s.fill_price);
       const ur=risk>0?(s.direction==="LONG"?(px-s.fill_price):(s.fill_price-px))/risk:null;
       const cls=ur>0?"pos":ur<0?"neg":"";
-      pxCell=`<td class="num"><b>${fmtPx(px)}</b><div class="age ${cls}">${ur==null?"":(ur>0?"+":"")+num(ur)+"R canlı"}</div></td>`;
+      pxCell=`<td class="num${tick}"><b>${fmtPx(px)}</b><div class="age ${cls}">${ur==null?"":(ur>0?"+":"")+num(ur)+"R canlı"}</div></td>`;
     }else if(o==="PENDING"){
       const ref=s.direction==="LONG"?s.entry_max:s.entry_min;
       const dist=ref?100*(px-ref)/ref:null;
-      pxCell=`<td class="num"><b>${fmtPx(px)}</b><div class="age">${dist==null?"":"girişe "+(dist>0?"+":"")+num(dist,1)+"%"}</div></td>`;
+      pxCell=`<td class="num${tick}"><b>${fmtPx(px)}</b><div class="age">${dist==null?"":"girişe "+(dist>0?"+":"")+num(dist,1)+"%"}</div></td>`;
     }else{
       pxCell=`<td class="num" style="color:var(--muted)">${fmtPx(px)}</td>`;
     }
     return `<tr data-i="${i}"${o==="NOT_FILLED"?' class="dim"':""}>
       <td class="num">${s.id}</td><td><b>${s.pair}</b></td>
       <td><span class="badge b-${s.direction}">${s.direction}</span></td>
-      <td class="num">${fmtTs(s.created_utc)}${age}</td>
+      <td>${fmtTs(s.created_utc)}${age}</td>
       <td><span class="badge b-${o}">${o}</span></td>
       ${pxCell}
       <td class="num">${num(s.entry_min,4)}–${num(s.entry_max,4)}</td>
@@ -809,8 +843,9 @@ function renderSignals(){
       <td class="num">${num(s.rr,2)}</td>
       <td class="num ${r>0?"pos":r<0?"neg":""}"><b>${r==null?"—":(r>0?"+":"")+num(r)}</b></td></tr>`;}).join("");
   el.innerHTML=`<table><thead><tr><th>#</th><th>Parite</th><th>Yön</th>
-    <th>Zaman</th><th>Durum</th><th>Anlık</th><th>Entry</th><th>Stop</th><th>TP1</th>
-    <th>RR</th><th>R</th></tr></thead><tbody>${tr}</tbody></table>`;
+    <th>Zaman</th><th>Durum</th><th class="r">Anlık</th><th class="r">Entry</th>
+    <th class="r">Stop</th><th class="r">TP1</th>
+    <th class="r">RR</th><th class="r">R</th></tr></thead><tbody>${tr}</tbody></table>`;
   el.querySelectorAll("tbody tr").forEach(row=>row.addEventListener("click",
     ()=>signalDetail(rows[Number(row.dataset.i)])));
 }
@@ -999,13 +1034,32 @@ function renderSys(uni,healthy){
   if(uni)$("stratUni").textContent=(uni.mode||"")+"-"+(uni.count||"");
   $("dot").className="dot"+(healthy?"":" err");
 }
+function renderFooter(backup,healthy,ms,perf){
+  const gist=backup&&backup.gist_url?
+    `gist <a href="${backup.gist_url}" target="_blank" rel="noopener">açık</a> · sync <b>${fmtTs(backup.last_sync_utc)}</b>`:
+    "gist kapalı";
+  $("statusbar").innerHTML=
+    `<span>${healthy?"●":"○"} <b>${healthy?"canlı":"bağlantı yok"}</b></span><span class="sep">|</span>`+
+    `<span>veri <b>${new Date().toLocaleTimeString("tr-TR")}</b></span><span class="sep">|</span>`+
+    `<span>${gist}</span><span class="sep">|</span>`+
+    `<span>yanıt <b>${ms} ms</b></span><span class="sep">|</span>`+
+    `<span>v3.2</span>`+
+    `<span class="right">gölge muhasebe · geçmiş performans garanti değildir · yatırım tavsiyesi değildir</span>`;
+  if(perf&&perf.total_r_multiple!=null){
+    const tr=perf.total_r_multiple;
+    document.title=`${tr>=0?"▲":"▼"} ${(tr>0?"+":"")+num(tr,1)}R · signal-engine`;
+  }
+}
 
 /* ---------- loop ---------- */
 async function refresh(){
-  const [perf,signals,status,uni,comments,market,news,px]=await Promise.all([
+  const t0=performance.now();
+  const [perf,signals,status,uni,comments,market,news,px,backup]=await Promise.all([
     j("/performance"),j("/signals?limit=200"),j("/status"),j("/universe"),
-    j("/commentary?limit=4"),j("/market"),j("/news"),j("/prices")]);
-  PRICES=(px&&px.prices)||{};
+    j("/commentary?limit=4"),j("/market"),j("/news"),j("/prices"),
+    j("/backup/info")]);
+  const fetchMs=Math.round(performance.now()-t0);
+  PREV_PRICES=PRICES;PRICES=(px&&px.prices)||{};
   LAST_STATUS=status;
   SIGNALS=(signals||[]).slice().sort((a,b)=>(b.id||0)-(a.id||0));
   renderHeader(perf,status);
@@ -1019,6 +1073,7 @@ async function refresh(){
   renderNews(news);
   renderPortfolio(SIGNALS);
   renderSys(uni,!!status);
+  renderFooter(backup,!!status,fetchMs,perf);
   $("updated").textContent=new Date().toLocaleTimeString("tr-TR");
 }
 let timer=null;
