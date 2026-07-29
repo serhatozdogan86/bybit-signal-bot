@@ -139,3 +139,35 @@ def test_open_pairs_lists_unclosed(tmp_path):
          "contract_json": "{}"},
     ])
     assert tracker.open_pairs() == ["AAAUSDT"]
+
+
+def test_confidence_and_setup_persisted(tmp_path):
+    """v3.3: sinyal kaydinda guven ve setup tipi kalici olmali."""
+    from app.services.database import Database as _DB
+    from app.strategies import signal_engine
+    from tests import fixtures as fx
+
+    db = _DB(str(tmp_path / "cs.db"))
+    tracker = SignalTracker(db, ltf_interval="15")
+    from app.config.settings import StrategyParams
+    htf = fx.make_series(fx.bullish_htf_closes(), interval="240", seed=3)
+    ltf = fx.make_series(fx.bullish_ltf_closes(), interval="15",
+                         volumes=fx.breakout_volumes(), seed=4)
+    d = signal_engine.evaluate("CONFUSDT", htf, ltf, StrategyParams())
+    assert d.decision.value == "SIGNAL"
+    tracker.maybe_track(d, ltf)
+    row = tracker.recent_signals(1)[0]
+    assert row["confidence"] in ("HIGH", "MEDIUM", "LOW")
+    assert row["setup_type"] in ("breakout_retest", "sweep_reclaim")
+    # eski yedek geri uyumu: alanlar olmadan import calismali
+    n = tracker.import_signals([{"pair": "OLDUSDT", "direction": "LONG",
+                                 "created_utc": "z", "entry_candle_ts": 1,
+                                 "entry_min": 1, "entry_max": 1.1,
+                                 "stop_loss": .9, "tp1": 2, "tp2": 3,
+                                 "rr": 2.0, "status": "CLOSED",
+                                 "outcome": "WIN", "fill_price": 1,
+                                 "exit_price": 2, "r_multiple": 2.0,
+                                 "closed_utc": "z", "contract_json": "{}"}])
+    assert n == 1
+    old = [r for r in tracker.recent_signals(5) if r["pair"] == "OLDUSDT"][0]
+    assert old["confidence"] is None and old["setup_type"] is None

@@ -33,7 +33,8 @@ CREATE TABLE IF NOT EXISTS signals(
   entry_min REAL, entry_max REAL, stop_loss REAL, tp1 REAL, tp2 REAL, rr REAL,
   status TEXT NOT NULL DEFAULT 'PENDING',
   outcome TEXT, fill_price REAL, exit_price REAL, r_multiple REAL,
-  closed_utc TEXT, contract_json TEXT
+  closed_utc TEXT, contract_json TEXT,
+  confidence TEXT, setup_type TEXT
 );
 CREATE TABLE IF NOT EXISTS cooldowns(key TEXT PRIMARY KEY, ts REAL);
 CREATE TABLE IF NOT EXISTS results(pair TEXT PRIMARY KEY, json TEXT);

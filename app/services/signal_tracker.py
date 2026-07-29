@@ -45,6 +45,15 @@ class SignalTracker:
         self._max_track = max_track_bars
 
     # ------------------------------------------------------ veri birikimi
+    def _migrate(self) -> None:
+        """v3.3: eski DB'lere confidence/setup_type kolonlarini ekle."""
+        for col in ("confidence", "setup_type"):
+            try:
+                self._db.execute(f"ALTER TABLE signals ADD COLUMN {col} TEXT")
+            except Exception:
+                pass  # kolon zaten var
+        self._migrate()
+
     def record_candles(self, series: KlineSeries) -> None:
         """Kapanmis mumlari arsivle. Son bar henuz olusuyor -> atlanir."""
         closed = series.candles[:-1]
@@ -74,11 +83,13 @@ class SignalTracker:
             return False
         self._db.execute(
             "INSERT INTO signals(pair,direction,created_utc,entry_candle_ts,"
-            "entry_min,entry_max,stop_loss,tp1,tp2,rr,contract_json) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            "entry_min,entry_max,stop_loss,tp1,tp2,rr,contract_json,"
+            "confidence,setup_type) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (d.pair, d.direction.value, d.timestamp_utc, ltf.candles[-1].ts,
              d.entry_zone.min, d.entry_zone.max, d.stop_loss,
-             d.targets.tp1, d.targets.tp2, d.rr, json.dumps(d.contract_dict())))
+             d.targets.tp1, d.targets.tp2, d.rr, json.dumps(d.contract_dict()),
+             d.confidence.value, d.setup_type.value))
         log.info(kv(event="shadow_track", pair=d.pair, direction=d.direction.value))
         return True
 
@@ -180,7 +191,8 @@ class SignalTracker:
         return self._db.query(
             "SELECT id,pair,direction,created_utc,entry_candle_ts,status,outcome,"
             "entry_min,entry_max,stop_loss,tp1,tp2,rr,fill_price,exit_price,"
-            "r_multiple,closed_utc FROM signals ORDER BY id DESC LIMIT ?", (limit,))
+            "r_multiple,closed_utc,confidence,setup_type "
+            "FROM signals ORDER BY id DESC LIMIT ?", (limit,))
 
     def recent_decisions(self, limit: int = 2000) -> list[dict]:
         return self._db.query(
@@ -229,13 +241,14 @@ class SignalTracker:
             self._db.execute(
                 "INSERT INTO signals(pair,direction,created_utc,entry_candle_ts,"
                 "entry_min,entry_max,stop_loss,tp1,tp2,rr,status,outcome,"
-                "fill_price,exit_price,r_multiple,closed_utc) "
-                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "fill_price,exit_price,r_multiple,closed_utc,confidence,setup_type) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (r.get("pair"), r.get("direction"), r.get("created_utc"),
                  r.get("entry_candle_ts"), r.get("entry_min"), r.get("entry_max"),
                  r.get("stop_loss"), r.get("tp1"), r.get("tp2"), r.get("rr"),
                  r.get("status", "PENDING"), r.get("outcome"),
                  r.get("fill_price"), r.get("exit_price"),
-                 r.get("r_multiple"), r.get("closed_utc")))
+                 r.get("r_multiple"), r.get("closed_utc"),
+                 r.get("confidence"), r.get("setup_type")))
             imported += 1
         return imported

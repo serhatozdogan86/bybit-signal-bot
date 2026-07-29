@@ -222,6 +222,11 @@ DASHBOARD_HTML = r"""<!doctype html>
   .b-NOT_FILLED,.b-EXPIRED{background:var(--grey-bg);color:#5B5344}
   .b-AMBIGUOUS{background:var(--blue-bg);color:var(--blue-ink)}
   .age{font-size:10px;color:var(--muted)}
+  .conf{display:inline-block;margin-left:5px;width:15px;text-align:center;
+        border-radius:4px;font-size:9.5px;font-weight:700;font-family:var(--mono)}
+  .conf.HIGH{background:var(--green-bg);color:var(--green-ink)}
+  .conf.MEDIUM{background:var(--amber-bg);color:var(--amber-ink)}
+  .conf.LOW{background:var(--grey-bg);color:#5B5344}
   .chips{display:flex;gap:6px;align-items:center}
   .chip{background:var(--card2);border:1px solid var(--line);
         color:var(--muted);border-radius:99px;padding:1.5px 10px;
@@ -815,7 +820,8 @@ function signalDetail(s){
     g("Çıkış fiyatı",s.exit_price==null?"—":num(s.exit_price,4))+
     g("Gerçekleşen R",s.r_multiple==null?"—":(s.r_multiple>0?"+":"")+num(s.r_multiple),
       s.r_multiple>0?"pos":s.r_multiple<0?"neg":"")+
-    g("Kapanış",s.closed_utc?fmtTs(s.closed_utc)+" UTC":"—")+"</div>";
+    g("Kapanış",s.closed_utc?fmtTs(s.closed_utc)+" UTC":"—")+
+    g("Setup / Güven",(s.setup_type||"—")+" / "+(s.confidence||"—"))+"</div>";
   const live=LAST_STATUS&&LAST_STATUS.results&&LAST_STATUS.results[s.pair];
   if(live&&live.decision==="SIGNAL"){
     html+=`<div class="note"><b>Son taramada aktif plan:</b> ${live.setup_type||""} · güven ${live.confidence||""}<br>
@@ -853,7 +859,7 @@ function renderSignals(){
       pxCell=`<td class="num" style="color:var(--muted)">${fmtPx(px)}</td>`;
     }
     return `<tr data-i="${i}"${o==="NOT_FILLED"?' class="dim"':""}>
-      <td class="num">${s.id}</td><td><b>${s.pair}</b></td>
+      <td class="num">${s.id}</td><td><b>${s.pair}</b>${s.confidence?`<span class="conf ${s.confidence}" title="güven: ${s.confidence}${s.setup_type?" · "+s.setup_type:""}">${s.confidence[0]}</span>`:""}</td>
       <td><span class="badge b-${s.direction}">${s.direction}</span></td>
       <td>${fmtTs(s.created_utc)}${age}</td>
       <td><span class="badge b-${o}">${o}</span></td>
