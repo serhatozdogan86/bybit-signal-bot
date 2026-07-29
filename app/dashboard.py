@@ -315,6 +315,11 @@ DASHBOARD_HTML = r"""<!doctype html>
   a{color:var(--blue)}
   /* buyuk yazi modu: tek-ekran kilidi kalkar, sayfa kayar; uzun listeler
      yine kendi icinde kayar (55vh tavan) */
+  #tipbox{position:fixed;display:none;background:#2A241B;color:#FBF8F2;
+    padding:9px 12px;border-radius:9px;font-size:11.8px;line-height:1.5;
+    max-width:320px;z-index:60;box-shadow:0 8px 24px rgba(42,36,27,.28);
+    pointer-events:none}
+  .step{outline:none}
   body.zoomed{overflow:auto}
   body.zoomed .app{height:auto;min-height:100vh}
   body.zoomed .scroll{max-height:55vh}
@@ -428,6 +433,8 @@ DASHBOARD_HTML = r"""<!doctype html>
 
   <footer class="statusbar" id="statusbar">yükleniyor…</footer>
 </div>
+
+<div id="tipbox"></div>
 
 <div id="overlay" class="ovl">
   <div class="sheet">
@@ -688,14 +695,22 @@ function renderDuel(signals){
 
 /* ---------- pipeline (tiklanabilir detay) ---------- */
 const STEPS=[
-  ["DATA","Yeterli mum yok (yeni listeleme)","insufficient data","#DC2626"],
-  ["REGIME","ADX<20: yönsüz piyasa","chop regime","#EA580C"],
-  ["HTF STRUCTURE","4H yapı çelişkili","HTF structure unclear","#F59E0B"],
-  ["LTF SETUP","Doğrulanmış retest/sweep yok","no valid LTF setup","#D3B411"],
-  ["VOLUME","Tetik hacmi <1.5× ort.","no volume confirmation","#84CC16"],
-  ["MARKET GATE","Rejim karşıtı yön bloklandı","counter-regime","#0EA5A4"],
-  ["RISK/REWARD","Plan RR bandı dışı (<2 / >6)","RR ","#16A34A"],
+  ["DATA","Yeterli mum yok (yeni listeleme)","insufficient data","#DC2626",
+   "Analiz için yeterli mum geçmişi var mı? 4H ve 15m serilerde en az 60 kapanmış bar gerekir. Yeni listelenen paritelerin tarihi yoktur; motor tahmin uydurmak yerine DATA_MISSING der. Bu aşamada elenen sayısı çoğunlukla o günkü yeni coin sayısıdır."],
+  ["REGIME","ADX<20: yönsüz piyasa","chop regime","#EA580C",
+   "Piyasa yönlü mü, testere mi? ADX (trend gücü göstergesi) 20'nin altındaysa parite yönsüz/chop kabul edilir ve elenir. Yönsüz piyasada kırılımların çoğu tuzaktır — motor bu ortamda hiç oynamamayı tercih eder."],
+  ["HTF STRUCTURE","4H yapı çelişkili","HTF structure unclear","#F59E0B",
+   "4 saatlik yapı analizi: yükselen dipler-tepeler (HH-HL) mi, düşenler (LH-LL) mi? EMA200 konumuyla birlikte net bir taraf seçilemiyorsa yön iddiası yok demektir → elenir. Kararsız piyasada en çok eleyen aşama budur; bu sağlıklıdır."],
+  ["LTF SETUP","Doğrulanmış retest/sweep yok","no valid LTF setup","#D3B411",
+   "15 dakikalıkta somut giriş kurulumu aranır: kırılım sonrası kabul görmüş seviye retest'i ya da likidite süpürmesi sonrası geri alım (sweep-reclaim). 'Grafik iyi görünüyor' yetmez; doğrulanmış kurulum yoksa elenir."],
+  ["VOLUME","Tetik hacmi <1.5× ort.","no volume confirmation","#84CC16",
+   "Tetik barın hacmi, son 20 barın ortalamasının en az 1.5 katı olmalı. Katılımsız kırılım güvenilmezdir — büyük oyuncu yoksa hareket taşınmaz. Hacim teyidi olmayan kurulum elenir."],
+  ["MARKET GATE","Rejim karşıtı yön bloklandı","counter-regime","#0EA5A4",
+   "v3.0 filtresi: her turda BTC 4H kapanışının EMA200'e göre rejimi belirlenir (boğa/ayı/nötr, ±%0.25 bant). Rejime TERS yöndeki sinyaller bloklanır: ayıda LONG, boğada SHORT. İlk 49 sinyalde karşı-trend tarafın sistematik kaybı (−6.99R) üzerine eklendi. BTC verisi alınamazsa kapı açık kalır (fail-open)."],
+  ["RISK/REWARD","Plan RR bandı dışı (<2 / >6)","RR ","#16A34A",
+   "Plan risk/ödül bandı 2.0–6.0. Alt sınır: hedef, riske edilenin en az 2 katı olmalı — kenar yoksa işlem yok. Üst sınır (v3.0): RR>6 çoğunlukla fiyatın dibine sıkışmış stop demektir; gürültü ilk dalgada stoplar. Gölge veride RR≥6 planlı 4 sinyalin 4'ü de kaybetti — tavan bu kanıtla kondu."],
 ];
+const SIGNAL_TIP="Yedi aşamanın tamamını geçen kararlar. Gölge takibe alınır: fiyatın giriş bölgesine gelmesi 6 saat beklenir; dolarsa 48 saat izlenir (önce stop = LOSS, önce hedef = WIN). Tıklayınca bu taramada geçenlerin setup/RR/güven dökümü açılır.";
 function stageOf(d){
   if(d.decision==="SIGNAL")return "SIGNAL";
   const r=(d.decision==="DATA_MISSING")?"insufficient data":(d.reject_reason||"");
@@ -732,18 +747,23 @@ function renderPipeline(status){
     cnt[s]=(cnt[s]||0)+1;
   }
   $("pipeMeta").textContent=total+" parite";
-  $("pipe").innerHTML=STEPS.map(([n,d,,col])=>{
+  $("pipe").innerHTML=STEPS.map(([n,d,,col,tip])=>{
     const c=cnt[n]||0;
-    return `<div class="step" data-s="${n}" title="tıkla: elenenleri gör">
+    return `<div class="step" data-s="${n}" data-tipx="${tip}" tabindex="0">
       <div class="h"><span>${n}</span><span class="n num">−${c}</span></div>
       <div class="d">${d}</div>
       <div class="g"><div style="width:${Math.min(100,100*c/total)}%;background:${col}"></div></div></div>`;
   }).join("")+
-  `<div class="step" data-s="SIGNAL"><div class="h"><span class="pos">→ SIGNAL</span><span class="n num pos">${sig}</span></div>
+  `<div class="step" data-s="SIGNAL" data-tipx="${SIGNAL_TIP}" tabindex="0"><div class="h"><span class="pos">→ SIGNAL</span><span class="n num pos">${sig}</span></div>
     <div class="d">Tüm aşamaları geçenler takibe alınır</div>
     <div class="g"><div style="width:${Math.min(100,sig/total*1000)}%;background:var(--green)"></div></div></div>`;
-  $("pipe").querySelectorAll(".step").forEach(el=>
-    el.addEventListener("click",()=>pipeDetail(el.dataset.s)));
+  $("pipe").querySelectorAll(".step").forEach(el=>{
+    el.addEventListener("click",()=>pipeDetail(el.dataset.s));
+    el.addEventListener("mouseenter",()=>showTip(el));
+    el.addEventListener("mouseleave",hideTip);
+    el.addEventListener("focus",()=>showTip(el));
+    el.addEventListener("blur",hideTip);
+  });
   $("pbar").innerHTML=STEPS.map(([n,,,col])=>{
     const c=cnt[n]||0;
     return c?`<div style="width:${100*c/total}%;background:${col}" title="${n}: ${c}"></div>`:"";
@@ -963,6 +983,25 @@ function renderPortfolio(signals){
     row("30 gün",at.ay,cnt.ay)+
     `<div class="foot">Simülasyon: her işlemde bakiyenin %${(riskPct*100).toFixed(1)}'i riske atılır, sonuç R×risk olarak bileşik işler. Kayma/komisyon yok; gölge muhasebedir, gerçek para değildir. Günler UTC'dir.</div>`;
 }
+let tipTimer=null;
+function showTip(el){
+  clearTimeout(tipTimer);
+  tipTimer=setTimeout(()=>{
+    const tb=$("tipbox");
+    tb.textContent=el.dataset.tipx||"";
+    if(!tb.textContent)return;
+    tb.style.display="block";
+    const r=el.getBoundingClientRect(), tw=330;
+    let left=r.right+12, top=r.top;
+    if(left+tw>window.innerWidth){left=r.left;top=r.bottom+8;}
+    tb.style.left=left+"px";
+    const th=tb.offsetHeight;
+    if(top+th>window.innerHeight-8)top=Math.max(8,window.innerHeight-th-8);
+    tb.style.top=top+"px";
+  },250);
+}
+function hideTip(){clearTimeout(tipTimer);$("tipbox").style.display="none";}
+
 window.__calcSig=id=>{const s=SIGNALS.find(x=>x.id===id);if(s)openCalc(s);};
 /* ---------- pozisyon hesaplayici ---------- */
 const money2=v=>"$"+Number(v).toLocaleString("en-US",{maximumFractionDigits:2});
