@@ -190,6 +190,7 @@ def test_new_endpoints_serve(tmp_path):
     class StubMarket:
         def metrics(self): return {"majors": []}
         def news(self): return {"items": []}
+        def prices(self): return {"prices": {"BTCUSDT": 64000.0}}
 
     class StubComment:
         def recent(self, limit=5): return [{"ts_utc": "x", "text": "y"}]
@@ -200,6 +201,7 @@ def test_new_endpoints_serve(tmp_path):
     c = app.test_client()
     assert c.get("/market").status_code == 200
     assert c.get("/news").status_code == 200
+    assert b"BTCUSDT" in c.get("/prices").data
     assert b"y" in c.get("/commentary").data
     body = c.get("/").data.decode()
     for marker in ("hourly_review", "kripto haber", "canlı metrikler",

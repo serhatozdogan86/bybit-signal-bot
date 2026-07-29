@@ -95,6 +95,8 @@ class MarketInfoService:
         self._n_ts = 0.0
         self._fng_cache: dict | None = None
         self._fng_ts = 0.0
+        self._px_cache: dict | None = None
+        self._px_ts = 0.0
 
     # ------------------------------------------------------------- metrics
     def metrics(self) -> dict:
@@ -173,6 +175,26 @@ class MarketInfoService:
             self._n_cache, self._n_ts = payload, time.time()
         return payload
 
+
+    # ------------------------------------------------------------- prices
+    def prices(self) -> dict:
+        """Tum linear USDT paritelerinin anlik fiyati (30 sn onbellek).
+
+        Dashboard sinyal tablosunun canli fiyat kolonunu besler; tek ucus,
+        istemci tarafinda filtrelenir.
+        """
+        with self._lock:
+            if self._px_cache and time.time() - self._px_ts < 30:
+                return self._px_cache
+        tickers = self._client.get_all_tickers() or []
+        payload = {
+            "updated_utc": _now_iso(),
+            "prices": {t["symbol"]: _f(t.get("lastPrice"))
+                       for t in tickers if t.get("symbol", "").endswith("USDT")},
+        }
+        with self._lock:
+            self._px_cache, self._px_ts = payload, time.time()
+        return payload
 
     # -------------------------------------------------- fear & greed (1 sa)
     def _get_fng(self) -> dict | None:

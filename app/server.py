@@ -128,6 +128,13 @@ def create_app(store: StateStore, scheduler: Scheduler,
         return app.response_class(json.dumps(market_info.metrics(), indent=2),
                                   mimetype="application/json")
 
+    @app.get("/prices")
+    def live_prices():
+        if market_info is None:
+            return jsonify({"error": "market info disabled"}), 404
+        return app.response_class(json.dumps(market_info.prices()),
+                                  mimetype="application/json")
+
     @app.get("/news")
     def market_news():
         if market_info is None:

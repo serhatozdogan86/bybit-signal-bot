@@ -406,6 +406,9 @@ async function j(url){
   catch(e){return null;}
 }
 const OUT=s=>s.outcome||s.status;
+let PRICES={};
+const fmtPx=v=>v==null?"—":Number(v).toLocaleString("en-US",
+  {maximumFractionDigits:v>=100?2:v>=1?4:6});
 const PREV={};
 function arrow(key,val){
   const p=PREV[key];PREV[key]=val;
@@ -694,17 +697,33 @@ function renderSignals(){
     const o=OUT(s),r=s.r_multiple;
     const open=o==="PENDING"||o==="FILLED";
     const age=open?`<div class="age">${fmtAge(s.created_utc)} / ${o==="PENDING"?"6 sa":"48 sa"}</div>`:"";
+    const px=PRICES[s.pair];
+    let pxCell;
+    if(px==null){pxCell='<td class="num" style="color:var(--grey)">—</td>';}
+    else if(o==="FILLED"&&s.fill_price!=null){
+      const risk=s.direction==="LONG"?(s.fill_price-s.stop_loss):(s.stop_loss-s.fill_price);
+      const ur=risk>0?(s.direction==="LONG"?(px-s.fill_price):(s.fill_price-px))/risk:null;
+      const cls=ur>0?"pos":ur<0?"neg":"";
+      pxCell=`<td class="num"><b>${fmtPx(px)}</b><div class="age ${cls}">${ur==null?"":(ur>0?"+":"")+num(ur)+"R canlı"}</div></td>`;
+    }else if(o==="PENDING"){
+      const ref=s.direction==="LONG"?s.entry_max:s.entry_min;
+      const dist=ref?100*(px-ref)/ref:null;
+      pxCell=`<td class="num"><b>${fmtPx(px)}</b><div class="age">${dist==null?"":"girişe "+(dist>0?"+":"")+num(dist,1)+"%"}</div></td>`;
+    }else{
+      pxCell=`<td class="num" style="color:var(--muted)">${fmtPx(px)}</td>`;
+    }
     return `<tr data-i="${i}"${o==="NOT_FILLED"?' class="dim"':""}>
       <td class="num">${s.id}</td><td><b>${s.pair}</b></td>
       <td><span class="badge b-${s.direction}">${s.direction}</span></td>
       <td class="num">${fmtTs(s.created_utc)}${age}</td>
       <td><span class="badge b-${o}">${o}</span></td>
+      ${pxCell}
       <td class="num">${num(s.entry_min,4)}–${num(s.entry_max,4)}</td>
       <td class="num">${num(s.stop_loss,4)}</td><td class="num">${num(s.tp1,4)}</td>
       <td class="num">${num(s.rr,2)}</td>
       <td class="num ${r>0?"pos":r<0?"neg":""}"><b>${r==null?"—":(r>0?"+":"")+num(r)}</b></td></tr>`;}).join("");
   el.innerHTML=`<table><thead><tr><th>#</th><th>Parite</th><th>Yön</th>
-    <th>Zaman</th><th>Durum</th><th>Entry</th><th>Stop</th><th>TP1</th>
+    <th>Zaman</th><th>Durum</th><th>Anlık</th><th>Entry</th><th>Stop</th><th>TP1</th>
     <th>RR</th><th>R</th></tr></thead><tbody>${tr}</tbody></table>`;
   el.querySelectorAll("tbody tr").forEach(row=>row.addEventListener("click",
     ()=>signalDetail(rows[Number(row.dataset.i)])));
@@ -830,9 +849,10 @@ function renderSys(uni,healthy){
 
 /* ---------- loop ---------- */
 async function refresh(){
-  const [perf,signals,status,uni,comments,market,news]=await Promise.all([
+  const [perf,signals,status,uni,comments,market,news,px]=await Promise.all([
     j("/performance"),j("/signals?limit=200"),j("/status"),j("/universe"),
-    j("/commentary?limit=4"),j("/market"),j("/news")]);
+    j("/commentary?limit=4"),j("/market"),j("/news"),j("/prices")]);
+  PRICES=(px&&px.prices)||{};
   LAST_STATUS=status;
   SIGNALS=(signals||[]).slice().sort((a,b)=>(b.id||0)-(a.id||0));
   renderHeader(perf,status);
