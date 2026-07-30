@@ -400,7 +400,8 @@ class SignalTracker:
         }
 
     def recent_signals(self, limit: int = 50) -> list[dict]:
-        return self._db.query(
+        """Golge takipteki son sinyaller (yeni -> eski); r_net dahil (v3.5)."""
+        rows = self._db.query(
             "SELECT id,pair,direction,created_utc,entry_candle_ts,status,outcome,"
             "entry_min,entry_max,stop_loss,tp1,tp2,rr,fill_price,exit_price,"
             "r_multiple,closed_utc,confidence,setup_type,cluster_id,engine_sha "
