@@ -10,3 +10,7 @@
   güven-öncelikli kuyruk, EV sıralaması, anti-korelasyon bonusu).
 - 2026-07-29 · Konsey: hacim eşiğine saatlik mevsimsellik düzeltmesi;
   sweep-reclaim vs breakout-retest rejim uyumu filtresi.
+- 2026-07-30 · YENİDEN GİRİŞ GÖZLEMİ: PRL aynı gün aynı bölgeden 3 kez
+  sinyallendi (2 LOSS + 1 açık). Dedup yalnız açık pozisyonu engelliyor;
+  kapanan kayıptan sonra aynı parite/kümeye soğuma süresi (örn. 8-12sa
+  veya 1×4H mum) kilit-v2 adayı.
