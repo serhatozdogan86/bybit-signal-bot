@@ -8,8 +8,9 @@ User=botuser
 WorkingDirectory=/opt/bybit-signal-bot
 EnvironmentFile=/etc/bybit-bot.env
 Environment=PYTHONUNBUFFERED=1
-ExecStartPre=/bin/bash -c 'echo ENGINE_SHA=$(git -C /opt/bybit-signal-bot rev-parse --short HEAD) > /run/bybit-sha.env'
-EnvironmentFile=-/run/bybit-sha.env
+RuntimeDirectory=bybit-bot
+ExecStartPre=/bin/bash -c 'echo ENGINE_SHA=$(git -C /opt/bybit-signal-bot rev-parse --short HEAD) > /run/bybit-bot/sha.env'
+EnvironmentFile=-/run/bybit-bot/sha.env
 ExecStart=/opt/bybit-signal-bot/.venv/bin/python -m app.main
 Restart=always
 RestartSec=10
