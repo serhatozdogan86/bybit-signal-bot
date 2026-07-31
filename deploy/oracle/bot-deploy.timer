@@ -1,0 +1,9 @@
+[Unit]
+Description=Bot deploy denetimi (2 dk)
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=2min
+
+[Install]
+WantedBy=timers.target

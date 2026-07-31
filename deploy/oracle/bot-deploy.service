@@ -1,0 +1,8 @@
+[Unit]
+Description=Bot auto-deploy (git pull + restart if changed)
+
+[Service]
+Type=oneshot
+User=botuser
+WorkingDirectory=/opt/bybit-signal-bot
+ExecStart=/bin/bash -c 'git fetch -q origin main; L=$(git rev-parse HEAD); R=$(git rev-parse origin/main); if [ "$L" != "$R" ]; then git reset --hard origin/main -q && .venv/bin/pip -q install -r requirements.txt && sudo systemctl restart bybit-bot; fi'

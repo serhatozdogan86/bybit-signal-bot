@@ -1,0 +1,1 @@
+botuser ALL=(root) NOPASSWD: /usr/bin/systemctl restart bybit-bot

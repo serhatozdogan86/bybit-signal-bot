@@ -37,7 +37,8 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-_ENGINE_SHA = (os.environ.get("RENDER_GIT_COMMIT") or "dev")[:7]
+_ENGINE_SHA = (os.environ.get("RENDER_GIT_COMMIT")
+               or os.environ.get("ENGINE_SHA") or "dev")[:7]
 
 
 def _cluster_id(d, ltf) -> str:
