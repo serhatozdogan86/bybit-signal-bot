@@ -760,6 +760,12 @@ const RU={
 "gölge muhasebe · geçmiş performans garanti değildir · yatırım tavsiyesi değildir":
  "теневой учёт · прошлые результаты не гарантия · не инвестиционная рекомендация",
 "başlıktaki TR/RU düğmesi":"кнопка TR/RU в шапке",
+"Şimdi yenile":"Обновить сейчас","≥ 1.5× ort.":"≥ 1.5× сред.",
+"Tüm sonuçlar":"Все результаты","gölge muhasebedir":"— теневой учёт",
+": varsayımsal giriş, kayma/komisyon yok, gerçek emir yok. Geçmiş performans garanti değildir; yatırım tavsiyesi değildir. Haber başlıkları dış kaynaktan aynen aktarılır.":
+ ": гипотетический вход, без проскальзывания и комиссий, без реальных ордеров. Прошлые результаты не гарантия; не инвестиционная рекомендация. Заголовки новостей передаются из внешнего источника без изменений.",
+"Yapı önce gelir; indikatörler yalnız teyittir. Kenar net değilse karar":
+ "Сначала структура; индикаторы лишь подтверждают. Если преимущество не очевидно — решение",
 "Genişlik:":"Ширина:","24s yükselen":"24ч рост","24s düşen":"24ч падение",
 "Korku":"Страх","Açgözlülük":"Жадность","Nötr":"Нейтрально",
 "Gölge sinyalleri para yönetimi diline çevirir. Model: her kapanan işlemde bakiyenin, girdiğin Risk % kadarı riske atılır; sonuç bakiye × (1 + risk × R) olarak İŞLEM KAPANIŞ SIRASIYLA bileşik işler (örn. 10.000$ ve %1 riskte +2.2R kazanç = +220$, −1R kayıp = −100$). Bugün / 7 gün / 30 gün satırları, o pencerede kapanan işlemlerin bakiyeye net etkisidir; 'açılan' o gün üretilen sinyal sayısıdır (günler UTC). Başlangıç $ ve Risk % alanlarını buradan değiştirebilirsin — tarayıcında saklanır. Kayma/komisyon yoktur; simülasyondur, gerçek para değildir. KAPASİTE MODU: Slot ve Kaldıraç alanları gerçek sermaye kısıtını modeller — sermaye slotlara bölünür, defter doluyken gelen sinyal atlanır (atlanan sayısı gösterilir); 'sınırsız varsayım' satırı kısıtsız teorik bakiyeyi kıyas için verir.":
@@ -820,7 +826,7 @@ const RU_PAT=[
  [/^Sonuç (\d+)$/, (m,n)=>`Результат ${n}`],
  [/^Dolmayan (\d+)$/, (m,n)=>`Не заполнено ${n}`],
  [/^(\d+) WIN \/ (\d+) LOSS$/, (m,a,b)=>`${a} WIN / ${b} LOSS`],
- [/(\d+) WIN · (\d+) LOSS/, (m,a,b)=>`${a} WIN · ${b} LOSS`],
+
  [/başabaş ~%([\d.]+)/, (m,n)=>`безубыток ~${n}%`],
  [/hepsi \((\d+)\)/, (m,n)=>`все (${n})`],
  [/güven (HIGH|MEDIUM|LOW)/, (m,g)=>`уверенность ${g}`],
@@ -1079,7 +1085,7 @@ function renderCurve(signals){
   for(const v of data){peak=Math.max(peak,v);maxDD=Math.max(maxDD,peak-v);}
   const st=$("eqStats");
   const netTxt=(PERF&&PERF.expectancy_net!=null)?` · net <b class="num">${(PERF.expectancy_net>0?"+":"")+num(PERF.expectancy_net,2)}R</b>`:"";
-  if(st)st.innerHTML=`PF <b class="num">${pf==null?"∞":num(pf,2)}</b> · beklenti <b class="num">${(exp>0?"+":"")+num(exp,2)}R</b>/işlem${netTxt} · maksDD <b class="num neg">−${num(maxDD,2)}R</b>`;
+  if(st)st.innerHTML=`PF <b class="num">${pf==null?"∞":num(pf,2)}</b> · beklenti <b class="num">${(exp>0?"+":"")+num(exp,2)}R</b>/${LANG==="ru"?"сделку":"işlem"}${netTxt} · maksDD <b class="num neg">−${num(maxDD,2)}R</b>`;
   const labels=done.map((s,i)=>i+1);
   const ptCol=done.map(s=>OUT(s)==="WIN"?"#16A34A":"#DC2626");
   const tips=done.map(s=>`${s.pair} ${s.direction} ${OUT(s)} ${(s.r_multiple>0?"+":"")+num(s.r_multiple)}R`);
@@ -1152,7 +1158,7 @@ function renderDuel(signals){
     title="tabloyu ${name} ile filtreler">
     <div class="top"><b>${name}</b><b class="num ${d.r>0?"pos":d.r<0?"neg":""}">${(d.r>0?"+":"")+num(d.r)}R</b></div>
     ${track(d.r)}
-    <div class="dstat">${d.w} WIN · ${d.l} LOSS · ${d.open} açık</div></div>`;
+    <div class="dstat">${d.w} WIN · ${d.l} LOSS · ${d.open} ${LANG==="ru"?"откр.":"açık"}</div></div>`;
   $("duel").innerHTML=row("LONG",L)+row("SHORT",S)+
     `<div class="axis"><span>−${num(mx,1)}R</span><span>0</span><span>+${num(mx,1)}R</span></div>`;
   $("duel").querySelectorAll(".drow").forEach(el=>el.addEventListener("click",()=>{
@@ -1202,12 +1208,19 @@ function pipeDetail(name){
       rows.map(d=>`<div class="kvgrid"><span class="k"><b>${d.pair}</b>
         <span class="badge b-${d.direction}">${d.direction}</span> ${d.setup_type||""}</span>
         <span class="v num">RR ${num(d.rr,2)} · ${d.confidence||""}</span></div>`).join("")+
-      '<div class="note">Tüm aşamaları geçen kararlar; gölge takibe alınır.</div>');
+      `<div class="note">${LANG==="ru"
+        ?"Решения, прошедшие все этапы; берутся в теневой учёт."
+        :"Tüm aşamaları geçen kararlar; gölge takibe alınır."}</div>`);
     return;
   }
   const st=STEPS.find(s=>s[0]===name);
-  openModal(name+" · "+rows.length+" parite elendi",
-    `<div class="note"><b>${st?st[1]:""}</b> — bu aşama motorun "${name}" filtresidir; geçilemeyen parite o taramada NO_TRADE olur.</div>
+  const _rp = (LANG==="ru");
+  const _desc = _rp && typeof STEPS_RU!=="undefined" && STEPS_RU[name]
+    ? STEPS_RU[name][0] : (st?st[1]:"");
+  openModal(name+" · "+rows.length+(_rp?" пар отсеяно":" parite elendi"),
+    `<div class="note"><b>${_desc}</b> — ${_rp
+      ? `это фильтр «${name}» движка; не прошедшая пара получает NO_TRADE в этом скане.`
+      : `bu aşama motorun "${name}" filtresidir; geçilemeyen parite o taramada NO_TRADE olur.`}</div>
      <div class="taglist">`+
     rows.map(d=>`<span class="badge b-NOT_FILLED" title="${(d.reject_reason||"").replace(/"/g,"'")}">${d.pair}</span>`).join("")+
     "</div>");
@@ -1334,7 +1347,7 @@ function renderSignals(){
     }
     return `<tr data-i="${i}" class="dir-${s.direction}${o==="NOT_FILLED"?" dim":""}">
       <td class="num c-id">${s.id}</td>
-      <td class="c-pair"><b>${s.pair}</b>${s.confidence?`<span class="conf ${s.confidence}" title="güven: ${s.confidence}${s.setup_type?" · "+s.setup_type:""}">${s.confidence[0]}</span>`:""}</td>
+      <td class="c-pair"><b>${s.pair}</b>${s.confidence?`<span class="conf ${s.confidence}" title="${LANG==="ru"?"уверенность":"güven"}: ${s.confidence}${s.setup_type?" · "+s.setup_type:""}">${s.confidence[0]}</span>`:""}</td>
       <td class="c-dir"><span class="badge b-${s.direction}">${s.direction}</span></td>
       <td class="c-time">${fmtTs(s.created_utc)}${age}</td>
       <td class="c-st"><span class="badge b-${o}">${o}</span></td>
@@ -1353,7 +1366,7 @@ function renderSignals(){
 function renderReview(comments){
   const el=$("review");
   if(!comments||!comments.length){
-    el.innerHTML='<div class="empty">ilk değerlendirme ilk tarama turundan sonra üretilir…</div>';return;}
+    el.innerHTML=`<div class="empty">${LANG==="ru"?"первый обзор появится после первого цикла сканирования…":"ilk değerlendirme ilk tarama turundan sonra üretilir…"}</div>`;return;}
   const latest=comments[0];
   const _ct=(LANG==="ru"&&latest.text_ru)?latest.text_ru:latest.text;
   const paras=_ct.split("\n").map(t=>
@@ -1490,13 +1503,15 @@ function renderPortfolio(signals){
     `<div class="bal"><div style="display:flex;justify-content:space-between;align-items:baseline">
        <span class="b num">${money(eq)}</span>
        <span class="p num ${totPct>0?"pos":totPct<0?"neg":""}">${(totPct>0?"+":"")+num(totPct,2)}%</span></div>
-       <div class="c" style="font-size:9.8px;color:var(--muted)">kapasite-kısıtlı · ${taken} alınan / ${skipped} atlanan · ${Object.keys(book).length} açık slot</div></div>`+
+       <div class="c" style="font-size:9.8px;color:var(--muted)">kapasite-kısıtlı · ${taken} ${LANG==="ru"?"принято":"alınan"} / ${skipped} ${LANG==="ru"?"пропущено":"atlanan"} · ${Object.keys(book).length} ${LANG==="ru"?"открытых слотов":"açık slot"}</div></div>`+
     `<div class="prow"><span class="w" style="width:auto">sınırsız varsayım</span>
       <span class="d num ${refPct>0?"pos":refPct<0?"neg":""}" style="font-weight:500">${money(ref)} (${(refPct>0?"+":"")+num(refPct,1)}%)</span><span class="c"></span></div>`+
     row("Bugün",at.gun,cnt.gun," / "+openedToday+" açılan")+
     row("7 gün",at.hafta,cnt.hafta)+
     row("30 gün",at.ay,cnt.ay)+
-    `<div class="foot">Kapasite modeli: sermaye ${K} slota bölünür (slot marjini × ${L}x kaldıraç tavanı); defter doluyken gelen sinyal ATLANIR; risk %${(riskPct*100).toFixed(1)}, işlem kapanış sırasıyla bileşik. Kayma/komisyon yok; gölge simülasyondur, gerçek para değildir. Günler UTC.</div>`;
+    `<div class="foot">${LANG==="ru"
+      ? `Модель ёмкости: капитал делится на ${K} слотов (маржа слота × потолок плеча ${L}x); при заполненной книге новый сигнал ПРОПУСКАЕТСЯ; риск ${(riskPct*100).toFixed(1)}%, сложный процент в порядке закрытия сделок. Без проскальзывания и комиссий; это симуляция, не реальные деньги. Дни по UTC.</div>`
+      : `Kapasite modeli: sermaye ${K} slota bölünür (slot marjini × ${L}x kaldıraç tavanı); defter doluyken gelen sinyal ATLANIR; risk %${(riskPct*100).toFixed(1)}, işlem kapanış sırasıyla bileşik. Kayma/komisyon yok; gölge simülasyondur, gerçek para değildir. Günler UTC.</div>`}`;
 }
 let tipTimer=null;
 function showTip(el){
