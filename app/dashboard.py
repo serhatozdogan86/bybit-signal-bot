@@ -346,6 +346,19 @@ DASHBOARD_HTML = r"""<!doctype html>
     .step .d{display:none}
   }
   /* ---------- MOBIL (<=760px): sekmeli tek kolon + menekse vurgu ---------- */
+  .col[data-tab="ayar"]{display:none}   /* yalniz mobil sekmede gorunur */
+  .setrow{display:flex;align-items:center;justify-content:space-between;
+     gap:12px;padding:11px 0;border-bottom:1px dashed var(--line)}
+  .setrow:last-child{border-bottom:0}
+  .setrow .sl{font-size:13.5px;color:var(--head);font-weight:500}
+  .setbtn{background:var(--blue);color:#fff;border:0;border-radius:9px;
+     padding:8px 14px;font-family:var(--sans);font-size:12.5px;font-weight:600;
+     cursor:pointer;text-decoration:none;display:inline-block}
+  .setbtn.ghost{background:var(--card2);color:var(--blue);
+     border:1px solid var(--line);margin-left:6px;font-family:var(--mono);font-size:11.5px}
+  .setrow select{font-size:13px}
+  .syslist{font-family:var(--mono);font-size:11.5px;line-height:2}
+  .syslist b{color:var(--head);font-weight:600}
   .tabbar{display:none}
   @media (max-width:760px){
     /* Claude Design mobil paleti: menekse vurgu, hafif lila zemin */
@@ -371,7 +384,11 @@ DASHBOARD_HTML = r"""<!doctype html>
     .hdr .hsum{flex-basis:100%;min-width:0;text-align:left;font-size:11.5px;
         order:3;white-space:normal;line-height:1.5}
     .hdr .hsum span{white-space:normal}
-    .hdr select,.hdr .icon{font-size:11.5px}
+    .hctl select,.hctl #langBtn,#calcBtn,#howtoBtn{display:none} /* -> Ayar sekmesi */
+    #setLang #langBtn{display:inline-flex;font-size:12.5px;padding:7px 14px}
+    .hdr .icon{font-size:12px}
+    .col[data-tab="ayar"]{display:none}
+    .col[data-tab="ayar"].on{display:flex}
     .cols{grid-template-columns:1fr}
     /* sekme mantigi: yalniz aktif sutun gorunur */
     .col[data-tab]{display:none}
@@ -450,7 +467,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       </select>
       <button id="refresh" class="icon" title="Şimdi yenile">⟳</button>
       <button id="langBtn" class="icon" title="Dil / Язык" data-noi18n>TR</button>
-      <a id="bookBtn" class="icon" href="/kitap" target="_blank" rel="noopener"
+      <a id="bookBtn" class="icon" href="/kitap"
          title="Ders Kitabı: stratejinin tam anlatımı">📗</a>
       <button id="calcBtn" class="icon" title="Pozisyon Hesaplayıcı">🧮</button>
       <button id="howtoBtn" class="icon" title="Nasıl okunur?">⚙</button>
@@ -509,6 +526,33 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="chead">Sinyaller · Gölge Takip <span class="tag" style="margin-left:0">satıra tıkla → detay</span>
           <span class="chips" id="chips" style="margin-left:auto"></span></div>
         <div class="cbody fill scroll sigwrap" id="signals" style="padding:0 0 4px"><div class="empty" style="padding:8px 14px">yükleniyor…</div></div>
+      </div>
+    </div>
+
+    <div class="col" data-tab="ayar">
+      <div class="card">
+        <div class="chead">Ayarlar <span class="tag">tercihler cihazında saklanır</span></div>
+        <div class="cbody">
+          <div class="setrow"><span class="sl">Dil / Язык</span><span id="setLang"></span></div>
+          <div class="setrow"><span class="sl">Yazı boyutu</span><span id="setFs"></span></div>
+          <div class="setrow"><span class="sl">Yenileme</span><span id="setIv"></span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="chead">Araçlar</div>
+        <div class="cbody">
+          <div class="setrow"><span class="sl">Pozisyon hesaplayıcı</span>
+            <button class="setbtn" id="setCalc">🧮 Aç</button></div>
+          <div class="setrow"><span class="sl">Nasıl okunur?</span>
+            <button class="setbtn" id="setHowto">Rehberi aç</button></div>
+          <div class="setrow"><span class="sl">Ders kitabı</span>
+            <span><a class="setbtn" id="setBook" href="/kitap">📗 Oku</a>
+                  <a class="setbtn ghost" id="setBookPdf" href="/kitap.pdf">PDF</a></span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="chead">Sistem</div>
+        <div class="cbody" id="setSys"><div class="empty">yükleniyor…</div></div>
       </div>
     </div>
 
@@ -573,10 +617,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       <dd>Kural tabanlı otomatik üretimdir (canlı insan/LLM yorumu değildir). Korku &amp; Açgözlülük: alternative.me.</dd>
     </dl>
     <div class="warn">Tüm sonuçlar <b>gölge muhasebedir</b>: varsayımsal giriş, kayma/komisyon yok, gerçek emir yok. Geçmiş performans garanti değildir; yatırım tavsiyesi değildir. Haber başlıkları dış kaynaktan aynen aktarılır.</div>
-    <div style="margin-top:12px;display:flex;align-items:center;gap:10px">
-      <a class="booklink" href="/kitap" target="_blank" rel="noopener">📗 Ders Kitabı — stratejinin tam anlatımı</a>
-      <a class="booklink pdf" href="/kitap.pdf" target="_blank" rel="noopener">PDF</a>
-      <button id="howtoClose" style="margin-left:auto">Kapat</button>
+    <div style="margin-top:12px;text-align:right">
+      <button id="howtoClose">Kapat</button>
     </div>
   </div>
 </div>
@@ -674,6 +716,12 @@ const RU={
 "alınan":"принято","atlanan":"пропущено","açık slot":"открытых слотов","açılan":"открыто","kapanan":"закрыто",
 /* sekmeler ve durum cubugu */
 "Özet":"Обзор","Sinyaller":"Сигналы","Piyasa":"Рынок","Ayar":"Настройки",
+"Ayarlar":"Настройки","tercihler cihazında saklanır":"настройки хранятся на устройстве",
+"Dil / Язык":"Язык / Dil","Yazı boyutu":"Размер шрифта","Yenileme":"Обновление",
+"Araçlar":"Инструменты","Pozisyon hesaplayıcı":"Калькулятор позиции","🧮 Aç":"🧮 Открыть",
+"Nasıl okunur?":"Как это читать?","Rehberi aç":"Открыть руководство",
+"Ders kitabı":"Учебник","📗 Oku":"📗 Читать","Sistem":"Система",
+"durum":"состояние","sürüm":"версия","gist sync":"синх. gist",
 "canlı":"онлайн","bağlantı yok":"нет связи","veri":"данные","yanıt":"ответ",
 "gist açık":"gist открыт","gist kapalı":"gist выключен","sync":"синх",
 "gölge muhasebe · geçmiş performans garanti değildir · yatırım tavsiyesi değildir":
@@ -812,8 +860,9 @@ function applyLang(l){
   document.documentElement.lang=l;
   try{localStorage.setItem("ui_lang",l);}catch(e){}
   const b=$("bookBtn"); if(b) b.href = l==="ru" ? "/kitap?lang=ru" : "/kitap";
-  const pdf=document.querySelector(".booklink.pdf");
-  if(pdf) pdf.href = l==="ru" ? "/kitap.pdf?lang=ru" : "/kitap.pdf";
+  const sb=$("setBook"), sp=$("setBookPdf");
+  if(sb) sb.href = l==="ru" ? "/kitap?lang=ru" : "/kitap";
+  if(sp) sp.href = l==="ru" ? "/kitap.pdf?lang=ru" : "/kitap.pdf";
   if(l==="ru") translateNode(document.body);
   else location.reload();
 }
@@ -861,8 +910,8 @@ $("calcClose").addEventListener("click",()=>$("calc").classList.remove("show"));
   try{saved=localStorage.getItem("ui_lang");}catch(e){}
   if(saved){ LANG=saved; document.documentElement.lang=saved;
     const b=$("bookBtn"); if(b&&saved==="ru") b.href="/kitap?lang=ru";
-    const pdf=document.querySelector(".booklink.pdf");
-    if(pdf&&saved==="ru") pdf.href="/kitap.pdf?lang=ru";
+    if(saved==="ru"){ const sb=$("setBook"), sp=$("setBookPdf");
+      if(sb) sb.href="/kitap?lang=ru"; if(sp) sp.href="/kitap.pdf?lang=ru"; }
     $("langBtn").textContent=saved.toUpperCase(); }
   else { $("langpick").classList.add("show"); }
   document.querySelectorAll(".langbtn").forEach(btn=>
@@ -872,8 +921,9 @@ $("calcClose").addEventListener("click",()=>$("calc").classList.remove("show"));
       LANG=l; document.documentElement.lang=l;
       $("langBtn").textContent=l.toUpperCase();
       const b=$("bookBtn"); if(b) b.href = l==="ru"?"/kitap?lang=ru":"/kitap";
-      const pdf=document.querySelector(".booklink.pdf");
-      if(pdf) pdf.href = l==="ru"?"/kitap.pdf?lang=ru":"/kitap.pdf";
+      const sb=$("setBook"), sp=$("setBookPdf");
+      if(sb) sb.href = l==="ru"?"/kitap?lang=ru":"/kitap";
+      if(sp) sp.href = l==="ru"?"/kitap.pdf?lang=ru":"/kitap.pdf";
       $("langpick").classList.remove("show");
       location.reload();   // secilen dille temiz render (tooltipler dahil)
     }));
@@ -886,7 +936,6 @@ $("calcClose").addEventListener("click",()=>$("calc").classList.remove("show"));
 
 /* ---------- mobil sekmeler ---------- */
 function setTab(name){
-  if(name==="ayar"){$("overlay").classList.add("show");return;}
   document.querySelectorAll(".col[data-tab]").forEach(el=>
     el.classList.toggle("on", el.dataset.tab===name));
   document.querySelectorAll(".tb").forEach(b=>
@@ -896,6 +945,21 @@ function setTab(name){
 }
 document.querySelectorAll(".tb").forEach(b=>
   b.addEventListener("click",()=>setTab(b.dataset.go)));
+/* mobilde header kontrollerini Ayar sekmesine tasi (masaustunde geri al) */
+function placeControls(){
+  const mob=window.matchMedia("(max-width:760px)").matches;
+  const move=(el,hostId)=>{ if(!el)return;
+    const host=$(hostId), hdr=document.querySelector(".hctl");
+    if(mob&&host&&el.parentElement!==host) host.appendChild(el);
+    if(!mob&&hdr&&el.parentElement!==hdr) hdr.appendChild(el);
+  };
+  move($("langBtn"),"setLang"); move($("fs"),"setFs"); move($("iv"),"setIv");
+}
+window.addEventListener("resize",()=>{clearTimeout(window.__pc);
+  window.__pc=setTimeout(placeControls,200);});
+$("setCalc").addEventListener("click",()=>openCalc(null));
+$("setHowto").addEventListener("click",()=>$("overlay").classList.add("show"));
+placeControls();
 (function initTab(){
   let t="ozet";
   try{t=localStorage.getItem("ui_tab")||"ozet";}catch(e){}
@@ -1514,6 +1578,14 @@ function renderFooter(backup,healthy,ms,perf){
     `<span>yanıt <b>${ms} ms</b></span><span class="sep">|</span>`+
     `<span>v3.5</span>`+
     `<span class="right">gölge muhasebe · geçmiş performans garanti değildir · yatırım tavsiyesi değildir</span>`;
+  const ss=$("setSys");
+  if(ss) ss.innerHTML=`<div class="syslist">
+    ${healthy?"● ":"○ "}durum: <b>${healthy?"canlı":"bağlantı yok"}</b><br>
+    veri: <b>${new Date().toLocaleTimeString(LANG==="ru"?"ru-RU":"tr-TR")}</b><br>
+    yanıt: <b>${ms} ms</b><br>
+    ${backup&&backup.last_sync_utc?`gist sync: <b>${fmtTs(backup.last_sync_utc)}</b><br>`:""}
+    sürüm: <b>v3.5</b></div>
+    <div class="note" style="margin-top:10px">gölge muhasebe · geçmiş performans garanti değildir · yatırım tavsiyesi değildir</div>`;
   if(perf&&perf.total_r_multiple!=null){
     const tr=perf.total_r_multiple;
     document.title=`${tr>=0?"▲":"▼"} ${(tr>0?"+":"")+num(tr,1)}R · signal-engine`;
