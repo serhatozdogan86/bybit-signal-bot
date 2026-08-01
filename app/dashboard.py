@@ -21,9 +21,10 @@ v2.7 sartname yerlesimi korunur; uc tasarim karari eklenir:
 """
 
 DASHBOARD_HTML = r"""<!doctype html>
-<html lang="tr">
+<html lang="tr" translate="no">
 <head>
 <meta charset="utf-8">
+<meta name="google" content="notranslate">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>signal-engine // dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -380,12 +381,19 @@ DASHBOARD_HTML = r"""<!doctype html>
     .app{height:auto;min-height:100vh;grid-template-rows:auto minmax(0,1fr) auto;
          gap:8px;padding:8px 10px 76px;max-width:100%;overflow-x:hidden}
     .cols,.col,.card,.kpis{min-width:0;max-width:100%}
+    /* mobilde ic kaydirma YOK: tek akis, sayfa kayar */
+    .cols > .col:first-child,.cols > .col:last-child{overflow:visible;padding-right:0}
+    .col,.card,.cbody,.scroll{overflow:visible!important;max-height:none!important}
+    .chead{flex-wrap:wrap;row-gap:2px}
+    .chead .tag{margin-left:0;flex-basis:100%}
+    .chips{flex-basis:100%;margin-left:0!important;display:flex;flex-wrap:wrap;gap:6px}
     .hdr{flex-wrap:wrap;gap:6px;padding:8px 12px;height:auto}
     .hdr .hsum{flex-basis:100%;min-width:0;text-align:left;font-size:11.5px;
         order:3;white-space:normal;line-height:1.5}
     .hdr .hsum span{white-space:normal}
-    .hctl select,.hctl #langBtn,#calcBtn,#howtoBtn{display:none} /* -> Ayar sekmesi */
-    #setLang #langBtn{display:inline-flex;font-size:12.5px;padding:7px 14px}
+    .hctl select,#calcBtn,#howtoBtn{display:none}   /* -> Ayar sekmesi */
+    #setLang:empty::after{content:"başlıktaki TR/RU düğmesi";font-size:11.5px;
+       color:var(--muted)}
     .hdr .icon{font-size:12px}
     .col[data-tab="ayar"]{display:none}
     .col[data-tab="ayar"].on{display:flex}
@@ -449,7 +457,7 @@ DASHBOARD_HTML = r"""<!doctype html>
   }
 </style>
 </head>
-<body>
+<body class="notranslate">
 <div class="app">
   <header class="hdr">
     <div class="logo"><span class="dot" id="dot"></span>signal<b>-engine</b></div>
@@ -745,6 +753,15 @@ const RU={
  "теневой учёт: гипотетический вход, без проскальзывания и комиссий; не инвестиционная рекомендация.",
 "yükleniyor":"загрузка","güncelleniyor":"обновление",
 "Entry bölgesi":"Зона входа",
+"Korku & Açgözlülük":"Индекс страха и жадности","Genişlik":"Ширина",
+"likit":"ликвидных","24S YÜKSELEN":"24Ч РОСТ","24S DÜŞEN":"24Ч ПАДЕНИЕ",
+"canlı metrikler":"живые метрики","kripto haber · dış kaynak":"крипто-новости · внешний источник",
+"durum":"состояние","veri":"данные","yanıt":"ответ","sürüm":"версия",
+"gölge muhasebe · geçmiş performans garanti değildir · yatırım tavsiyesi değildir":
+ "теневой учёт · прошлые результаты не гарантия · не инвестиционная рекомендация",
+"başlıktaki TR/RU düğmesi":"кнопка TR/RU в шапке",
+"Genişlik:":"Ширина:","24s yükselen":"24ч рост","24s düşen":"24ч падение",
+"Korku":"Страх","Açgözlülük":"Жадность","Nötr":"Нейтрально",
 "Gölge sinyalleri para yönetimi diline çevirir. Model: her kapanan işlemde bakiyenin, girdiğin Risk % kadarı riske atılır; sonuç bakiye × (1 + risk × R) olarak İŞLEM KAPANIŞ SIRASIYLA bileşik işler (örn. 10.000$ ve %1 riskte +2.2R kazanç = +220$, −1R kayıp = −100$). Bugün / 7 gün / 30 gün satırları, o pencerede kapanan işlemlerin bakiyeye net etkisidir; 'açılan' o gün üretilen sinyal sayısıdır (günler UTC). Başlangıç $ ve Risk % alanlarını buradan değiştirebilirsin — tarayıcında saklanır. Kayma/komisyon yoktur; simülasyondur, gerçek para değildir. KAPASİTE MODU: Slot ve Kaldıraç alanları gerçek sermaye kısıtını modeller — sermaye slotlara bölünür, defter doluyken gelen sinyal atlanır (atlanan sayısı gösterilir); 'sınırsız varsayım' satırı kısıtsız teorik bakiyeyi kıyas için verir.":
  "Переводит теневые сигналы на язык управления капиталом. Модель: в каждой закрытой сделке рискуем заданным % от баланса; результат считается сложным процентом В ПОРЯДКЕ ЗАКРЫТИЯ сделок (например, при 10 000$ и риске 1%: +2.2R = +220$, −1R = −100$). Строки Сегодня / 7 дней / 30 дней — чистое влияние закрытых в этом окне сделок; «открыто» — число сигналов, созданных за день (дни по UTC). Поля Старт $ и Риск % редактируются, значения хранятся в браузере. Проскальзывания и комиссий нет; это симуляция, не реальные деньги. РЕЖИМ ЁМКОСТИ: поля Слот и Плечо моделируют реальное ограничение капитала — капитал делится на слоты, при заполненной книге новый сигнал пропускается (счётчик показывает сколько); строка «допущение без лимита» даёт теоретический баланс без ограничений для сравнения.",
 "Aynı motorun LONG ve SHORT taraflarının ayrı karnesi. Her yön için: sonuçlanan işlemlerin R toplamı (büyük rakam ve çubuk — 0 ekseninden sağa yeşil kâr, sola kırmızı zarar; ölçek iki yönün mutlak maksimumudur), W/L sayıları ve açık pozisyon adedi. Bir taraf sistematik eksideyse motor rejime ters işlem üretiyor demektir — v3.0 market gate tam olarak bu verinin üzerine inşa edildi. Bloğa tıklayınca sinyal tablosu o yönle filtrelenir.":
@@ -797,6 +814,7 @@ const RU_PAT=[
  [/([+\-][\d.]+)R canlı/, (m,n)=>`${n}R сейчас`],
  [/(\d+) parite/, (m,n)=>`${n} пар`],
  [/(\d+) tarama/, (m,n)=>`${n} сканов`],
+ [/^ · likit (\d+)$/, (m,n)=>` · ликвидных ${n}`],
  [/^Tümü (\d+)$/, (m,n)=>`Все ${n}`],
  [/^Açık (\d+)$/, (m,n)=>`Открытые ${n}`],
  [/^Sonuç (\d+)$/, (m,n)=>`Результат ${n}`],
@@ -907,7 +925,10 @@ $("calcClose").addEventListener("click",()=>$("calc").classList.remove("show"));
 /* ---------- dil secimi ---------- */
 (function initLang(){
   let saved=null;
-  try{saved=localStorage.getItem("ui_lang");}catch(e){}
+  const urlLang=new URLSearchParams(location.search).get("lang");
+  if(urlLang==="ru"||urlLang==="tr"){ saved=urlLang;
+    try{localStorage.setItem("ui_lang",saved);}catch(e){} }
+  else { try{saved=localStorage.getItem("ui_lang");}catch(e){} }
   if(saved){ LANG=saved; document.documentElement.lang=saved;
     const b=$("bookBtn"); if(b&&saved==="ru") b.href="/kitap?lang=ru";
     if(saved==="ru"){ const sb=$("setBook"), sp=$("setBookPdf");
@@ -925,12 +946,12 @@ $("calcClose").addEventListener("click",()=>$("calc").classList.remove("show"));
       if(sb) sb.href = l==="ru"?"/kitap?lang=ru":"/kitap";
       if(sp) sp.href = l==="ru"?"/kitap.pdf?lang=ru":"/kitap.pdf";
       $("langpick").classList.remove("show");
-      location.reload();   // secilen dille temiz render (tooltipler dahil)
+      location.replace(location.pathname + (l==="ru" ? "?lang=ru" : "?lang=tr"));
     }));
   $("langBtn").addEventListener("click",()=>{
     const next = LANG==="ru" ? "tr" : "ru";
     try{localStorage.setItem("ui_lang",next);}catch(e){}
-    location.reload();   // temiz gecis: TR kaynak metinlere geri don
+    location.replace(location.pathname + (next==="ru" ? "?lang=ru" : "?lang=tr"));
   });
 })();
 
@@ -953,7 +974,7 @@ function placeControls(){
     if(mob&&host&&el.parentElement!==host) host.appendChild(el);
     if(!mob&&hdr&&el.parentElement!==hdr) hdr.appendChild(el);
   };
-  move($("langBtn"),"setLang"); move($("fs"),"setFs"); move($("iv"),"setIv");
+  move($("fs"),"setFs"); move($("iv"),"setIv");   /* dil dugmesi baslikta kalir */
 }
 window.addEventListener("resize",()=>{clearTimeout(window.__pc);
   window.__pc=setTimeout(placeControls,200);});
@@ -1360,10 +1381,10 @@ function renderMarket(m){
     fng=`<div class="fng"><div class="lbl"><span>Korku &amp; Açgözlülük</span>
       <b class="num">${m.fng.value} · ${m.fng.label_tr}</b></div>
       <div class="track"><div class="mark" style="left:calc(${m.fng.value}% - 1px)"></div></div></div>`;}
-  const br=m.breadth?`<div class="breadth num"><b>Genişlik:</b>
+  const br=m.breadth?`<div class="breadth num"><b>${LANG==="ru"?"Ширина:":"Genişlik:"}</b>
     <span class="pos">${m.breadth.advancers}▲</span> /
     <span class="neg">${m.breadth.decliners}▼</span>
-    <span> · likit ${m.liquid_universe}</span></div>`:"";
+    <span> · ${LANG==="ru"?"ликвидных":"likit"} ${m.liquid_universe}</span></div>`:"";
   const link=s=>`https://www.bybit.com/trade/usdt/${s}`;
   const mov=list=>list.map(t=>{
     const cls=t.pct24h>0?"pos":"neg";
@@ -1557,10 +1578,17 @@ function calcRun(){
   if(t2){const gain2=qty*Math.abs(t2-e);rows+=g("TP2 kazanç",`+${money2(gain2)} (+${num(gain2/riskUsd,2)}R)`,"pos");}
   rows+=g("Tahmini komisyon","~"+money2(fee)+` (riskin %${num(feeR*100,1)}'i)`)+
     g("Yaklaşık likidasyon",fmtPx(liq),liqSafe?"":"neg")+"</div>";
+  const _ru2 = (typeof LANG!=="undefined"&&LANG==="ru");
   rows+=liqSafe?
-    `<div class="note" style="border-left:3px solid var(--green)"><b>Güvenli:</b> ${lev}x kaldıraçta likidasyon (${fmtPx(liq)}) stop'un (${fmtPx(st)}) ötesinde — plan stop'u çalışır. Bu paritede yaklaşık güvenli üst sınır ~${maxLev}x.</div>`:
-    `<div class="note" style="border-left:3px solid var(--red)"><b>⚠ Tehlike:</b> ${lev}x kaldıraçta likidasyon (${fmtPx(liq)}) stop'a ulaşmadan tetiklenir — planın stop'u değil borsa likidasyonu çalışır ve kayıp risk$'ı aşar. Kaldıracı ~${maxLev}x altına çek.</div>`;
-  rows+='<div class="note">Değerler yaklaşıktır (likidasyon borsanın marjin modeline göre değişir; komisyon taker %0.055×2 varsayımı). Yatırım tavsiyesi değildir.</div>';
+    (_ru2
+      ? `<div class="note" style="border-left:3px solid var(--green)"><b>Безопасно:</b> при плече ${lev}x ликвидация (${fmtPx(liq)}) находится за стопом (${fmtPx(st)}) — сработает стоп из плана. Примерный безопасный предел по этой паре ~${maxLev}x.</div>`
+      : `<div class="note" style="border-left:3px solid var(--green)"><b>Güvenli:</b> ${lev}x kaldıraçta likidasyon (${fmtPx(liq)}) stop'un (${fmtPx(st)}) ötesinde — plan stop'u çalışır. Bu paritede yaklaşık güvenli üst sınır ~${maxLev}x.</div>`)
+    :
+    (_ru2
+      ? `<div class="note" style="border-left:3px solid var(--red)"><b>⚠ Опасно:</b> при плече ${lev}x ликвидация (${fmtPx(liq)}) наступит раньше стопа — сработает не стоп из плана, а ликвидация биржи, и убыток превысит сумму риска. Снизьте плечо ниже ~${maxLev}x.</div>`
+      : `<div class="note" style="border-left:3px solid var(--red)"><b>⚠ Tehlike:</b> ${lev}x kaldıraçta likidasyon (${fmtPx(liq)}) stop'a ulaşmadan tetiklenir — planın stop'u değil borsa likidasyonu çalışır ve kayıp risk$'ı aşar. Kaldıracı ~${maxLev}x altına çek.</div>`);
+  rows+= _ru2 ? '<div class="note">Значения приблизительные (ликвидация зависит от маржинальной модели биржи; комиссия — допущение taker 0.055%×2). Не инвестиционная рекомендация.</div>'
+    : '<div class="note">Değerler yaklaşıktır (likidasyon borsanın marjin modeline göre değişir; komisyon taker %0.055×2 varsayımı). Yatırım tavsiyesi değildir.</div>';
   out.innerHTML=rows;translateNode(out);
 }
 function renderSys(uni,healthy){
@@ -1578,14 +1606,16 @@ function renderFooter(backup,healthy,ms,perf){
     `<span>yanıt <b>${ms} ms</b></span><span class="sep">|</span>`+
     `<span>v3.5</span>`+
     `<span class="right">gölge muhasebe · geçmiş performans garanti değildir · yatırım tavsiyesi değildir</span>`;
-  const ss=$("setSys");
+  const ss=$("setSys"), _r=(LANG==="ru");
   if(ss) ss.innerHTML=`<div class="syslist">
-    ${healthy?"● ":"○ "}durum: <b>${healthy?"canlı":"bağlantı yok"}</b><br>
-    veri: <b>${new Date().toLocaleTimeString(LANG==="ru"?"ru-RU":"tr-TR")}</b><br>
-    yanıt: <b>${ms} ms</b><br>
-    ${backup&&backup.last_sync_utc?`gist sync: <b>${fmtTs(backup.last_sync_utc)}</b><br>`:""}
-    sürüm: <b>v3.5</b></div>
-    <div class="note" style="margin-top:10px">gölge muhasebe · geçmiş performans garanti değildir · yatırım tavsiyesi değildir</div>`;
+    ${healthy?"● ":"○ "}${_r?"состояние":"durum"}: <b>${healthy?(_r?"онлайн":"canlı"):(_r?"нет связи":"bağlantı yok")}</b><br>
+    ${_r?"данные":"veri"}: <b>${new Date().toLocaleTimeString(_r?"ru-RU":"tr-TR")}</b><br>
+    ${_r?"ответ":"yanıt"}: <b>${ms} ms</b><br>
+    ${backup&&backup.last_sync_utc?`${_r?"синх. gist":"gist sync"}: <b>${fmtTs(backup.last_sync_utc)}</b><br>`:""}
+    ${_r?"версия":"sürüm"}: <b>v3.5</b></div>
+    <div class="note" style="margin-top:10px">${_r
+      ?"теневой учёт · прошлые результаты не гарантия · не инвестиционная рекомендация"
+      :"gölge muhasebe · geçmiş performans garanti değildir · yatırım tavsiyesi değildir"}</div>`;
   if(perf&&perf.total_r_multiple!=null){
     const tr=perf.total_r_multiple;
     document.title=`${tr>=0?"▲":"▼"} ${(tr>0?"+":"")+num(tr,1)}R · signal-engine`;
