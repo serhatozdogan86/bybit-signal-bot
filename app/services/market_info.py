@@ -13,6 +13,7 @@ aynen gosterilir.
 """
 from __future__ import annotations
 
+from app.services.ru_text import to_ru
 import threading
 import time
 from datetime import datetime, timezone
@@ -140,6 +141,7 @@ class MarketInfoService:
             "breadth": {"advancers": adv, "decliners": dec},
             "fng": fng,
             "pulse": _pulse(majors, adv, dec, fng),
+            "pulse_ru": to_ru(_pulse(majors, adv, dec, fng)),
         }
         with self._lock:
             self._m_cache, self._m_ts = payload, time.time()

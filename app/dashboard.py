@@ -345,10 +345,25 @@ DASHBOARD_HTML = r"""<!doctype html>
     .midrow{min-height:clamp(160px,24vh,240px)}
     .step .d{display:none}
   }
-  /* ---------- MOBIL (<=760px): sekmeli tek kolon ---------- */
+  /* ---------- MOBIL (<=760px): sekmeli tek kolon + menekse vurgu ---------- */
   .tabbar{display:none}
   @media (max-width:760px){
+    /* Claude Design mobil paleti: menekse vurgu, hafif lila zemin */
+    :root{--blue:#6D28D9;--bg:#F6F4FB;--card:#FFFFFF;--card2:#F3F0FB;
+          --line:#E6E0F5;--head:#3B2E63;--muted:#7C7396;
+          --blue-bg:#EFE9FD;--grey-bg:#EFECF7;--shadow:0 1px 3px rgba(61,46,99,.07)}
     body{overflow:auto;-webkit-text-size-adjust:100%}
+    .hdr{border-color:var(--line)}
+    .kpi .val{letter-spacing:-.02em}
+    .kpi .val:not(.pos):not(.neg){color:var(--blue)}
+    .badge.b-SHORT{background:#FBE9F3;color:#BE185D}
+    .sigwrap tbody tr{border-left-color:#C4B5FD}
+    .sigwrap tbody tr.dir-LONG{border-left-color:#16A34A}
+    .sigwrap tbody tr.dir-SHORT{border-left-color:#A855F7}
+    .chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
+    .tb.active{color:var(--blue)}
+    .tabbar{background:rgba(255,255,255,.97)}
+    .statusbar{background:rgba(246,244,251,.95)}
     .app{height:auto;min-height:100vh;grid-template-rows:auto minmax(0,1fr) auto;
          gap:8px;padding:8px 10px 76px;max-width:100%;overflow-x:hidden}
     .cols,.col,.card,.kpis{min-width:0;max-width:100%}
@@ -1255,7 +1270,8 @@ function renderReview(comments){
   if(!comments||!comments.length){
     el.innerHTML='<div class="empty">ilk değerlendirme ilk tarama turundan sonra üretilir…</div>';return;}
   const latest=comments[0];
-  const paras=latest.text.split("\n").map(t=>
+  const _ct=(LANG==="ru"&&latest.text_ru)?latest.text_ru:latest.text;
+  const paras=_ct.split("\n").map(t=>
     `<p${t.startsWith("Uyari")?' class="warnline"':""}>${t}</p>`).join("");
   el.innerHTML=`<div class="rts">${fmtTs(latest.ts_utc)} UTC</div>
     <div class="txt">${paras}</div>
@@ -1290,7 +1306,9 @@ function renderMarket(m){
     return `<a href="${link(t.symbol)}" target="_blank" rel="noopener" title="Bybit'te aç">
       <span>${t.symbol.replace("USDT","")}</span>
       <span class="num ${cls}">${(t.pct24h>0?"+":"")+num(t.pct24h,1)}%</span></a>`;}).join("");
-  const pulse=m.pulse?`<div class="pulse"><span class="tg">market pulse · kural-tabanlı okuma</span><br>${m.pulse}</div>`:"";
+  const _pl = (LANG==="ru"&&m.pulse_ru)?m.pulse_ru:m.pulse;
+  const _pltag = LANG==="ru"?"пульс рынка · чтение по правилам":"market pulse · kural-tabanlı okuma";
+  const pulse=_pl?`<div class="pulse"><span class="tg">${_pltag}</span><br>${_pl}</div>`:"";
   el.innerHTML=`<div class="majors">${mj}</div>${fng}${br}
     <div class="movers">
       <div><h4>24s yükselen</h4>${mov(m.gainers||[])}</div>

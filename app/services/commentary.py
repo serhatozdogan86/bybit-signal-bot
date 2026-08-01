@@ -13,6 +13,8 @@ gist yedegine 0_commentary.json olarak eklenir (uzaktan okunabilirlik).
 from __future__ import annotations
 
 import json
+
+from app.services.ru_text import to_ru
 import time
 from datetime import datetime, timezone
 
@@ -29,6 +31,7 @@ CREATE TABLE IF NOT EXISTS commentary(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   ts_utc TEXT NOT NULL,
   text TEXT NOT NULL,
+  text_ru TEXT,
   stats_json TEXT
 );
 """
@@ -51,6 +54,10 @@ class CommentaryService:
         self._db = db
         self._tracker = tracker
         self._interval = interval_sec
+        try:   # eski DB'ler icin kolon migrasyonu
+            db.execute("ALTER TABLE commentary ADD COLUMN text_ru TEXT")
+        except Exception:
+            pass
         self._last = 0.0
         self.market_bias = "neutral"   # scheduler her turda gunceller (v3.4)
         db.execute(_TABLE)
@@ -75,15 +82,17 @@ class CommentaryService:
         prev_ts = prev["ts_utc"] if prev else None
 
         text = self._compose(stats, signals, prev_stats, prev_ts)
-        row = {"ts_utc": _now_iso(), "text": text,
+        text_ru = to_ru(text)          # v3.5 i18n: sunum katmani cevirisi
+        row = {"ts_utc": _now_iso(), "text": text, "text_ru": text_ru,
                "stats_json": json.dumps({
                    "decided": stats.get("decided_trades", 0),
                    "total_r": stats.get("total_r_multiple", 0.0),
                    "win_rate": stats.get("win_rate"),
                })}
         self._db.execute(
-            "INSERT INTO commentary(ts_utc, text, stats_json) VALUES(?,?,?)",
-            (row["ts_utc"], row["text"], row["stats_json"]))
+            "INSERT INTO commentary(ts_utc, text, text_ru, stats_json) "
+            "VALUES(?,?,?,?)",
+            (row["ts_utc"], row["text"], row["text_ru"], row["stats_json"]))
         self._db.execute(
             "DELETE FROM commentary WHERE id NOT IN "
             "(SELECT id FROM commentary ORDER BY id DESC LIMIT 48)")
@@ -204,12 +213,12 @@ class CommentaryService:
     # --------------------------------------------------------------- query
     def _latest(self) -> dict | None:
         rows = self._db.query(
-            "SELECT ts_utc, text, stats_json FROM commentary "
+            "SELECT ts_utc, text, text_ru, stats_json FROM commentary "
             "ORDER BY id DESC LIMIT 1")
         return dict(rows[0]) if rows else None
 
     def recent(self, limit: int = 5) -> list[dict]:
         rows = self._db.query(
-            "SELECT ts_utc, text FROM commentary ORDER BY id DESC LIMIT ?",
+            "SELECT ts_utc, text, text_ru FROM commentary ORDER BY id DESC LIMIT ?",
             (limit,))
         return [dict(r) for r in rows]
