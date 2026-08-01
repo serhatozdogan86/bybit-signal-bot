@@ -55,6 +55,9 @@ DASHBOARD_HTML = r"""<!doctype html>
   .num{font-family:var(--mono);font-variant-numeric:tabular-nums;
        font-size:.94em;letter-spacing:-.01em}
   td.num{text-align:right}
+  td.c-lv{display:flex;gap:14px;justify-content:flex-end;white-space:nowrap}
+  td.c-lv span[data-l]::before{content:attr(data-l) " ";font-family:var(--sans);
+    font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
   th.r{text-align:right}
   .app{display:grid;grid-template-rows:56px minmax(0,1fr) 24px;height:100vh;
        gap:10px;padding:10px 12px 6px;max-width:1920px;margin:0 auto}
@@ -336,6 +339,69 @@ DASHBOARD_HTML = r"""<!doctype html>
     .midrow{min-height:clamp(160px,24vh,240px)}
     .step .d{display:none}
   }
+  /* ---------- MOBIL (<=760px): sekmeli tek kolon ---------- */
+  .tabbar{display:none}
+  @media (max-width:760px){
+    body{overflow:auto;-webkit-text-size-adjust:100%}
+    .app{height:auto;min-height:100vh;grid-template-rows:auto minmax(0,1fr) auto;
+         gap:8px;padding:8px 10px 76px;max-width:100%;overflow-x:hidden}
+    .cols,.col,.card,.kpis{min-width:0;max-width:100%}
+    .hdr{flex-wrap:wrap;gap:6px;padding:8px 12px;height:auto}
+    .hdr .hsum{flex-basis:100%;min-width:0;text-align:left;font-size:11.5px;
+        order:3;white-space:normal;line-height:1.5}
+    .hdr .hsum span{white-space:normal}
+    .hdr select,.hdr .icon{font-size:11.5px}
+    .cols{grid-template-columns:1fr}
+    /* sekme mantigi: yalniz aktif sutun gorunur */
+    .col[data-tab]{display:none}
+    .col[data-tab].on{display:flex}
+    .kpis{grid-template-columns:1fr 1fr;gap:8px}
+    .kpi .val{font-size:24px}
+    .midrow{grid-template-columns:1fr;min-height:0}
+    .scroll{max-height:none;overflow:visible}
+    .card{min-height:0}
+    /* sinyal tablosu -> kart listesi */
+    .sigwrap table,.sigwrap thead{display:block}
+    .sigwrap thead{display:none}
+    .sigwrap tbody{display:block}
+    .sigwrap tbody tr{display:grid;grid-template-columns:1fr auto;
+        gap:2px 10px;background:var(--card);border:1px solid var(--line);
+        border-left:3px solid var(--line);border-radius:10px;
+        padding:10px 12px;margin-bottom:8px}
+    .sigwrap tbody tr.dir-LONG{border-left-color:var(--green)}
+    .sigwrap tbody tr.dir-SHORT{border-left-color:var(--red)}
+    .sigwrap tbody tr:nth-child(even) td{background:transparent}
+    .sigwrap td{border:0;padding:0;font-size:13px}
+    .sigwrap td[data-l]::before{content:attr(data-l);display:block;
+        font-family:var(--mono);font-size:9px;letter-spacing:.08em;
+        text-transform:uppercase;color:var(--muted)}
+    .sigwrap td.c-pair{grid-column:1;grid-row:1;font-size:15px}
+    .sigwrap td.c-dir{grid-column:1;grid-row:2}
+    .sigwrap td.c-px{grid-column:2;grid-row:1;text-align:right;font-size:15px}
+    .sigwrap td.c-r{grid-column:2;grid-row:2;text-align:right;font-size:15px;font-weight:700}
+    .sigwrap td.c-st{grid-column:1;grid-row:3}
+    .sigwrap td.c-time{grid-column:2;grid-row:3;text-align:right;color:var(--muted);font-size:11.5px}
+    .sigwrap td.c-lv{grid-column:1/-1;grid-row:4;display:grid;
+        grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px;
+        padding-top:8px;border-top:1px dashed var(--line)}
+    .sigwrap td.c-id{display:none}
+    /* alt sekme cubugu */
+    .tabbar{display:grid;grid-template-columns:repeat(4,1fr);
+        position:fixed;left:0;right:0;bottom:0;z-index:50;
+        background:rgba(255,254,250,.96);backdrop-filter:blur(8px);
+        border-top:1px solid var(--line);padding:6px 4px 8px}
+    .tb{background:none;border:0;display:flex;flex-direction:column;
+        align-items:center;gap:3px;font-family:var(--sans);font-size:10.5px;
+        color:var(--muted);cursor:pointer;padding:4px 0}
+    .tb span{font-size:16px;line-height:1}
+    .tb.active{color:var(--blue);font-weight:600}
+    .statusbar{position:fixed;bottom:56px;left:0;right:0;font-size:9.5px;
+        padding:3px 10px;background:rgba(245,241,232,.94);z-index:49;
+        border-top:1px solid var(--line)}
+    .statusbar .right{display:none}
+    .ovl .sheet{max-width:94vw;max-height:86vh;overflow:auto}
+    #tipbox{max-width:76vw}
+  }
   @media (max-width:1180px){
     body{overflow:auto}
     .app{height:auto}
@@ -370,7 +436,7 @@ DASHBOARD_HTML = r"""<!doctype html>
   </header>
 
   <div class="cols">
-    <div class="col">
+    <div class="col" data-tab="ozet">
       <div class="card">
         <div class="chead">Strateji <span class="tag">strateji sözleşmesi</span></div>
         <div class="cbody strat">
@@ -405,7 +471,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       </div>
     </div>
 
-    <div class="col">
+    <div class="col" data-tab="sinyaller">
       <div class="kpis" id="kpis"></div>
       <div class="midrow">
         <div class="card">
@@ -420,11 +486,11 @@ DASHBOARD_HTML = r"""<!doctype html>
       <div class="card fill">
         <div class="chead">Sinyaller · Gölge Takip <span class="tag" style="margin-left:0">satıra tıkla → detay</span>
           <span class="chips" id="chips" style="margin-left:auto"></span></div>
-        <div class="cbody fill scroll" id="signals" style="padding:0 0 4px"><div class="empty" style="padding:8px 14px">yükleniyor…</div></div>
+        <div class="cbody fill scroll sigwrap" id="signals" style="padding:0 0 4px"><div class="empty" style="padding:8px 14px">yükleniyor…</div></div>
       </div>
     </div>
 
-    <div class="col">
+    <div class="col" data-tab="piyasa">
       <div class="card">
         <div class="chead">Piyasa Nabzı <span class="tag" id="mupd">canlı metrikler</span></div>
         <div class="cbody" id="market"><div class="empty">yükleniyor…</div></div>
@@ -440,6 +506,12 @@ DASHBOARD_HTML = r"""<!doctype html>
     </div>
   </div>
 
+  <nav class="tabbar" id="tabbar" role="tablist">
+    <button class="tb active" data-go="ozet" role="tab"><span>▤</span>Özet</button>
+    <button class="tb" data-go="sinyaller" role="tab"><span>≡</span>Sinyaller</button>
+    <button class="tb" data-go="piyasa" role="tab"><span>◈</span>Piyasa</button>
+    <button class="tb" data-go="ayar" role="tab"><span>⚙</span>Ayar</button>
+  </nav>
   <footer class="statusbar" id="statusbar">yükleniyor…</footer>
 </div>
 
@@ -544,6 +616,24 @@ function openModal(title,html){
 });
 $("modalClose").addEventListener("click",()=>$("modal").classList.remove("show"));
 $("calcClose").addEventListener("click",()=>$("calc").classList.remove("show"));
+/* ---------- mobil sekmeler ---------- */
+function setTab(name){
+  if(name==="ayar"){$("overlay").classList.add("show");return;}
+  document.querySelectorAll(".col[data-tab]").forEach(el=>
+    el.classList.toggle("on", el.dataset.tab===name));
+  document.querySelectorAll(".tb").forEach(b=>
+    b.classList.toggle("active", b.dataset.go===name));
+  window.scrollTo({top:0,behavior:"smooth"});
+  try{localStorage.setItem("ui_tab",name);}catch(e){}
+}
+document.querySelectorAll(".tb").forEach(b=>
+  b.addEventListener("click",()=>setTab(b.dataset.go)));
+(function initTab(){
+  let t="ozet";
+  try{t=localStorage.getItem("ui_tab")||"ozet";}catch(e){}
+  if(t==="ayar")t="ozet";
+  setTab(t);
+})();
 $("calcBtn").addEventListener("click",()=>openCalc(null));
 ["cBal","cRisk","cLev","cDir","cEntry","cStop","cTp1","cTp2"].forEach(id=>
   $(id).addEventListener("input",calcRun));
@@ -602,7 +692,8 @@ function renderKpis(perf,status,uni,signals){
     kpi("ALL","Taranan Evren",uni?uni.count:"—","",
         (uni?uni.mode:"")+" · "+(meta.scan_count??"—")+" tarama",null);
   $("kpis").querySelectorAll(".kpi").forEach(k=>k.addEventListener("click",()=>{
-    FILTER=k.dataset.f;renderChips();renderSignals();}));
+    FILTER=k.dataset.f;renderChips();renderSignals();
+    if(window.matchMedia("(max-width:760px)").matches)setTab("sinyaller");}));
 }
 
 /* ---------- equity: derinlikli Chart.js + SVG fallback ---------- */
@@ -862,28 +953,27 @@ function renderSignals(){
       const risk=s.direction==="LONG"?(s.fill_price-s.stop_loss):(s.stop_loss-s.fill_price);
       const ur=risk>0?(s.direction==="LONG"?(px-s.fill_price):(s.fill_price-px))/risk:null;
       const cls=ur>0?"pos":ur<0?"neg":"";
-      pxCell=`<td class="num${tick}"><b>${fmtPx(px)}</b><div class="age ${cls}">${ur==null?"":(ur>0?"+":"")+num(ur)+"R canlı"}</div></td>`;
+      pxCell=`<td class="num c-px${tick}"><b>${fmtPx(px)}</b><div class="age ${cls}">${ur==null?"":(ur>0?"+":"")+num(ur)+"R canlı"}</div></td>`;
     }else if(o==="PENDING"){
       const ref=s.direction==="LONG"?s.entry_max:s.entry_min;
       const dist=ref?100*(px-ref)/ref:null;
-      pxCell=`<td class="num${tick}"><b>${fmtPx(px)}</b><div class="age">${dist==null?"":"girişe "+(dist>0?"+":"")+num(dist,1)+"%"}</div></td>`;
+      pxCell=`<td class="num c-px${tick}"><b>${fmtPx(px)}</b><div class="age">${dist==null?"":"girişe "+(dist>0?"+":"")+num(dist,1)+"%"}</div></td>`;
     }else{
-      pxCell=`<td class="num" style="color:var(--muted)">${fmtPx(px)}</td>`;
+      pxCell=`<td class="num c-px" style="color:var(--muted)">${fmtPx(px)}</td>`;
     }
-    return `<tr data-i="${i}"${o==="NOT_FILLED"?' class="dim"':""}>
-      <td class="num">${s.id}</td><td><b>${s.pair}</b>${s.confidence?`<span class="conf ${s.confidence}" title="güven: ${s.confidence}${s.setup_type?" · "+s.setup_type:""}">${s.confidence[0]}</span>`:""}</td>
-      <td><span class="badge b-${s.direction}">${s.direction}</span></td>
-      <td>${fmtTs(s.created_utc)}${age}</td>
-      <td><span class="badge b-${o}">${o}</span></td>
+    return `<tr data-i="${i}" class="dir-${s.direction}${o==="NOT_FILLED"?" dim":""}">
+      <td class="num c-id">${s.id}</td>
+      <td class="c-pair"><b>${s.pair}</b>${s.confidence?`<span class="conf ${s.confidence}" title="güven: ${s.confidence}${s.setup_type?" · "+s.setup_type:""}">${s.confidence[0]}</span>`:""}</td>
+      <td class="c-dir"><span class="badge b-${s.direction}">${s.direction}</span></td>
+      <td class="c-time">${fmtTs(s.created_utc)}${age}</td>
+      <td class="c-st"><span class="badge b-${o}">${o}</span></td>
       ${pxCell}
-      <td class="num">${num(s.entry_min,4)}–${num(s.entry_max,4)}</td>
-      <td class="num">${num(s.stop_loss,4)}</td><td class="num">${num(s.tp1,4)}</td>
-      <td class="num">${num(s.rr,2)}</td>
-      <td class="num ${r>0?"pos":r<0?"neg":""}"><b>${r==null?"—":(r>0?"+":"")+num(r)}</b></td></tr>`;}).join("");
+      <td class="num c-lv"><span data-l="giriş">${num(s.entry_min,4)}–${num(s.entry_max,4)}</span><span data-l="stop">${num(s.stop_loss,4)}</span><span data-l="tp1">${num(s.tp1,4)}</span><span data-l="rr">${num(s.rr,2)}</span></td>
+      <td class="num c-r ${r>0?"pos":r<0?"neg":""}"><b>${r==null?"—":(r>0?"+":"")+num(r)}</b></td></tr>`;}).join("");
   el.innerHTML=`<table><thead><tr><th>#</th><th>Parite</th><th>Yön</th>
-    <th>Zaman</th><th>Durum</th><th class="r">Anlık</th><th class="r">Entry</th>
-    <th class="r">Stop</th><th class="r">TP1</th>
-    <th class="r">RR</th><th class="r">R</th></tr></thead><tbody>${tr}</tbody></table>`;
+    <th>Zaman</th><th>Durum</th><th class="r">Anlık</th>
+    <th class="r lvh">Giriş / Stop / TP1 / RR</th>
+    <th class="r">R</th></tr></thead><tbody>${tr}</tbody></table>`;
   el.querySelectorAll("tbody tr").forEach(row=>row.addEventListener("click",
     ()=>signalDetail(rows[Number(row.dataset.i)])));
 }
