@@ -428,6 +428,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <option value="300000">5 dk</option>
       </select>
       <button id="refresh" class="icon" title="Şimdi yenile">⟳</button>
+      <button id="langBtn" class="icon" title="Dil / Язык" data-noi18n>TR</button>
       <a id="bookBtn" class="icon" href="/kitap" target="_blank" rel="noopener"
          title="Ders Kitabı: stratejinin tam anlatımı">📗</a>
       <button id="calcBtn" class="icon" title="Pozisyon Hesaplayıcı">🧮</button>
@@ -517,6 +518,22 @@ DASHBOARD_HTML = r"""<!doctype html>
 
 <div id="tipbox"></div>
 
+<div id="langpick" class="ovl" data-noi18n>
+  <div class="sheet" style="max-width:420px;text-align:center">
+    <h3 style="margin-bottom:4px">Dil / Язык</h3>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 18px">
+      Panoyu hangi dilde kullanmak istersiniz?<br>
+      На каком языке открыть панель?</p>
+    <div style="display:flex;gap:12px;justify-content:center">
+      <button class="langbtn" data-lang="tr">🇹🇷 Türkçe</button>
+      <button class="langbtn" data-lang="ru">🇷🇺 Русский</button>
+    </div>
+    <p style="color:var(--muted);font-size:11px;margin:16px 0 0">
+      Daha sonra başlıktaki TR/RU düğmesinden değiştirebilirsiniz ·
+      Позже можно сменить кнопкой TR/RU</p>
+  </div>
+</div>
+
 <div id="overlay" class="ovl">
   <div class="sheet">
     <h3>Nasıl okunur?</h3>
@@ -579,6 +596,185 @@ DASHBOARD_HTML = r"""<!doctype html>
 <script>
 "use strict";
 const $=id=>document.getElementById(id);
+/* ================= i18n: TR (kaynak) -> RU cevirisi ================= */
+const RU={
+/* baslik ve kartlar */
+"Strateji":"Стратегия","strateji sözleşmesi":"регламент стратегии",
+"Filtre Boru Hattı":"Конвейер фильтров","Kümülatif R (Equity)":"Кумулятивный R (эквити)",
+"yeşil WIN · kırmızı LOSS":"зелёный WIN · красный LOSS",
+"Yön Bilançosu":"Баланс по направлениям","tıkla → yön filtresi":"клик → фильтр направления",
+"Sinyaller · Gölge Takip":"Сигналы · Теневой учёт","satıra tıkla → detay":"клик по строке → детали",
+"Piyasa Nabzı":"Пульс рынка","canlı metrikler":"живые метрики",
+"Saatlik Değerlendirme":"Часовой обзор","hourly_review · otomatik":"hourly_review · автоматически",
+"Haber Akışı":"Лента новостей","kripto haber · dış kaynak":"крипто-новости · внешний источник",
+"Portföy Simülasyonu":"Симуляция портфеля","gölge · bileşik":"тень · сложный процент",
+/* KPI */
+"Win Rate":"Винрейт","Toplam R":"Суммарный R","Açık Pozisyon":"Открытые позиции",
+"Giriş İsabeti":"Точность входа","Taranan Evren":"Сканируемая вселенная",
+"gölge takipte":"в теневом учёте","top · 1 tarama":"top · 1 скан",
+/* strateji karti */
+"Zaman dilimi":"Таймфрейм","Hacim teyidi":"Подтверждение объёмом","Risk/ödül bandı":"Диапазон риск/прибыль",
+"Yön kapısı":"Ворота направления","Setup":"Сетап","Evren":"Вселенная","BTC 4H rejimi":"режим BTC 4H",
+"retest · sweep":"ретест · свип","Conservative swing.":"Conservative swing.",
+/* boru hatti */
+"Yeterli mum yok (yeni listeleme)":"Недостаточно свечей (новый листинг)",
+"ADX<20: yönsüz piyasa":"ADX<20: рынок без направления",
+"4H yapı çelişkili":"Структура 4H противоречива",
+"Doğrulanmış retest/sweep yok":"Нет подтверждённого ретеста/свипа",
+"Tetik hacmi <1.5× ort.":"Объём триггера <1.5× сред.",
+"Rejim karşıtı yön bloklandı":"Направление против режима заблокировано",
+"Plan RR bandı dışı (<2 / >6)":"RR плана вне диапазона (<2 / >6)",
+"Tüm aşamaları geçenler takibe alınır":"Прошедшие все этапы берутся в учёт",
+"elenen →":"отсеяно →","tarama bekleniyor…":"ожидание скана…",
+/* tablo basliklari */
+"Parite":"Пара","Yön":"Направление","Zaman":"Время","Durum":"Статус","Anlık":"Сейчас",
+"Giriş / Stop / TP1 / RR":"Вход / Стоп / TP1 / RR","giriş":"вход","stop":"стоп",
+/* durum rozetleri ve filtreler */
+"Tümü":"Все","Açık":"Открытые","Sonuç":"Результат","Dolmayan":"Не заполнено",
+"açık":"откр.","yükleniyor…":"загрузка…","hesaplanıyor…":"расчёт…",
+"henüz sonuçlanan sinyal yok":"пока нет завершённых сигналов",
+"kayıt yok":"нет записей","bu filtrede sinyal yok":"нет сигналов по этому фильтру",
+/* detay modali */
+"Kapat":"Закрыть","Yön / Setup":"Направление / Сетап","Giriş bölgesi":"Зона входа",
+"Stop":"Стоп","Hedefler":"Цели","Plan RR":"RR плана","Durum / Sonuç":"Статус / Результат",
+"Sonuç R":"Результат R","Açılış":"Открытие","Kapanış":"Закрытие","Setup / Güven":"Сетап / Уверенность",
+"Net R (maliyet v0)":"Чистый R (издержки v0)","Bu sinyalle pozisyon hesapla":"Рассчитать позицию по сигналу",
+/* hesaplayici */
+"Pozisyon Hesaplayıcı":"Калькулятор позиции","Sinyal":"Сигнал","— manuel —":"— вручную —",
+"Bakiye $":"Баланс $","Risk %":"Риск %","Kaldıraç":"Плечо","Entry":"Вход","TP1":"TP1","TP2":"TP2",
+"Riske atılan":"Под риском","Stop mesafesi":"Дистанция до стопа","Miktar":"Количество",
+"Pozisyon (notional)":"Позиция (номинал)","Gerekli marjin":"Требуемая маржа","Stop'ta kayıp":"Убыток на стопе",
+"TP1 kazanç":"Прибыль TP1","TP2 kazanç":"Прибыль TP2","Tahmini komisyon":"Оценка комиссии",
+"Yaklaşık likidasyon":"Примерная ликвидация","Güvenli:":"Безопасно:","⚠ Tehlike:":"⚠ Опасно:",
+"bakiye, risk, entry ve stop girin…":"введите баланс, риск, вход и стоп…",
+/* portfoy */
+"Başlangıç $":"Старт $","Slot":"Слот","Kald.":"Плечо","Bugün":"Сегодня","7 gün":"7 дней","30 gün":"30 дней",
+"kapasite-kısıtlı":"с учётом ёмкости","sınırsız varsayım":"допущение без лимита",
+"alınan":"принято","atlanan":"пропущено","açık slot":"открытых слотов","açılan":"открыто","kapanan":"закрыто",
+/* sekmeler ve durum cubugu */
+"Özet":"Обзор","Sinyaller":"Сигналы","Piyasa":"Рынок","Ayar":"Настройки",
+"canlı":"онлайн","bağlantı yok":"нет связи","veri":"данные","yanıt":"ответ",
+"gist açık":"gist открыт","gist kapalı":"gist выключен","sync":"синх",
+"gölge muhasebe · geçmiş performans garanti değildir · yatırım tavsiyesi değildir":
+  "теневой учёт · прошлые результаты не гарантия · не инвестиционная рекомендация",
+/* rehber modali */
+"Nasıl okunur?":"Как это читать?","R (risk katsayısı)":"R (единица риска)",
+"Win rate ve başabaş":"Винрейт и точка безубыточности","Filtre boru hattı":"Конвейер фильтров",
+"Portföy ısısı":"Теплота портфеля","Ders Kitabı — stratejinin tam anlatımı":"Учебник — полное описание стратегии",
+"Piyasa Nabzı / Saatlik Değerlendirme":"Пульс рынка / Часовой обзор",
+/* diger */
+"yazı boyutu":"размер шрифта","yenileme aralığı":"интервал обновления","Nasıl okunur?":"Как это читать?",
+"Yazı: Normal":"Шрифт: обычный","Büyük":"Крупный","Çok Büyük":"Очень крупный",
+"Ders Kitabı: stratejinin tam anlatımı":"Учебник: полное описание стратегии",
+"devamını gör":"читать далее","daha fazla":"ещё",
+"başabaş":"безубыток","doldu":"заполнено","değil":"нет","işlem":"сделка","tarama":"скан",
+"sinyal sonuçlandı":"сигналов завершено","isabet":"точность","toplam":"итого",
+"eşiğin üzerinde":"выше порога","eşiğin altında":"ниже порога",
+"beklenti":"ожидание","maksDD":"макс. просадка","net":"чисто",
+"WIN":"WIN","LOSS":"LOSS","PENDING":"PENDING","FILLED":"FILLED",
+"gölge muhasebe: varsayımsal giriş, kayma/komisyon yok; yatırım tavsiyesi değildir.":
+ "теневой учёт: гипотетический вход, без проскальзывания и комиссий; не инвестиционная рекомендация.",
+"yükleniyor":"загрузка","güncelleniyor":"обновление",
+/* uzun aciklamalar */
+"Her işlemin sonucu, riske atılan birim cinsinden: kayıp = −1R, kazanç = ödül/risk oranı kadar (+2.2R gibi).":
+ "Результат каждой сделки в единицах риска: убыток = −1R, прибыль = отношение вознаграждения к риску (например +2.2R).",
+"Kazançlar kayıplardan büyükse %50 isabet gerekmez. Başabaş = 1 / (1 + ort. kazanç R).":
+ "Если выигрыши крупнее убытков, 50% точности не нужны. Безубыток = 1 / (1 + средний выигрыш R).",
+"DATA → REGIME → HTF → LTF → VOLUME → MARKET GATE → RR; herhangi biri geçilemezse NO_TRADE. Aşamaya tıklayınca o aşamada elenen pariteler listelenir, üzerine gelince aşama açıklanır.":
+ "DATA → REGIME → HTF → LTF → VOLUME → MARKET GATE → RR; если этап не пройден — NO_TRADE. Клик по этапу показывает отсеянные пары, наведение — пояснение.",
+"Girişe gelmesi 6 saat beklenir; gelirse 48 saat izlenir. Önce stop = LOSS, önce hedef = WIN. NOT_FILLED orana dahil edilmez (hayalet R'si ayrıca izlenir); aynı mumda stop+hedef görülürse muhafazakâr kuralla LOSS sayılır.":
+ "Подхода к зоне входа ждём 6 часов; при входе наблюдаем 48 часов. Сначала стоп = LOSS, сначала цель = WIN. NOT_FILLED в статистику не входит (его «призрачный» R учитывается отдельно); если в одной свече и стоп, и цель — консервативно считаем LOSS.",
+"Aynı yönde en fazla 4, aynı kümede 2, toplamda 8 açık sinyal. Limit doluyken gelen sinyal reddedilmez, sıraya alınır ve ayrı kohortta izlenir.":
+ "Не более 4 открытых сигналов в одну сторону, 2 в одном кластере, 8 суммарно. При заполненном лимите сигнал не отбрасывается, а ставится в очередь и отслеживается в отдельной когорте.",
+"Kural tabanlı otomatik üretimdir (canlı insan/LLM yorumu değildir). Korku & Açgözlülük: alternative.me.":
+ "Генерируется автоматически по правилам (не живой комментарий человека или LLM). Индекс страха и жадности: alternative.me.",
+"Ders Kitabı — stratejinin tam anlatımı":"Учебник — полное описание стратегии",
+"Değerler yaklaşıktır (likidasyon borsanın marjin modeline göre değişir; komisyon taker %0.055×2 varsayımı). Yatırım tavsiyesi değildir.":
+ "Значения приблизительные (ликвидация зависит от маржинальной модели биржи; комиссия — допущение taker 0.055%×2). Не инвестиционная рекомендация."
+};
+/* kalip cevirileri (sayi iceren dinamik cumleler) */
+const RU_PAT=[
+ [/(\d+) sinyal sonuçlandı/, (m,n)=>`завершено сигналов: ${n}`],
+ [/isabet %([\d.]+)/, (m,n)=>`точность ${n}%`],
+ [/başabaş ~%([\d.]+)/, (m,n)=>`безубыток ~${n}%`],
+ [/toplam ([+\-][\d.]+R)/, (m,n)=>`итого ${n}`],
+ [/eşiğin (üzerinde|altında)/, (m,d)=>d==="üzerinde"?"выше порога":"ниже порога"],
+ [/n<30, hüküm için erken/, ()=>"n<30, рано делать выводы"],
+ [/(\d+) doldu \/ (\d+) değil/, (m,a,b)=>`${a} заполнено / ${b} нет`],
+ [/(\d+) WIN · (\d+) LOSS · (\d+) açık/, (m,a,b,c)=>`${a} WIN · ${b} LOSS · ${c} откр.`],
+ [/(\d+) sonuçlanan/, (m,n)=>`${n} завершено`],
+ [/(\d+) kapanan/, (m,n)=>`${n} закрыто`],
+ [/(\d+) açılan/, (m,n)=>`${n} открыто`],
+ [/(\d+) dk önce/, (m,n)=>`${n} мин назад`],
+ [/(\d+) sa önce/, (m,n)=>`${n} ч назад`],
+ [/girişe ([+\-][\d.]+%)/, (m,n)=>`до входа ${n}`],
+ [/([+\-][\d.]+)R canlı/, (m,n)=>`${n}R сейчас`],
+ [/(\d+) parite/, (m,n)=>`${n} пар`],
+ [/(\d+) tarama/, (m,n)=>`${n} сканов`],
+ [/^Tümü (\d+)$/, (m,n)=>`Все ${n}`],
+ [/^Açık (\d+)$/, (m,n)=>`Открытые ${n}`],
+ [/^Sonuç (\d+)$/, (m,n)=>`Результат ${n}`],
+ [/^Dolmayan (\d+)$/, (m,n)=>`Не заполнено ${n}`],
+ [/^(\d+) WIN \/ (\d+) LOSS$/, (m,a,b)=>`${a} WIN / ${b} LOSS`],
+ [/(\d+) WIN · (\d+) LOSS/, (m,a,b)=>`${a} WIN · ${b} LOSS`],
+ [/başabaş ~%([\d.]+)/, (m,n)=>`безубыток ~${n}%`],
+ [/hepsi \((\d+)\)/, (m,n)=>`все (${n})`]
+];
+let LANG="tr";
+function trSeg(seg){                       // tek parca: sozluk -> kalip
+  const t=seg.trim(); if(!t) return null;
+  if(RU[t]!==undefined) return seg.replace(t,RU[t]);
+  let out=seg, hit=false;
+  for(const [re,fn] of RU_PAT){
+    const m=out.match(re);
+    if(m){ out=out.replace(m[0], fn(...m)); hit=true; }
+  }
+  return hit?out:null;
+}
+function tr1(s){                            // birlesik cumleleri parcalara ayir
+  const t=s.trim(); if(!t) return null;
+  if(RU[t]!==undefined) return s.replace(t,RU[t]);
+  if(s.includes(" · ")){
+    const parts=s.split(" · ");
+    const done=parts.map(p=>trSeg(p));
+    if(done.some(x=>x!==null))
+      return parts.map((p,i)=>done[i]===null?p:done[i]).join(" · ");
+    return null;
+  }
+  return trSeg(s);
+}
+const RU_LONG=[
+ [/Tüm sonuçlar <b>gölge muhasebedir<\/b>/, "Все результаты — <b>теневой учёт</b>"],
+];
+function translateNode(root){
+  if(LANG!=="ru") return;
+  const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+  const jobs=[];
+  while(w.nextNode()){ const n=w.currentNode;
+    if(!n.nodeValue||!n.nodeValue.trim()) continue;
+    if(n.parentElement&&n.parentElement.closest("[data-noi18n]")) continue;
+    const out=tr1(n.nodeValue); if(out!==null) jobs.push([n,out]); }
+  jobs.forEach(([n,v])=>{n.nodeValue=v;});
+  root.querySelectorAll("[data-tip],[data-tipx],[title],[placeholder]").forEach(el=>{
+    ["data-tip","data-tipx","title","placeholder"].forEach(a=>{
+      const v=el.getAttribute(a); if(!v) return;
+      const out=RU[v.trim()]||null; if(out) el.setAttribute(a,out);
+      else{ // uzun tooltip metinleri: cumle cumle dene
+        const parts=v.split(" · ").map(p=>RU[p.trim()]||p);
+        if(parts.some((p,i)=>p!==v.split(" · ")[i])) el.setAttribute(a,parts.join(" · "));
+      }
+    });
+  });
+}
+function applyLang(l){
+  LANG=l;
+  document.documentElement.lang=l;
+  try{localStorage.setItem("ui_lang",l);}catch(e){}
+  const b=$("bookBtn"); if(b) b.href = l==="ru" ? "/kitap?lang=ru" : "/kitap";
+  if(l==="ru") translateNode(document.body);
+  else location.reload();
+}
+
 const num=(v,d=2)=>v==null?"—":Number(v).toFixed(d);
 const fmtTs=s=>s?s.replace("T"," ").replace("Z","").slice(5,16):"—";
 function fmtAge(iso){
@@ -609,13 +805,38 @@ let LAST_STATUS=null;
 /* ---------- modal ---------- */
 function openModal(title,html){
   $("modalTitle").innerHTML=title;$("modalBody").innerHTML=html;
-  $("modal").classList.add("show");
+  $("modal").classList.add("show");translateNode($("modal"));
 }
 ["overlay","modal","calc"].forEach(id=>{
   $(id).addEventListener("click",e=>{if(e.target.id===id)$(id).classList.remove("show");});
 });
 $("modalClose").addEventListener("click",()=>$("modal").classList.remove("show"));
 $("calcClose").addEventListener("click",()=>$("calc").classList.remove("show"));
+/* ---------- dil secimi ---------- */
+(function initLang(){
+  let saved=null;
+  try{saved=localStorage.getItem("ui_lang");}catch(e){}
+  if(saved){ LANG=saved; document.documentElement.lang=saved;
+    const b=$("bookBtn"); if(b&&saved==="ru") b.href="/kitap?lang=ru";
+    $("langBtn").textContent=saved.toUpperCase(); }
+  else { $("langpick").classList.add("show"); }
+  document.querySelectorAll(".langbtn").forEach(btn=>
+    btn.addEventListener("click",()=>{
+      const l=btn.dataset.lang;
+      try{localStorage.setItem("ui_lang",l);}catch(e){}
+      LANG=l; document.documentElement.lang=l;
+      $("langBtn").textContent=l.toUpperCase();
+      const b=$("bookBtn"); if(b) b.href = l==="ru"?"/kitap?lang=ru":"/kitap";
+      $("langpick").classList.remove("show");
+      location.reload();   // secilen dille temiz render (tooltipler dahil)
+    }));
+  $("langBtn").addEventListener("click",()=>{
+    const next = LANG==="ru" ? "tr" : "ru";
+    try{localStorage.setItem("ui_lang",next);}catch(e){}
+    location.reload();   // temiz gecis: TR kaynak metinlere geri don
+  });
+})();
+
 /* ---------- mobil sekmeler ---------- */
 function setTab(name){
   if(name==="ayar"){$("overlay").classList.add("show");return;}
@@ -669,12 +890,19 @@ function renderKpis(perf,status,uni,signals){
   const nf=(signals||[]).filter(s=>OUT(s)==="NOT_FILLED").length;
   const frV=(filled+nf)?100*filled/(filled+nf):null;
   const openV=perf?perf.open_signals:null;
-  const TIPS={
+  const TIPS_RU={
+    "Win Rate":"Доля выигрышных среди завершённых (WIN+LOSS) сигналов — NOT_FILLED не учитывается. Строка ниже — точка безубыточности: 1 / (1 + средний выигрыш в R). Если винрейт выше этого порога, система в плюсе. · клик → фильтр завершённых",
+    "Toplam R":"Сумма R по всем завершённым сделкам. R = единица риска: убыток −1R, прибыль равна отношению вознаграждения к риску (например +2.2R). Ниже: валовая прибыль / валовой убыток. Считает не деньги, а единицы риска — так сравнимы любые пары. · клик → фильтр завершённых",
+    "Açık Pozisyon":"Сигналы в теневом учёте, ещё не завершённые: PENDING (ждём подхода к зоне входа, 6 ч) + FILLED (вход исполнен, наблюдение 48 ч). · клик → фильтр открытых",
+    "Giriş İsabeti":"Доля сигналов, у которых цена дошла до зоны входа. NOT_FILLED = за 6 часов цена так и не пришла; в статистику прибыли/убытка не входит. · клик → фильтр незаполненных",
+    "Taranan Evren":"Число пар, отбираемых ежедневно по 24-часовому обороту, и счётчик сканов. Каждый цикл (~15 минут) прогоняет всю вселенную через 7 фильтров. · клик → все сигналы"};
+  const TIPS_TR={
     "Win Rate":"Sonuçlanan (WIN+LOSS) sinyaller içinde kazananların oranı — NOT_FILLED hesaba katılmaz. Alt satırdaki başabaş, kâra geçiş eşiğidir: 1 / (1 + ortalama kazanç R). Win rate bu eşiğin üzerindeyse sistem artıdadır. · tıkla → sonuçlananları filtrele",
     "Toplam R":"Tüm sonuçlanan işlemlerin R toplamı. R = riske atılan birim: kayıp −1R, kazanç ödül/risk oranı kadar (+2.2R gibi). Alt satır: brüt kazanç / brüt kayıp. Para değil, risk birimi sayar — pariteler böyle karşılaştırılır. · tıkla → sonuçlananları filtrele",
     "Açık Pozisyon":"Gölge takipte hâlâ sonuçlanmamış sinyaller: PENDING (girişe gelmesi bekleniyor, 6 sa) + FILLED (dolu, 48 sa izlemede). · tıkla → açıkları filtrele",
     "Giriş İsabeti":"Üretilen sinyallerden fiyatı giriş bölgesine gelip dolanların oranı. NOT_FILLED = 6 saat içinde fiyat girişe hiç uğramadı; kazanç/kayıp oranına dahil edilmez. · tıkla → dolmayanları filtrele",
     "Taranan Evren":"24s hacme göre her gün yeniden seçilen parite sayısı ve bugüne kadarki tarama turu. Her tur ~15 dakikada bir tüm evreni 7 aşamalı filtreden geçirir. · tıkla → tüm sinyaller"};
+  const TIPS = (typeof LANG!=="undefined"&&LANG==="ru") ? TIPS_RU : TIPS_TR;
   const kpi=(f,lbl,val,cls,sub,tr)=>`<div class="kpi clickable" data-f="${f}"
     data-tip="${TIPS[lbl]||""}" tabindex="0">${tr||""}
     <div class="lbl">${lbl}</div><div class="val num ${cls||""}">${val}</div>
@@ -817,6 +1045,15 @@ const STEPS=[
   ["RISK/REWARD","Plan RR bandı dışı (<2 / >6)","RR ","#16A34A",
    "Plan risk/ödül bandı 2.0–6.0. Alt sınır: hedef, riske edilenin en az 2 katı olmalı — kenar yoksa işlem yok. Üst sınır (v3.0): RR>6 çoğunlukla fiyatın dibine sıkışmış stop demektir; gürültü ilk dalgada stoplar. Gölge veride RR≥6 planlı 4 sinyalin 4'ü de kaybetti — tavan bu kanıtla kondu."],
 ];
+const STEPS_RU={
+ "DATA":["Недостаточно свечей (новый листинг)","Достаточно ли истории? Нужны минимум 60 закрытых баров на 4H и 15m. У новых листингов истории нет; вместо догадок движок говорит DATA_MISSING."],
+ "REGIME":["ADX<20: рынок без направления","Есть ли направление или это пила? Если ADX (сила тренда) ниже 20, пара считается бесцельной и отсеивается. В такой фазе большинство пробоев — ловушки."],
+ "HTF STRUCTURE":["Структура 4H противоречива","Анализ 4-часовой структуры: растущие минимумы-максимумы (HH-HL) или падающие (LH-LL)? Если вместе с положением EMA200 сторона не определяется — отсев. В нерешительном рынке это самый частый фильтр, и это здорово."],
+ "LTF SETUP":["Нет подтверждённого ретеста/свипа","На 15m ищется конкретная формация: ретест принятого уровня после пробоя либо возврат уровня после снятия ликвидности (sweep-reclaim). «Красиво выглядит» недостаточно."],
+ "VOLUME":["Объём триггера <1.5× сред.","Объём триггерного бара должен быть не ниже 1.5× среднего за 20 баров. Пробой без участия крупного игрока не выносит движение."],
+ "MARKET GATE":["Направление против режима заблокировано","Фильтр v3.0: по закрытию BTC 4H относительно EMA200 определяется режим (бык/медведь/нейтраль, гистерезис ±0.5%, подтверждение двумя закрытиями). Сигналы ПРОТИВ режима блокируются: лонги в медвежьем, шорты в бычьем. Если данных BTC нет дольше 2 часов — ворота закрывают оба направления (fail-closed)."],
+ "RISK/REWARD":["RR плана вне диапазона (<2 / >6)","Диапазон риск/прибыль 2.0–6.0. Нижняя граница: цель должна быть минимум вдвое дальше риска. Верхняя (v3.0): RR>6 обычно означает стоп, вжатый в цену; рыночный шум выбивает его первой волной. В теневых данных все 4 сигнала с RR≥6 проиграли."],
+ "SIGNAL":["Прошедшие все этапы берутся в учёт","Решения, прошедшие все семь этапов. Берутся в теневой учёт: 6 часов ждём подхода цены к зоне входа; при входе — 48 часов наблюдения (сначала стоп = LOSS, сначала цель = WIN)."]};
 const SIGNAL_TIP="Yedi aşamanın tamamını geçen kararlar. Gölge takibe alınır: fiyatın giriş bölgesine gelmesi 6 saat beklenir; dolarsa 48 saat izlenir (önce stop = LOSS, önce hedef = WIN). Tıklayınca bu taramada geçenlerin setup/RR/güven dökümü açılır.";
 function stageOf(d){
   if(d.decision==="SIGNAL")return "SIGNAL";
@@ -854,14 +1091,16 @@ function renderPipeline(status){
     cnt[s]=(cnt[s]||0)+1;
   }
   $("pipeMeta").textContent=total+" parite";
+  const _ru = (typeof LANG!=="undefined"&&LANG==="ru");
   $("pipe").innerHTML=STEPS.map(([n,d,,col,tip])=>{
     const c=cnt[n]||0;
+    if(_ru&&STEPS_RU[n]){ d=STEPS_RU[n][0]; tip=STEPS_RU[n][1]; }
     return `<div class="step" data-s="${n}" data-tipx="${tip}" tabindex="0">
       <div class="h"><span>${n}</span><span class="n num">−${c}</span></div>
       <div class="d">${d}</div>
       <div class="g"><div style="width:${Math.min(100,100*c/total)}%;background:${col}"></div></div></div>`;
   }).join("")+
-  `<div class="step" data-s="SIGNAL" data-tipx="${SIGNAL_TIP}" tabindex="0"><div class="h"><span class="pos">→ SIGNAL</span><span class="n num pos">${sig}</span></div>
+  `<div class="step" data-s="SIGNAL" data-tipx="${_ru?STEPS_RU.SIGNAL[1]:SIGNAL_TIP}" tabindex="0"><div class="h"><span class="pos">→ SIGNAL</span><span class="n num pos">${sig}</span></div>
     <div class="d">Tüm aşamaları geçenler takibe alınır</div>
     <div class="g"><div style="width:${Math.min(100,sig/total*1000)}%;background:var(--green)"></div></div></div>`;
   $("pipe").querySelectorAll(".step").forEach(el=>{
@@ -1171,7 +1410,7 @@ function openCalc(sig){
   if(sig){$("cSig").value=String(sig.id);calcFill(sig);}
   else calcRun();
   $("modal").classList.remove("show");
-  $("calc").classList.add("show");
+  $("calc").classList.add("show");translateNode($("calc"));
 }
 function calcRun(){
   const bal=Number($("cBal").value)||0, riskP=(Number($("cRisk").value)||0)/100;
@@ -1208,7 +1447,7 @@ function calcRun(){
     `<div class="note" style="border-left:3px solid var(--green)"><b>Güvenli:</b> ${lev}x kaldıraçta likidasyon (${fmtPx(liq)}) stop'un (${fmtPx(st)}) ötesinde — plan stop'u çalışır. Bu paritede yaklaşık güvenli üst sınır ~${maxLev}x.</div>`:
     `<div class="note" style="border-left:3px solid var(--red)"><b>⚠ Tehlike:</b> ${lev}x kaldıraçta likidasyon (${fmtPx(liq)}) stop'a ulaşmadan tetiklenir — planın stop'u değil borsa likidasyonu çalışır ve kayıp risk$'ı aşar. Kaldıracı ~${maxLev}x altına çek.</div>`;
   rows+='<div class="note">Değerler yaklaşıktır (likidasyon borsanın marjin modeline göre değişir; komisyon taker %0.055×2 varsayımı). Yatırım tavsiyesi değildir.</div>';
-  out.innerHTML=rows;
+  out.innerHTML=rows;translateNode(out);
 }
 function renderSys(uni,healthy){
   if(uni)$("stratUni").textContent=(uni.mode||"")+"-"+(uni.count||"");
@@ -1254,7 +1493,8 @@ async function refresh(){
   renderPortfolio(SIGNALS);
   renderSys(uni,!!status);
   renderFooter(backup,!!status,fetchMs,perf);
-  $("updated").textContent=new Date().toLocaleTimeString("tr-TR");
+  $("updated").textContent=new Date().toLocaleTimeString(LANG==="ru"?"ru-RU":"tr-TR");
+  translateNode(document.body);
 }
 let timer=null;
 function schedule(){

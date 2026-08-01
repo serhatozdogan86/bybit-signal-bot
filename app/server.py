@@ -21,6 +21,11 @@ from app.services.signal_tracker import SignalTracker
 from app.services.state_store import StateStore
 
 
+def _read_doc(name: str) -> str | None:
+    path = Path(__file__).resolve().parent.parent / "docs" / name
+    return path.read_text(encoding="utf-8") if path.is_file() else None
+
+
 def _send_doc(name: str, mimetype: str):
     """docs/ altindaki dokumani servis et; yoksa 404 (kilit disi, saf sunum)."""
     path = Path(__file__).resolve().parent.parent / "docs" / name
@@ -46,7 +51,24 @@ def create_app(store: StateStore, scheduler: Scheduler,
 
     @app.get("/kitap")
     def kitap():
-        """Ders kitabi (HTML). Repo ile ayni surum, internet gerektirmez."""
+        """Ders kitabi (HTML). ?lang=ru varsa Rusca surum (hazir degilse TR)."""
+        if request.args.get("lang") == "ru":
+            ru = Path(__file__).resolve().parent.parent / "docs" / "ders-kitabi-ru.html"
+            if ru.is_file():
+                return Response(ru.read_bytes(), mimetype="text/html; charset=utf-8")
+            # RU surumu hazirlaninca otomatik devreye girer; simdilik TR + not
+            html = _read_doc("ders-kitabi.html")
+            if html is None:
+                return jsonify({"error": "kitap bulunamadi"}), 404
+            banner = ("<div style=\"background:#EAF0FB;border:1px solid #2563EB;"
+                      "border-radius:10px;padding:12px 16px;margin:0 0 20px;"
+                      "font-family:Inter,sans-serif;font-size:13.5px;color:#2A241B\">"
+                      "\u0420\u0443\u0441\u0441\u043a\u0430\u044f \u0432\u0435\u0440\u0441\u0438\u044f "
+                      "\u0443\u0447\u0435\u0431\u043d\u0438\u043a\u0430 \u0433\u043e\u0442\u043e\u0432\u0438\u0442\u0441\u044f. "
+                      "\u041d\u0438\u0436\u0435 \u2014 \u0442\u0443\u0440\u0435\u0446\u043a\u0430\u044f "
+                      "\u0432\u0435\u0440\u0441\u0438\u044f.</div>")
+            html = html.replace('<div class="page">', '<div class="page">' + banner, 1)
+            return Response(html, mimetype="text/html; charset=utf-8")
         return _send_doc("ders-kitabi.html", "text/html; charset=utf-8")
 
     @app.get("/kitap.pdf")
