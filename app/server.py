@@ -54,7 +54,9 @@ def create_app(store: StateStore, scheduler: Scheduler,
         """Sinyalin kanit paketi (mumlar + plan + teyitler)."""
         if tracker is None:
             return jsonify({"error": "shadow tracking disabled"}), 404
-        data = tracker.signal_chart(sig_id)
+        before = min(max(int(request.args.get("before", 24)), 8), 80)
+        after = min(max(int(request.args.get("after", 24)), 8), 80)
+        data = tracker.signal_chart(sig_id, before=before, after=after)
         if data is None:
             return jsonify({"error": "signal not found"}), 404
         return app.response_class(json.dumps(data, indent=2),

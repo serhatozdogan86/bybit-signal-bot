@@ -320,7 +320,15 @@ DASHBOARD_HTML = r"""<!doctype html>
   .sheet .warn{margin-top:12px;padding:9px 12px;border-left:3px solid var(--red);
                background:var(--red-bg);border-radius:7px;font-size:12px}
   .evid{margin:14px 0 6px;background:var(--card2);border:1px solid var(--line);
-     border-radius:12px;padding:10px 12px}
+     border-radius:12px;padding:12px 14px}
+  #modal .sheet{max-width:1000px}
+  @media(max-width:760px){#modal .sheet{max-width:96vw}}
+  .zoombar{display:flex;gap:6px;align-items:center;margin-bottom:8px}
+  .zoombar button{background:var(--card);border:1px solid var(--line);
+     color:var(--head);border-radius:7px;padding:4px 11px;cursor:pointer;
+     font-family:var(--mono);font-size:11px}
+  .zoombar button.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .zoombar .zl{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-right:auto}
   .evid svg{width:100%;height:auto;display:block}
   .evid .lgd{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;
      font-family:var(--mono);font-size:10px;color:var(--muted)}
@@ -1544,11 +1552,13 @@ function showTip(el){
 }
 function hideTip(){clearTimeout(tipTimer);$("tipbox").style.display="none";}
 
-async function loadEvidence(id){
+let EV_ZOOM=24;
+async function loadEvidence(id,win){
   const box=$("evidBox"); if(!box) return;
   const ru=(LANG==="ru");
+  if(win) EV_ZOOM=win;
   try{
-    const d=await j(`/signal/${id}/chart`);
+    const d=await j(`/signal/${id}/chart?before=${EV_ZOOM}&after=${EV_ZOOM}`);
     if(!d||d.error){box.innerHTML=`<div class="empty">${ru?"данные графика недоступны":"grafik verisi yok"}</div>`;return;}
     const e=d.evidence||{}, s=d.signal||{};
     const rows=[];
@@ -1557,7 +1567,10 @@ async function loadEvidence(id){
     if(e.confluence) rows.push(`<b>${ru?"конфлюэнс":"confluence"}</b> ${e.confluence}`);
     if(e.invalidation) rows.push(`<b>${ru?"инвалидация":"invalidasyon"}</b> ${e.invalidation}`);
     if(e.regime||e.htf_bias) rows.push(`<b>${ru?"режим / 4H":"rejim / 4H"}</b> ${[e.regime,e.htf_bias].filter(Boolean).join(" · ")}`);
-    box.innerHTML=drawEvidence(d)+
+    const zb=[[12,ru?"вблизи":"yakın"],[24,ru?"обычно":"normal"],[48,ru?"шире":"geniş"]]
+      .map(([v,l])=>`<button class="${EV_ZOOM===v?"on":""}" onclick="loadEvidence(${id},${v})">${l}</button>`).join("");
+    box.innerHTML=`<div class="zoombar"><span class="zl">${ru?"окно графика":"grafik penceresi"}: ±${EV_ZOOM} ${ru?"свечей 15m":"mum (15m)"}</span>${zb}</div>`+
+      drawEvidence(d)+
       (rows.length?`<div class="evlist">${rows.map(r=>`<div>${r}</div>`).join("")}</div>`:"");
     translateNode(box);
   }catch(err){
@@ -1570,20 +1583,20 @@ function drawEvidence(d){
   const cs=(d.candles||[]).filter(c=>c.high!=null);
   const s=d.signal||{}, ru=(LANG==="ru");
   if(cs.length<5) return `<div class="empty">${ru?"недостаточно свечей для графика":"grafik için yeterli mum yok"}</div>`;
-  const W=760,H=330,PADL=8,PADR=64,TOP=10,VOLH=52,GAP=8;
+  const W=760,H=460,PADL=8,PADR=70,TOP=12,VOLH=74,GAP=10;
   const CH=H-VOLH-GAP-TOP;
   const lvls=[s.entry_min,s.entry_max,s.stop_loss,s.tp1,s.tp2].filter(v=>v!=null);
   let lo=Math.min(...cs.map(c=>c.low),...lvls), hi=Math.max(...cs.map(c=>c.high),...lvls);
   const pad=(hi-lo)*0.06||hi*0.01; lo-=pad; hi+=pad;
   const X=i=>PADL+i*((W-PADL-PADR)/cs.length);
-  const BW=Math.max(2,(W-PADL-PADR)/cs.length*0.62);
+  const BW=Math.max(3,(W-PADL-PADR)/cs.length*0.66);
   const Y=v=>TOP+CH-((v-lo)/(hi-lo))*CH;
   const vmax=Math.max(...cs.map(c=>c.volume||0))||1;
   const VY=v=>H-(v/vmax)*VOLH;
   const trig=cs.findIndex(c=>c.ts===s.entry_candle_ts);
   // hacim ortalamasi (son 20)
   const vavg=cs.slice(Math.max(0,trig-20),trig).reduce((a,c)=>a+(c.volume||0),0)/Math.max(1,Math.min(20,trig));
-  let out=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace" font-size="9.5">`;
+  let out=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace" font-size="12">`;
   // plan bantlari
   if(s.entry_min!=null&&s.entry_max!=null){
     const y1=Y(Math.max(s.entry_min,s.entry_max)), y2=Y(Math.min(s.entry_min,s.entry_max));
