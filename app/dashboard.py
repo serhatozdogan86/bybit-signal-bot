@@ -319,6 +319,16 @@ DASHBOARD_HTML = r"""<!doctype html>
   .sheet dd{margin:1px 0 0;color:var(--muted);font-size:12px}
   .sheet .warn{margin-top:12px;padding:9px 12px;border-left:3px solid var(--red);
                background:var(--red-bg);border-radius:7px;font-size:12px}
+  .evid{margin:14px 0 6px;background:var(--card2);border:1px solid var(--line);
+     border-radius:12px;padding:10px 12px}
+  .evid svg{width:100%;height:auto;display:block}
+  .evid .lgd{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;
+     font-family:var(--mono);font-size:10px;color:var(--muted)}
+  .evid .lgd i{display:inline-block;width:9px;height:9px;border-radius:2px;
+     margin-right:4px;vertical-align:-1px}
+  .evlist{font-size:12.5px;line-height:1.7;margin-top:8px}
+  .evlist b{font-family:var(--mono);font-size:11px;letter-spacing:.04em;
+     color:var(--head);text-transform:uppercase}
   .kvgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;
           font-size:13px;margin-top:6px}
   .kvgrid .k{color:var(--muted)}
@@ -1317,8 +1327,10 @@ function signalDetail(s){
       <b>Confluence:</b> ${(live.indicator_confluence||[]).join(", ")||"—"}</div>`;
   }
   html+='<div class="note">Gölge muhasebe: varsayımsal giriş, kayma/komisyon yok; yatırım tavsiyesi değildir.</div>';
-  html+=`<div style="margin-top:10px"><button onclick='window.__calcSig(${s.id})'>🧮 Bu sinyalle pozisyon hesapla</button></div>`;
+  html=`<div class="evid" id="evidBox"><div class="empty">${LANG==="ru"?"загрузка графика…":"grafik yükleniyor…"}</div></div>`+html;
+  html+=`<div style="margin-top:10px"><button onclick='window.__calcSig(${s.id})'>🧮 ${LANG==="ru"?"Рассчитать позицию по сигналу":"Bu sinyalle pozisyon hesapla"}</button></div>`;
   openModal(s.pair,html);
+  loadEvidence(s.id);
 }
 function renderSignals(){
   const rows=SIGNALS.filter(matches);
@@ -1532,6 +1544,95 @@ function showTip(el){
 }
 function hideTip(){clearTimeout(tipTimer);$("tipbox").style.display="none";}
 
+async function loadEvidence(id){
+  const box=$("evidBox"); if(!box) return;
+  const ru=(LANG==="ru");
+  try{
+    const d=await j(`/signal/${id}/chart`);
+    if(!d||d.error){box.innerHTML=`<div class="empty">${ru?"данные графика недоступны":"grafik verisi yok"}</div>`;return;}
+    const e=d.evidence||{}, s=d.signal||{};
+    const rows=[];
+    if(s.setup_type) rows.push(`<b>${ru?"формация":"kurulum"}</b> ${s.setup_type}${s.confidence?` · ${ru?"уверенность":"güven"} ${s.confidence}`:""}`);
+    if(e.liquidity) rows.push(`<b>${ru?"ликвидность":"likidite"}</b> ${e.liquidity}`);
+    if(e.confluence) rows.push(`<b>${ru?"конфлюэнс":"confluence"}</b> ${e.confluence}`);
+    if(e.invalidation) rows.push(`<b>${ru?"инвалидация":"invalidasyon"}</b> ${e.invalidation}`);
+    if(e.regime||e.htf_bias) rows.push(`<b>${ru?"режим / 4H":"rejim / 4H"}</b> ${[e.regime,e.htf_bias].filter(Boolean).join(" · ")}`);
+    box.innerHTML=drawEvidence(d)+
+      (rows.length?`<div class="evlist">${rows.map(r=>`<div>${r}</div>`).join("")}</div>`:"");
+    translateNode(box);
+  }catch(err){
+    box.innerHTML=`<div class="empty">${ru?"график недоступен":"grafik alınamadı"}</div>`;
+  }
+}
+
+/* ---------- kanit grafigi (mum + plan + teyitler) ---------- */
+function drawEvidence(d){
+  const cs=(d.candles||[]).filter(c=>c.high!=null);
+  const s=d.signal||{}, ru=(LANG==="ru");
+  if(cs.length<5) return `<div class="empty">${ru?"недостаточно свечей для графика":"grafik için yeterli mum yok"}</div>`;
+  const W=760,H=330,PADL=8,PADR=64,TOP=10,VOLH=52,GAP=8;
+  const CH=H-VOLH-GAP-TOP;
+  const lvls=[s.entry_min,s.entry_max,s.stop_loss,s.tp1,s.tp2].filter(v=>v!=null);
+  let lo=Math.min(...cs.map(c=>c.low),...lvls), hi=Math.max(...cs.map(c=>c.high),...lvls);
+  const pad=(hi-lo)*0.06||hi*0.01; lo-=pad; hi+=pad;
+  const X=i=>PADL+i*((W-PADL-PADR)/cs.length);
+  const BW=Math.max(2,(W-PADL-PADR)/cs.length*0.62);
+  const Y=v=>TOP+CH-((v-lo)/(hi-lo))*CH;
+  const vmax=Math.max(...cs.map(c=>c.volume||0))||1;
+  const VY=v=>H-(v/vmax)*VOLH;
+  const trig=cs.findIndex(c=>c.ts===s.entry_candle_ts);
+  // hacim ortalamasi (son 20)
+  const vavg=cs.slice(Math.max(0,trig-20),trig).reduce((a,c)=>a+(c.volume||0),0)/Math.max(1,Math.min(20,trig));
+  let out=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace" font-size="9.5">`;
+  // plan bantlari
+  if(s.entry_min!=null&&s.entry_max!=null){
+    const y1=Y(Math.max(s.entry_min,s.entry_max)), y2=Y(Math.min(s.entry_min,s.entry_max));
+    out+=`<rect x="0" y="${y1}" width="${W-PADR}" height="${Math.max(2,y2-y1)}" fill="#2563EB" opacity="0.13"/>
+      <text x="${W-PADR+4}" y="${(y1+y2)/2+3}" fill="#2563EB">${ru?"вход":"giriş"}</text>`;
+  }
+  const line=(v,col,lbl,dash)=>v==null?"":`<line x1="0" y1="${Y(v)}" x2="${W-PADR}" y2="${Y(v)}"
+      stroke="${col}" stroke-width="1.4" ${dash?'stroke-dasharray="5 4"':""}/>
+      <text x="${W-PADR+4}" y="${Y(v)+3}" fill="${col}">${lbl}</text>`;
+  out+=line(s.stop_loss,"#DC2626","STOP");
+  out+=line(s.tp1,"#16A34A","TP1");
+  out+=line(s.tp2,"#16A34A","TP2",true);
+  // mumlar + hacim
+  cs.forEach((c,i)=>{
+    const up=c.close>=c.open, col=up?"#16A34A":"#DC2626";
+    const isTrig=(i===trig);
+    out+=`<line x1="${X(i)+BW/2}" y1="${Y(c.high)}" x2="${X(i)+BW/2}" y2="${Y(c.low)}" stroke="${col}" stroke-width="1"/>
+      <rect x="${X(i)}" y="${Y(Math.max(c.open,c.close))}" width="${BW}"
+        height="${Math.max(1,Math.abs(Y(c.open)-Y(c.close)))}" fill="${col}"
+        ${isTrig?'stroke="#2563EB" stroke-width="1.6"':""}/>
+      <rect x="${X(i)}" y="${VY(c.volume||0)}" width="${BW}" height="${H-VY(c.volume||0)}"
+        fill="${isTrig?"#2563EB":col}" opacity="${isTrig?0.85:0.28}"/>`;
+  });
+  // hacim esigi
+  if(vavg>0){const ty=VY(vavg*1.5);
+    out+=`<line x1="0" y1="${ty}" x2="${W-PADR}" y2="${ty}" stroke="#B45309" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="${W-PADR+4}" y="${ty+3}" fill="#B45309">1.5×</text>`;}
+  // tetik isareti
+  if(trig>=0){
+    out+=`<line x1="${X(trig)+BW/2}" y1="${TOP}" x2="${X(trig)+BW/2}" y2="${TOP+CH}"
+        stroke="#2563EB" stroke-width="1" stroke-dasharray="3 4" opacity="0.7"/>
+      <text x="${X(trig)+BW/2+3}" y="${TOP+9}" fill="#2563EB">${ru?"сигнал":"sinyal"}</text>`;}
+  // dolus / cikis noktalari
+  const mark=(ts,px,col,lbl)=>{
+    if(px==null) return "";
+    let idx=cs.findIndex(c=>c.ts>=ts); if(idx<0) idx=cs.length-1;
+    return `<circle cx="${X(idx)+BW/2}" cy="${Y(px)}" r="4" fill="${col}" stroke="#FFFEFA" stroke-width="1.5"/>
+      <text x="${X(idx)+BW/2+7}" y="${Y(px)-6}" fill="${col}">${lbl}</text>`;};
+  if(s.fill_price!=null) out+=mark(s.entry_candle_ts,s.fill_price,"#2563EB",ru?"вход":"doluş");
+  if(s.exit_price!=null&&s.closed_utc)
+    out+=mark(Date.parse(s.closed_utc.replace(" ","T"))||cs[cs.length-1].ts,s.exit_price,
+      (s.outcome==="WIN"?"#16A34A":"#DC2626"),s.outcome||"");
+  out+="</svg>";
+  const lg=(c,t)=>`<span><i style="background:${c}"></i>${t}</span>`;
+  out+=`<div class="lgd">${lg("#2563EB",ru?"зона входа / триггер":"giriş bölgesi / tetik")}
+    ${lg("#DC2626","STOP")}${lg("#16A34A","TP1/TP2")}
+    ${lg("#B45309",ru?"порог объёма 1.5×":"hacim eşiği 1.5×")}</div>`;
+  return out;
+}
 window.__calcSig=id=>{const s=SIGNALS.find(x=>x.id===id);if(s)openCalc(s);};
 /* ---------- pozisyon hesaplayici ---------- */
 const money2=v=>"$"+Number(v).toLocaleString("en-US",{maximumFractionDigits:2});

@@ -414,6 +414,47 @@ class SignalTracker:
                           else None)
         return rows
 
+    def signal_chart(self, sig_id: int, before: int = 48,
+                     after: int = 40) -> dict | None:
+        """Bir sinyalin kanit paketi: cevresindeki mumlar + plan + teyitler.
+
+        Gorsellestirme icindir; motor kararlarina dokunmaz.
+        """
+        row = self._db.query_one("SELECT * FROM signals WHERE id=?", (sig_id,))
+        if not row:
+            return None
+        sig = dict(row)
+        step = 15 * 60_000                      # 15m ms
+        t0 = (sig["entry_candle_ts"] or 0) - before * step
+        t1 = (sig["entry_candle_ts"] or 0) + after * step
+        candles = self._db.query(
+            "SELECT ts,open,high,low,close,volume FROM candles "
+            "WHERE symbol=? AND interval=? AND ts BETWEEN ? AND ? ORDER BY ts",
+            (sig["pair"], self._ltf, t0, t1))
+        contract = {}
+        try:
+            contract = json.loads(sig.get("contract_json") or "{}")
+        except (json.JSONDecodeError, TypeError):
+            contract = {}
+        ev = contract.get("evidence") or {}
+        return {
+            "signal": {k: sig.get(k) for k in (
+                "id", "pair", "direction", "created_utc", "entry_candle_ts",
+                "entry_min", "entry_max", "stop_loss", "tp1", "tp2", "rr",
+                "status", "outcome", "fill_price", "exit_price", "r_multiple",
+                "closed_utc", "confidence", "setup_type")},
+            "candles": [dict(c) for c in candles],
+            "evidence": {
+                "invalidation": contract.get("invalidation")
+                or ev.get("invalidation"),
+                "liquidity": contract.get("liquidity") or ev.get("liquidity"),
+                "confluence": contract.get("confluence") or ev.get("confluence"),
+                "regime": contract.get("regime"),
+                "htf_bias": contract.get("htf_bias"),
+                "notes": contract.get("notes"),
+            },
+        }
+
     def blocked_signals(self, limit: int = 300) -> list[dict]:
         """Karsi-olgu kohortu: kapinin blokladigi, golgede izlenen kararlar."""
         return self._db.query(

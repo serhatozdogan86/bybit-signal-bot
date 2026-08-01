@@ -49,6 +49,17 @@ def create_app(store: StateStore, scheduler: Scheduler,
     def healthz():
         return jsonify({"status": "ok", **store.get_meta()})
 
+    @app.get("/signal/<int:sig_id>/chart")
+    def signal_chart(sig_id: int):
+        """Sinyalin kanit paketi (mumlar + plan + teyitler)."""
+        if tracker is None:
+            return jsonify({"error": "shadow tracking disabled"}), 404
+        data = tracker.signal_chart(sig_id)
+        if data is None:
+            return jsonify({"error": "signal not found"}), 404
+        return app.response_class(json.dumps(data, indent=2),
+                                  mimetype="application/json")
+
     @app.get("/kitap")
     def kitap():
         """Ders kitabi (HTML). ?lang=ru varsa Rusca surum (hazir degilse TR)."""
