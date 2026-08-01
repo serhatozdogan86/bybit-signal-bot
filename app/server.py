@@ -73,7 +73,11 @@ def create_app(store: StateStore, scheduler: Scheduler,
 
     @app.get("/kitap.pdf")
     def kitap_pdf():
-        """Ders kitabinin basiliya hazir A4 surumu."""
+        """Ders kitabinin basiliya hazir A4 surumu (?lang=ru destekli)."""
+        if request.args.get("lang") == "ru":
+            ru = Path(__file__).resolve().parent.parent / "docs" / "ders-kitabi-ru.pdf"
+            if ru.is_file():
+                return Response(ru.read_bytes(), mimetype="application/pdf")
         return _send_doc("ders-kitabi.pdf", "application/pdf")
 
     @app.get("/health")

@@ -98,6 +98,12 @@ DASHBOARD_HTML = r"""<!doctype html>
   .cols{display:grid;grid-template-columns:220px minmax(0,1fr) 300px;
         gap:10px;min-height:0}
   .col{display:flex;flex-direction:column;gap:10px;min-height:0}
+  /* yan sutunlar tasarsa kendi icinde kaysin (portfoy karti gizlenmesin) */
+  .cols > .col:first-child, .cols > .col:last-child{overflow-y:auto;
+     scrollbar-width:thin;padding-right:2px}
+  .cols > .col:first-child > .card{flex:0 0 auto}
+  #pfCard{flex:0 0 auto}
+  #pfCard .cbody{max-height:none}
   .card{background:var(--card);border:1px solid var(--line);border-radius:11px;
         box-shadow:var(--shadow);display:flex;flex-direction:column;min-height:0}
   .chead{padding:var(--pad) 14px 0;font-size:11px;font-weight:700;
@@ -458,7 +464,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="lbl"><span>elenen →</span><span id="plbl">SIGNAL</span></div>
         </div>
       </div>
-      <div class="card fill pf">
+      <div class="card fill pf" id="pfCard">
         <div class="chead"><span class="tipwrap" tabindex="0" data-tip="Gölge sinyalleri para yönetimi diline çevirir. Model: her kapanan işlemde bakiyenin, girdiğin Risk % kadarı riske atılır; sonuç bakiye × (1 + risk × R) olarak İŞLEM KAPANIŞ SIRASIYLA bileşik işler (örn. 10.000$ ve %1 riskte +2.2R kazanç = +220$, −1R kayıp = −100$). Bugün / 7 gün / 30 gün satırları, o pencerede kapanan işlemlerin bakiyeye net etkisidir; 'açılan' o gün üretilen sinyal sayısıdır (günler UTC). Başlangıç $ ve Risk % alanlarını buradan değiştirebilirsin — tarayıcında saklanır. Kayma/komisyon yoktur; simülasyondur, gerçek para değildir. KAPASİTE MODU: Slot ve Kaldıraç alanları gerçek sermaye kısıtını modeller — sermaye slotlara bölünür, defter doluyken gelen sinyal atlanır (atlanan sayısı gösterilir); 'sınırsız varsayım' satırı kısıtsız teorik bakiyeyi kıyas için verir.">Portföy Simülasyonu <span class="i">ⓘ</span></span> <span class="tag">gölge · bileşik</span></div>
         <div class="cbody fill scroll" id="pf">
           <div class="inputs">
@@ -675,6 +681,23 @@ const RU={
 "gölge muhasebe: varsayımsal giriş, kayma/komisyon yok; yatırım tavsiyesi değildir.":
  "теневой учёт: гипотетический вход, без проскальзывания и комиссий; не инвестиционная рекомендация.",
 "yükleniyor":"загрузка","güncelleniyor":"обновление",
+"Entry bölgesi":"Зона входа",
+"Gölge sinyalleri para yönetimi diline çevirir. Model: her kapanan işlemde bakiyenin, girdiğin Risk % kadarı riske atılır; sonuç bakiye × (1 + risk × R) olarak İŞLEM KAPANIŞ SIRASIYLA bileşik işler (örn. 10.000$ ve %1 riskte +2.2R kazanç = +220$, −1R kayıp = −100$). Bugün / 7 gün / 30 gün satırları, o pencerede kapanan işlemlerin bakiyeye net etkisidir; 'açılan' o gün üretilen sinyal sayısıdır (günler UTC). Başlangıç $ ve Risk % alanlarını buradan değiştirebilirsin — tarayıcında saklanır. Kayma/komisyon yoktur; simülasyondur, gerçek para değildir. KAPASİTE MODU: Slot ve Kaldıraç alanları gerçek sermaye kısıtını modeller — sermaye slotlara bölünür, defter doluyken gelen sinyal atlanır (atlanan sayısı gösterilir); 'sınırsız varsayım' satırı kısıtsız teorik bakiyeyi kıyas için verir.":
+ "Переводит теневые сигналы на язык управления капиталом. Модель: в каждой закрытой сделке рискуем заданным % от баланса; результат считается сложным процентом В ПОРЯДКЕ ЗАКРЫТИЯ сделок (например, при 10 000$ и риске 1%: +2.2R = +220$, −1R = −100$). Строки Сегодня / 7 дней / 30 дней — чистое влияние закрытых в этом окне сделок; «открыто» — число сигналов, созданных за день (дни по UTC). Поля Старт $ и Риск % редактируются, значения хранятся в браузере. Проскальзывания и комиссий нет; это симуляция, не реальные деньги. РЕЖИМ ЁМКОСТИ: поля Слот и Плечо моделируют реальное ограничение капитала — капитал делится на слоты, при заполненной книге новый сигнал пропускается (счётчик показывает сколько); строка «допущение без лимита» даёт теоретический баланс без ограничений для сравнения.",
+"Aynı motorun LONG ve SHORT taraflarının ayrı karnesi. Her yön için: sonuçlanan işlemlerin R toplamı (büyük rakam ve çubuk — 0 ekseninden sağa yeşil kâr, sola kırmızı zarar; ölçek iki yönün mutlak maksimumudur), W/L sayıları ve açık pozisyon adedi. Bir taraf sistematik eksideyse motor rejime ters işlem üretiyor demektir — v3.0 market gate tam olarak bu verinin üzerine inşa edildi. Bloğa tıklayınca sinyal tablosu o yönle filtrelenir.":
+ "Отдельная сводка по сторонам LONG и SHORT одного и того же движка. Для каждого направления: сумма R по завершённым сделкам (крупное число и полоса — вправо от нуля зелёная прибыль, влево красный убыток; масштаб — максимум по модулю из двух сторон), счёт W/L и число открытых позиций. Если одна сторона систематически в минусе, движок торгует против режима — ворота рынка v3.0 построены именно на этих данных. Клик по блоку фильтрует таблицу сигналов по направлению.",
+"Risk-first hesap: önce kaç $ riske atacağın belirlenir (bakiye × risk %), pozisyon büyüklüğü buradan TÜRETİLİR: miktar = risk$ / |entry − stop|. Kaldıraç kârı değil yalnızca bağlanan marjini değiştirir — stop'taki kayıp her kaldıraçta aynı risk$'dır. Likidasyon kontrolü, seçtiğin kaldıraçta likidasyonun stop'tan ÖNCE gelip gelmeyeceğini sınar (yaklaşık, izole marjin varsayımı). Değerler yaklaşıktır; yatırım tavsiyesi değildir.":
+ "Расчёт от риска: сначала определяется сумма под риском (баланс × риск %), а размер позиции ВЫВОДИТСЯ из неё: количество = риск$ / |вход − стоп|. Плечо не меняет прибыль, оно меняет лишь занятую маржу — убыток на стопе при любом плече равен той же сумме риска. Проверка ликвидации показывает, наступит ли ликвидация РАНЬШЕ стопа при выбранном плече (приблизительно, изолированная маржа). Значения ориентировочные; не инвестиционная рекомендация.","TP1 / TP2":"TP1 / TP2","RR planı":"RR плана",
+"Risk (fiyat)":"Риск (цена)","Fill fiyatı":"Цена входа","Çıkış fiyatı":"Цена выхода",
+"Gerçekleşen R":"Фактический R","Son taramada aktif plan":"Активный план последнего скана",
+"İnvalidasyon":"Инвалидация","Likidite":"Ликвидность","Confluence":"Конфлюэнс",
+"güven":"уверенность","Gölge muhasebe: varsayımsal giriş, kayma/komisyon yok; yatırım tavsiyesi değildir.":
+ "Теневой учёт: гипотетический вход, без проскальзывания и комиссий; не инвестиционная рекомендация.",
+"🧮 Bu sinyalle pozisyon hesapla":"🧮 Рассчитать позицию по сигналу",
+"Güvenli maks. kaldıraç":"Безопасное макс. плечо","riskin":"от риска",
+"Bu paritede yaklaşık güvenli üst sınır":"Примерный безопасный предел по этой паре",
+"Stop, yön ile tutarsız: LONG için stop < entry, SHORT için stop > entry olmalı.":
+ "Стоп не согласован с направлением: для LONG стоп < входа, для SHORT стоп > входа.",
 /* uzun aciklamalar */
 "Her işlemin sonucu, riske atılan birim cinsinden: kayıp = −1R, kazanç = ödül/risk oranı kadar (+2.2R gibi).":
  "Результат каждой сделки в единицах риска: убыток = −1R, прибыль = отношение вознаграждения к риску (например +2.2R).",
@@ -718,7 +741,10 @@ const RU_PAT=[
  [/^(\d+) WIN \/ (\d+) LOSS$/, (m,a,b)=>`${a} WIN / ${b} LOSS`],
  [/(\d+) WIN · (\d+) LOSS/, (m,a,b)=>`${a} WIN · ${b} LOSS`],
  [/başabaş ~%([\d.]+)/, (m,n)=>`безубыток ~${n}%`],
- [/hepsi \((\d+)\)/, (m,n)=>`все (${n})`]
+ [/hepsi \((\d+)\)/, (m,n)=>`все (${n})`],
+ [/güven (HIGH|MEDIUM|LOW)/, (m,g)=>`уверенность ${g}`],
+ [/riskin %([\d.]+)'i/, (m,n)=>`${n}% от риска`],
+ [/~([\d]+)x/, (m,n)=>`~${n}x`]
 ];
 let LANG="tr";
 function trSeg(seg){                       // tek parca: sozluk -> kalip
@@ -771,6 +797,8 @@ function applyLang(l){
   document.documentElement.lang=l;
   try{localStorage.setItem("ui_lang",l);}catch(e){}
   const b=$("bookBtn"); if(b) b.href = l==="ru" ? "/kitap?lang=ru" : "/kitap";
+  const pdf=document.querySelector(".booklink.pdf");
+  if(pdf) pdf.href = l==="ru" ? "/kitap.pdf?lang=ru" : "/kitap.pdf";
   if(l==="ru") translateNode(document.body);
   else location.reload();
 }
@@ -818,6 +846,8 @@ $("calcClose").addEventListener("click",()=>$("calc").classList.remove("show"));
   try{saved=localStorage.getItem("ui_lang");}catch(e){}
   if(saved){ LANG=saved; document.documentElement.lang=saved;
     const b=$("bookBtn"); if(b&&saved==="ru") b.href="/kitap?lang=ru";
+    const pdf=document.querySelector(".booklink.pdf");
+    if(pdf&&saved==="ru") pdf.href="/kitap.pdf?lang=ru";
     $("langBtn").textContent=saved.toUpperCase(); }
   else { $("langpick").classList.add("show"); }
   document.querySelectorAll(".langbtn").forEach(btn=>
@@ -827,6 +857,8 @@ $("calcClose").addEventListener("click",()=>$("calc").classList.remove("show"));
       LANG=l; document.documentElement.lang=l;
       $("langBtn").textContent=l.toUpperCase();
       const b=$("bookBtn"); if(b) b.href = l==="ru"?"/kitap?lang=ru":"/kitap";
+      const pdf=document.querySelector(".booklink.pdf");
+      if(pdf) pdf.href = l==="ru"?"/kitap.pdf?lang=ru":"/kitap.pdf";
       $("langpick").classList.remove("show");
       location.reload();   // secilen dille temiz render (tooltipler dahil)
     }));

@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Сигнальный движок — Учебник</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F5F1E8; --card:#FFFEFA; --ink:#2A241B; --head:#4A4132;
+    --muted:#8A7F6C; --line:#E5DECF; --grid:#EDE6D6;
+    --blue:#2563EB; --green:#16A34A; --red:#DC2626; --amber:#B45309;
+    --green-bg:#E7F3EA; --red-bg:#FBEAEA; --blue-bg:#EAF0FB; --amber-bg:#FCF3E3;
+    --serif:"Source Serif 4",Georgia,serif;
+    --sans:"Inter",-apple-system,sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+       font-size:15.5px;line-height:1.75}
+  .page{max-width:880px;margin:0 auto;padding:48px 28px 90px}
+  /* kapak */
+  .cover{border:1px solid var(--line);background:var(--card);border-radius:16px;
+         padding:52px 48px 40px;margin-bottom:42px}
+  .cover .tag{font-family:var(--mono);font-size:11px;letter-spacing:.14em;
+              color:var(--blue);text-transform:uppercase}
+  .cover h1{font-family:var(--serif);font-weight:700;font-size:40px;
+            line-height:1.15;margin:10px 0 14px;color:var(--head)}
+  .cover p{color:var(--muted);max-width:560px;margin:0 0 6px}
+  .cover .meta{font-family:var(--mono);font-size:11.5px;color:var(--muted);
+               margin-top:22px;border-top:1px dashed var(--line);padding-top:14px}
+  /* icindekiler */
+  .toc{background:var(--card);border:1px solid var(--line);border-radius:14px;
+       padding:22px 28px;margin-bottom:48px}
+  .toc h2{font-family:var(--mono);font-size:11px;letter-spacing:.14em;
+          text-transform:uppercase;color:var(--head);margin:0 0 10px}
+  .toc ol{margin:0;padding-left:0;list-style:none;column-count:2;column-gap:34px}
+  .toc li{margin:5px 0;font-size:13.5px;break-inside:avoid}
+  .toc a{color:var(--ink);text-decoration:none}
+  .toc a:hover{color:var(--blue)}
+  .toc .n{font-family:var(--mono);color:var(--blue);font-size:11.5px;margin-right:8px}
+  /* bolum */
+  section.ch{margin:0 0 64px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;
+           text-transform:uppercase;color:var(--blue);margin-bottom:6px}
+  h2.title{font-family:var(--serif);font-weight:700;font-size:29px;
+           color:var(--head);margin:0 0 6px;line-height:1.2}
+  .lede{color:var(--muted);font-size:15px;margin:0 0 20px;max-width:640px}
+  h3{font-family:var(--sans);font-weight:700;font-size:16.5px;color:var(--head);
+     margin:30px 0 8px}
+  p{margin:0 0 14px}
+  em{font-style:italic}
+  strong{color:var(--head)}
+  code{font-family:var(--mono);font-size:.88em;background:var(--card);
+       border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+  /* sekil plakasi */
+  figure{margin:26px 0;background:var(--card);border:1px solid var(--line);
+         border-radius:14px;padding:18px 18px 12px;break-inside:avoid}
+  figure svg{width:100%;height:auto;display:block}
+  figcaption{font-size:12.5px;color:var(--muted);margin-top:10px;
+             padding-top:10px;border-top:1px dashed var(--line)}
+  figcaption b{font-family:var(--mono);color:var(--head);font-weight:600;
+               font-size:11.5px;letter-spacing:.05em}
+  /* kutular */
+  .box{border-radius:12px;padding:14px 18px;margin:20px 0;font-size:14.5px;
+       border:1px solid var(--line);background:var(--card)}
+  .box .bt{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;
+           text-transform:uppercase;font-weight:600;display:block;margin-bottom:6px}
+  .box.kavram{background:var(--blue-bg)} .box.kavram .bt{color:var(--blue)}
+  .box.vaka{background:var(--amber-bg)}  .box.vaka .bt{color:var(--amber)}
+  .box.uyari{background:var(--red-bg)}   .box.uyari .bt{color:var(--red)}
+  .box.kural{background:var(--green-bg)} .box.kural .bt{color:var(--green)}
+  /* sinav */
+  details.quiz{background:var(--card);border:1px solid var(--line);
+               border-radius:12px;padding:14px 18px;margin:22px 0}
+  details.quiz summary{cursor:pointer;font-weight:600;color:var(--head);
+                       font-size:14px;font-family:var(--mono)}
+  details.quiz .q{margin:12px 0 4px;font-weight:600;font-size:14px}
+  details.quiz .a{color:var(--muted);font-size:14px;margin:0 0 6px;
+                  padding-left:14px;border-left:3px solid var(--line)}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin:16px 0}
+  th{font-family:var(--mono);font-size:11px;letter-spacing:.06em;
+     text-transform:uppercase;color:var(--head);text-align:left;
+     border-bottom:2px solid var(--line);padding:7px 10px}
+  td{border-bottom:1px solid var(--line);padding:8px 10px;vertical-align:top}
+  td:first-child{font-weight:600;color:var(--head);white-space:nowrap}
+  .fm{font-family:var(--mono);font-size:.9em}
+  hr.sep{border:0;border-top:1px solid var(--line);margin:40px 0}
+  @media(max-width:640px){.toc ol{column-count:1}.cover{padding:34px 26px}
+    .cover h1{font-size:31px}h2.title{font-size:24px}.page{padding:26px 16px 60px}}
+  @media print{
+    @page{size:A4;margin:13mm 12mm}
+    body{background:#fff}
+    .page{max-width:100%;padding:0}
+    figure,.box,details.quiz,table{break-inside:avoid}
+    section.ch{break-before:page}
+    section.ch:first-of-type{break-before:auto}
+    details.quiz{display:block}
+    details.quiz summary{list-style:none}
+    details.quiz .q,details.quiz .a{display:block}
+    a{color:inherit;text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="page">
+<div class="cover">
+  <div class="tag">bybit-signal-bot · v3.5 период блокировки конфигурации</div>
+  <h1>Сигнальный движок<br>Учебник</h1>
+  <p>Стратегия, механизм принятия решений и научная дисциплина сигнального
+     движка для крипто-фьючерсов — с нуля, с иллюстрациями, для того, кто
+     никогда этим не занимался.</p>
+  <p><em>Все результаты — теневой учёт; ничто здесь не является инвестиционной рекомендацией.</em></p>
+  <div class="meta">9 глав · 14 иллюстраций · со словарём и проверочными вопросами · август 2026</div>
+</div>
+
+<nav class="toc">
+  <h2>Содержание</h2>
+  <ol>
+    <li><span class="n">Г1</span><a href="#b1">Язык рынка</a></li>
+    <li><span class="n">Г2</span><a href="#b2">Чтение рынка: структура и режим</a></li>
+    <li><span class="n">Г3</span><a href="#b3">Две формации: ретест и свип</a></li>
+    <li><span class="n">Г4</span><a href="#b4">Подтверждение и план: объём, риск, прибыль</a></li>
+    <li><span class="n">Г5</span><a href="#b5">Линия решений: семь фильтров</a></li>
+    <li><span class="n">Г6</span><a href="#b6">Теневой учёт и издержки</a></li>
+    <li><span class="n">Г7</span><a href="#b7">Портфель: движок теплоты</a></li>
+    <li><span class="n">Г8</span><a href="#b8">Научный слой: когорты и блокировка</a></li>
+    <li><span class="n">Г9</span><a href="#b9">Панель, инфраструктура и FAQ</a></li>
+    <li><span class="n">ПР</span><a href="#sozluk">Расширенный словарь</a></li>
+  </ol>
+</nav>
+
+<section class="ch">
+  <div class="eyebrow">Введение · Как читать эту книгу</div>
+  <h2 class="title">Что это за бот и чем он не является</h2>
+  <p>Эта книга описывает решающий движок, который круглосуточно сканирует рынок
+  бессрочных фьючерсов биржи Bybit. Каждые 15 минут движок прогоняет 150 пар
+  через семифильтровый конвейер; редкие возможности, прошедшие все ступени, он
+  называет <strong>сигналом</strong> и ведёт каждый такой сигнал <strong>на бумаге</strong> до самого
+  конца. Бот не отправляет на биржу ни одного ордера и не касается денег — то,
+  что он делает, называется <strong>теневым учётом</strong>: журнал «а что было бы, если бы
+  мы вошли?».</p>
+  <p>Книга построена как учебник: сначала язык (глава 1), затем навык чтения
+  рынка (глава 2), конкретные формации (главы 3-4), линия решений (глава 5),
+  бухгалтерия (глава 6), портфельная дисциплина (глава 7) и то, как система
+  проверяет саму себя (глава 8). В конце каждой главы — короткий блок
+  <em>проверь себя</em>; иллюстрации представляют реальную логику стратегии.</p>
+  <div class="box uyari"><span class="bt">Постоянное предупреждение</span>
+  Ничто в этой книге не является инвестиционной рекомендацией. Крипто-фьючерсы —
+  инструмент высокого риска; при торговле с плечом возможна потеря всего
+  капитала. Теневые результаты содержат оптимистичные допущения; прошлые
+  результаты не гарантируют будущих.</div>
+</section>
+
+<section class="ch" id="b1">
+  <div class="eyebrow">Глава 1 · Базовый язык</div>
+  <h2 class="title">Язык рынка</h2>
+  <p class="lede">Свечи, таймфреймы, двусторонняя ставка и главная единица
+  измерения этой системы — R. Без этой главы остальное читать бессмысленно.</p>
+
+  <h3>1.1 Свеча: цена в четырёх числах</h3>
+  <p>Каждый столбик на графике (<strong>свеча</strong>) хранит четыре числа за свой отрезок
+  времени: открытие, максимум, минимум, закрытие. Тело — между открытием и
+  закрытием; тонкие линии (<strong>тени</strong>) показывают крайности, которые цена
+  попробовала, но не удержала. Если закрытие выше открытия, свеча зелёная
+  (победили покупатели), если ниже — красная.</p><figure>
+  <svg viewBox="0 0 760 240" font-family="JetBrains Mono, monospace" font-size="11">
+    <defs><pattern id="g1" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M20 0H0V20" fill="none" stroke="#EDE6D6" stroke-width="1"/></pattern></defs>
+    <rect width="760" height="240" fill="url(#g1)"/>
+    <!-- yesil mum -->
+    <line x1="200" y1="30" x2="200" y2="210" stroke="#16A34A" stroke-width="2.5"/>
+    <rect x="178" y="70" width="44" height="100" rx="3" fill="#16A34A"/>
+    <text x="240" y="36" fill="#8A7F6C">максимум (конец тени)</text>
+    <text x="240" y="76" fill="#4A4132" font-weight="600">закрытие</text>
+    <text x="240" y="172" fill="#4A4132" font-weight="600">открытие</text>
+    <text x="240" y="214" fill="#8A7F6C">минимум</text>
+    <text x="155" y="125" fill="#16A34A" font-weight="600" text-anchor="end">ТЕЛО</text>
+    <text x="178" y="232" fill="#16A34A" font-weight="600">ЗЕЛЁНАЯ: закрытие &gt; открытия</text>
+    <!-- kirmizi mum -->
+    <line x1="560" y1="40" x2="560" y2="205" stroke="#DC2626" stroke-width="2.5"/>
+    <rect x="538" y="75" width="44" height="90" rx="3" fill="#DC2626"/>
+    <text x="600" y="80" fill="#4A4132" font-weight="600">открытие</text>
+    <text x="600" y="162" fill="#4A4132" font-weight="600">закрытие</text>
+    <text x="538" y="232" fill="#DC2626" font-weight="600">КРАСНАЯ: закрытие &lt; открытия</text>
+  </svg>
+  <figcaption><b>ИЛЛ. 1.1</b> · Анатомия свечи. Тело = открытие-закрытие; тени = цены, которые попробовали, но не удержали. Бот особенно внимателен к теням: <em>прокол уровня тенью</em> и <em>прокол закрытием</em> — разные вещи (вернёмся к этому в уроке о свипе, глава 3).</figcaption>
+  </figure><h3>1.2 Таймфреймы: две лупы</h3>
+  <p>Один и тот же рынок разглядывают двумя лупами. <strong>4H</strong> (каждая свеча —
+  4 часа) даёт общую картину: чей тренд, где важные уровни. <strong>15m</strong> (каждая
+  свеча — 15 минут) настраивает момент входа. Правило простое: <em>направление
+  выбирается на 4H, курок нажимается на 15m.</em> Внутри одной 4-часовой свечи
+  живут ровно 16 пятнадцатиминутных.</p><figure>
+  <svg viewBox="0 0 760 200" font-family="JetBrains Mono, monospace" font-size="11">
+    <rect width="760" height="200" fill="url(#g1)"/>
+    <text x="30" y="28" fill="#4A4132" font-weight="600" font-size="12">4H — здесь выбирается направление</text>
+    <line x1="70" y1="55" x2="70" y2="165" stroke="#16A34A" stroke-width="2"/>
+    <rect x="45" y="75" width="50" height="70" rx="3" fill="#16A34A"/>
+    <path d="M110 110 H 165" stroke="#8A7F6C" stroke-width="1.5" marker-end="url(#arr)"/>
+    <defs><marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6" fill="none" stroke="#8A7F6C" stroke-width="1.3"/></marker></defs>
+    <text x="120" y="100" fill="#8A7F6C" font-size="10">= 16 ×</text>
+    <text x="185" y="28" fill="#4A4132" font-weight="600" font-size="12">15m — здесь нажимается курок</text>
+    <g stroke-width="1.6">
+      <line x1="200" y1="120" x2="200" y2="150" stroke="#DC2626"/><rect x="194" y="126" width="12" height="16" fill="#DC2626"/>
+      <line x1="222" y1="110" x2="222" y2="145" stroke="#16A34A"/><rect x="216" y="118" width="12" height="18" fill="#16A34A"/>
+      <line x1="244" y1="100" x2="244" y2="138" stroke="#16A34A"/><rect x="238" y="108" width="12" height="20" fill="#16A34A"/>
+      <line x1="266" y1="105" x2="266" y2="135" stroke="#DC2626"/><rect x="260" y="112" width="12" height="14" fill="#DC2626"/>
+      <line x1="288" y1="92" x2="288" y2="128" stroke="#16A34A"/><rect x="282" y="98" width="12" height="22" fill="#16A34A"/>
+      <line x1="310" y1="80" x2="310" y2="118" stroke="#16A34A"/><rect x="304" y="88" width="12" height="20" fill="#16A34A"/>
+      <line x1="332" y1="70" x2="332" y2="105" stroke="#16A34A"/><rect x="326" y="76" width="12" height="20" fill="#16A34A"/>
+      <line x1="354" y1="76" x2="354" y2="108" stroke="#DC2626"/><rect x="348" y="82" width="12" height="16" fill="#DC2626"/>
+      <line x1="376" y1="62" x2="376" y2="98" stroke="#16A34A"/><rect x="370" y="68" width="12" height="22" fill="#16A34A"/>
+    </g>
+    <text x="200" y="185" fill="#8A7F6C">…внутренняя ткань тех же 4 часов: зона входа, ретест, свип видны здесь</text>
+  </svg>
+  <figcaption><b>ИЛЛ. 1.2</b> · Многотаймфреймовый анализ. 4H — стратегическое решение (искать LONG или SHORT), 15m — тактика (откуда и когда). Весь конвейер движка построен на этом разделении труда.</figcaption>
+  </figure><h3>1.3 Двусторонняя ставка: LONG и SHORT</h3>
+  <p><strong>Бессрочный фьючерс (perpetual futures)</strong> — бессрочный контракт, который
+  позволяет занимать позицию по цене монеты, не владея самой монетой.
+  <strong>LONG</strong> — ставка на рост (купить дешевле, продать дороже). <strong>SHORT</strong> —
+  ставка на падение (продать дороже взаймы, выкупить дешевле); возможность
+  зарабатывать на снижении — главное отличие фьючерсов от спота. Цена этой
+  возможности — два новых понятия.</p>
+  <p><strong>Плечо</strong> — это заём силы у биржи: с плечом 5x залог (<strong>маржа</strong>) в 100$
+  открывает позицию на 500$. Вопреки расхожему мнению плечо меняет не прибыль,
+  а <em>размер занятой маржи</em> и дистанцию до <strong>ликвидации</strong>: если цена уйдёт
+  против настолько, что съест залог, биржа закроет позицию принудительно. Чем
+  больше плечо, тем ближе ликвидация к точке входа — при чрезмерном плече счёт
+  ликвидируется раньше, чем сработает стоп из плана. Проверка «ликвидация
+  против стопа» в калькуляторе 🧮 на панели существует именно ради этой
+  ловушки.</p>
+
+  <h3>1.4 R: главная мера этой книги</h3>
+  <p>Система считает не в деньгах, а в <strong>R</strong>. Определение: <span class="fm">1R =
+  расстояние между входом и стопом = сумма, которой рискуем в сделке</span>. Любой
+  убыток равен −1R; прибыль зависит от дальности цели: +2R, +4R и так далее.
+  Зачем? Потому что альткоин за 0.07$ и биткоин за 64 000$ сопоставимы только
+  через общую единицу риска. Все показатели на панели (суммарный R, ожидание,
+  макс. просадка) записаны в этой единице.</p>
+  <div class="box kavram"><span class="bt">Блок понятий · Математика безубыточности</span>
+  Если средний выигрыш <span class="fm">+2.7R</span>, а каждый убыток <span class="fm">−1R</span>, то доля
+  выигрышей, нужная для выхода в плюс: <span class="fm">1 / (1 + 2.7) ≈ 27%</span>. То есть
+  система остаётся в безубытке, даже проигрывая три сделки из четырёх — низкая
+  точность при крупных выигрышах и есть естественный профиль свинг-стратегий.
+  Винрейт на панели всегда читается вместе с этой линией безубыточности.</div>
+
+  <details class="quiz"><summary>Проверь себя · Глава 1</summary>
+    <div class="q">1) Что происходит с позицией SHORT, если цена падает?</div>
+    <div class="a">Вы зарабатываете — SHORT это ставка на снижение: проданный
+    дороже контракт выкупается дешевле.</div>
+    <div class="q">2) Умножает ли плечо 10x прибыль в десять раз?</div>
+    <div class="a">Нет. При том же размере позиции прибыль и убыток те же; плечо
+    лишь уменьшает занятую маржу и приближает ликвидацию.</div>
+    <div class="q">3) Какова точка безубыточности при среднем выигрыше +3R?</div>
+    <div class="a"><span class="fm">1/(1+3) = 25%</span>. Одна выигрышная сделка из четырёх —
+    ноль; всё, что выше, — прибыль.</div>
+  </details>
+</section><section class="ch" id="b2">
+  <div class="eyebrow">Глава 2 · Навык чтения</div>
+  <h2 class="title">Чтение рынка: структура и режим</h2>
+  <p class="lede">Прежде индикаторов читается собственный почерк цены: что
+  говорят вершины и впадины, где долгосрочный уровень воды, есть ли направление
+  или это пила?</p>
+
+  <h3>2.1 Структура: HH-HL и LH-LL</h3>
+  <p>Простейшее определение тренда — порядок вершин и впадин. Восходящий тренд
+  рисует <strong>HH-HL</strong>: каждая вершина выше предыдущей (Higher High), каждая
+  впадина выше предыдущей (Higher Low) — покупатели готовы покупать всё выше на
+  каждом откате. Нисходящий тренд — зеркальное <strong>LH-LL</strong>. Третий фильтр
+  движка читает именно это: если на 4H порядок ясен, сторона определена; если
+  два рисунка переплелись (противоречивая структура), пара отсеивается.</p><figure>
+  <svg viewBox="0 0 760 250" font-family="JetBrains Mono, monospace" font-size="11">
+    <rect width="760" height="250" fill="url(#g1)"/>
+    <text x="30" y="26" fill="#16A34A" font-weight="600" font-size="12">СТРУКТУРА РОСТА · HH-HL</text>
+    <polyline points="40,200 95,120 130,160 195,85 235,130 310,55"
+      fill="none" stroke="#16A34A" stroke-width="2.5" stroke-linejoin="round"/>
+    <circle cx="95" cy="120" r="4" fill="#16A34A"/><text x="82" y="108">HH</text>
+    <circle cx="130" cy="160" r="4" fill="#4A4132"/><text x="118" y="180">HL</text>
+    <circle cx="195" cy="85" r="4" fill="#16A34A"/><text x="183" y="73">HH</text>
+    <circle cx="235" cy="130" r="4" fill="#4A4132"/><text x="224" y="150">HL</text>
+    <text x="40" y="235" fill="#8A7F6C">каждое дно выше предыдущего → контроль у покупателя → ищем LONG</text>
+    <text x="420" y="26" fill="#DC2626" font-weight="600" font-size="12">СТРУКТУРА ПАДЕНИЯ · LH-LL</text>
+    <polyline points="430,70 485,145 520,105 585,180 625,140 710,215"
+      fill="none" stroke="#DC2626" stroke-width="2.5" stroke-linejoin="round"/>
+    <circle cx="485" cy="145" r="4" fill="#DC2626"/><text x="472" y="165">LL</text>
+    <circle cx="520" cy="105" r="4" fill="#4A4132"/><text x="508" y="93">LH</text>
+    <circle cx="585" cy="180" r="4" fill="#DC2626"/><text x="573" y="200">LL</text>
+    <circle cx="625" cy="140" r="4" fill="#4A4132"/><text x="614" y="128">LH</text>
+  </svg>
+  <figcaption><b>ИЛЛ. 2.1</b> · Структура рынка. Слева: восходящая лестница HH-HL; справа: нисходящая LH-LL. Когда порядок нарушен (например «LL после HH»), структура противоречива, и движок не выбирает сторону в этой паре.</figcaption>
+  </figure><h3>2.2 EMA200: долгосрочный уровень воды</h3>
+  <p><strong>EMA200</strong> — экспоненциально взвешенное среднее последних 200 свечей, то
+  есть медленная река, чуть внимательнее прислушивающаяся к недавнему прошлому.
+  Если цена устойчиво выше — климат бычий, если ниже — медвежий. Движок
+  использует это в двух местах: как подтверждение структуры отдельной пары
+  (фильтр 3) и, что важнее, как <strong>компас всего рынка</strong> на 4-часовом графике
+  биткоина (фильтр 6, ворота рынка — глава 5).</p>
+
+  <h3>2.3 Гистерезис: чтобы компас не дрожал</h3>
+  <p>Когда цена колеблется вплотную к EMA200, наивное правило «выше/ниже»
+  переворачивает ворота на каждой свече. Решение заимствовано из инженерии:
+  <strong>гистерезис</strong> — как термостат, который включается на 24.0° и выключается не
+  на 24.1°, смена режима требует двух условий сразу: цена должна выйти за порог
+  (<span class="fm">EMA200 ± 0.5%</span>) <em>и</em> подтвердить это <strong>двумя закрытыми 4H свечами
+  подряд</strong>. Возвраты внутрь полосы режим не меняют — сохраняется прежний.</p><figure>
+  <svg viewBox="0 0 760 250" font-family="JetBrains Mono, monospace" font-size="11">
+    <rect width="760" height="250" fill="url(#g1)"/>
+    <path d="M30 140 C 200 132, 500 128, 730 118" fill="none" stroke="#4A4132" stroke-width="2" stroke-dasharray="7 5"/>
+    <text x="34" y="132" fill="#4A4132" font-weight="600">BTC 4H EMA200</text>
+    <path d="M30 118 C 200 110, 500 106, 730 96" fill="none" stroke="#8A7F6C" stroke-width="1"/>
+    <path d="M30 162 C 200 154, 500 150, 730 140" fill="none" stroke="#8A7F6C" stroke-width="1"/>
+    <text x="612" y="90" fill="#8A7F6C" font-size="10">порог +0.5%</text>
+    <text x="612" y="155" fill="#8A7F6C" font-size="10">порог −0.5%</text>
+    <!-- fiyat -->
+    <polyline points="40,190 100,150 150,125 205,135 260,122 315,138 370,120 425,100 480,108 535,88 600,92 660,74 720,80"
+      fill="none" stroke="#2563EB" stroke-width="2.5" stroke-linejoin="round"/>
+    <circle cx="425" cy="100" r="5" fill="#FFFEFA" stroke="#2563EB" stroke-width="2"/>
+    <circle cx="535" cy="88" r="5" fill="#16A34A"/>
+    <circle cx="600" cy="92" r="5" fill="#16A34A"/>
+    <text x="300" y="215" fill="#8A7F6C">внутри полосы: режим НЕ меняется (сохраняется прежний)</text>
+    <text x="500" y="60" fill="#16A34A" font-weight="600">2 закрытия подряд выше порога → режим: БЫК</text>
+    <line x1="560" y1="66" x2="560" y2="82" stroke="#16A34A" stroke-width="1.3"/>
+  </svg>
+  <figcaption><b>ИЛЛ. 2.2</b> · Определение режима с гистерезисом. Когда синяя линия (цена) прокалывает порог одной свечой, режим ещё не меняется (белая точка); он разворачивается только после двух закрытий 4H подряд за порогом (зелёные точки). При потере данных последний режим живёт максимум 2 часа, затем ворота перекрывают оба направления (fail-closed).</figcaption>
+  </figure><h3>2.4 ADX: тренд или пила?</h3>
+  <p><strong>ADX</strong> не говорит о направлении, он измеряет его <em>силу</em> — как термометр.
+  Ниже 20 — зона «пилы»: цена ходит в узком диапазоне, пробои один за другим
+  оказываются ловушками. Второй фильтр движка беспощаден: при ADX &lt; 20 пара в
+  этом цикле вообще не рассматривается. <em>На рынке без направления самая
+  прибыльная позиция — её отсутствие.</em></p><figure>
+  <svg viewBox="0 0 760 210" font-family="JetBrains Mono, monospace" font-size="11">
+    <rect width="760" height="210" fill="url(#g1)"/>
+    <text x="30" y="26" fill="#B45309" font-weight="600" font-size="12">ПИЛА (ADX &lt; 20) → ОТСЕВ</text>
+    <polyline points="40,110 70,90 100,115 130,92 160,118 190,95 220,112 250,90 280,115 310,96 340,112"
+      fill="none" stroke="#B45309" stroke-width="2.2"/>
+    <line x1="40" y1="82" x2="340" y2="82" stroke="#8A7F6C" stroke-dasharray="4 4"/>
+    <line x1="40" y1="122" x2="340" y2="122" stroke="#8A7F6C" stroke-dasharray="4 4"/>
+    <text x="40" y="150" fill="#8A7F6C">узкий диапазон · ложные пробои · охота за стопами</text>
+    <text x="430" y="26" fill="#16A34A" font-weight="600" font-size="12">ТРЕНД (ADX ≥ 20) → АНАЛИЗ ПРОДОЛЖАЕТСЯ</text>
+    <polyline points="430,160 480,135 515,148 570,110 605,126 665,85 700,98 730,60"
+      fill="none" stroke="#16A34A" stroke-width="2.2"/>
+    <text x="430" y="190" fill="#8A7F6C">направленный поток · откаты удерживаются</text>
+  </svg>
+  <figcaption><b>ИЛЛ. 2.3</b> · Два разных моря. Слева — пила без энергии, здесь движок не играет вовсе; справа — тренд измеримой силы, анализ продолжается.</figcaption>
+  </figure><details class="quiz"><summary>Проверь себя · Глава 2</summary>
+    <div class="q">1) Цена сделала новый HH, но затем ушла ниже предыдущей впадины (LL). Что со структурой?</div>
+    <div class="a">Она противоречива — два рисунка говорят одновременно. Движок не
+    выбирает сторону, пара отсеивается на фильтре 3.</div>
+    <div class="q">2) BTC закрыл одну 4H свечу на 0.8% выше EMA200. Режим стал бычьим?</div>
+    <div class="a">Ещё нет — гистерезис требует <em>двух закрытий подряд</em>. Если и
+    вторая свеча закроется выше порога, режим сменится.</div>
+    <div class="q">3) ADX равен 14, но формация выглядит идеально. Что сделает движок?</div>
+    <div class="a">Даже не станет смотреть: отсев на фильтре 2. В фазе без
+    направления большинство «идеальных» пробоев — ловушки.</div>
+  </details>
+</section>
+
+<section class="ch" id="b3">
+  <div class="eyebrow">Глава 3 · Уроки формаций</div>
+  <h2 class="title">Две формации: ретест и свип</h2>
+  <p class="lede">Движок знает только два шаблона входа. Оба отвечают на один
+  вопрос разными путями: «стоит ли за этим движением настоящее намерение?»</p>
+
+  <h3>3.1 Пробой-ретест: возврат и рукопожатие</h3>
+  <p>Когда важное сопротивление пробито, есть два сценария: либо пробой был
+  ложным и цена проваливается обратно, либо уровень сменил роль — прежнее
+  сопротивление стало поддержкой. Классический способ различить их —
+  <strong>ретест</strong>: цена возвращается к пробитому уровню и <em>удерживается</em> на нём
+  (принятие, acceptance). Именно из этой зоны удержания движок планирует
+  лимитный вход: стоп чуть ниже уровня, цели — на отмеренном расстоянии.</p><figure>
+  <svg viewBox="0 0 760 300" font-family="JetBrains Mono, monospace" font-size="11">
+    <rect width="760" height="300" fill="url(#g1)"/>
+    <!-- direnc seviyesi -->
+    <line x1="40" y1="150" x2="720" y2="150" stroke="#4A4132" stroke-width="1.6" stroke-dasharray="8 5"/>
+    <text x="44" y="143" fill="#4A4132" font-weight="600">уровень: старое сопротивление → новая поддержка</text>
+    <!-- fiyat yolu -->
+    <polyline points="50,235 105,185 150,215 200,170 245,196 300,158 330,120 360,96 400,118 445,146 490,152 530,142 575,112 640,70 705,45"
+      fill="none" stroke="#2563EB" stroke-width="2.5" stroke-linejoin="round"/>
+    <!-- kirilim vurgusu -->
+    <circle cx="330" cy="120" r="5" fill="#2563EB"/>
+    <text x="268" y="98" fill="#2563EB" font-weight="600">1· ПРОБОЙ</text>
+    <text x="356" y="86" fill="#8A7F6C" font-size="10">2· принятие: закрытия выше</text>
+    <!-- retest bolgesi -->
+    <rect x="455" y="140" width="80" height="20" rx="4" fill="#16A34A" opacity="0.18"/>
+    <circle cx="490" cy="152" r="5" fill="#16A34A"/>
+    <text x="440" y="185" fill="#16A34A" font-weight="600">3· РЕТЕСТ = зона входа</text>
+    <!-- stop / tp -->
+    <line x1="455" y1="196" x2="535" y2="196" stroke="#DC2626" stroke-width="2"/>
+    <text x="543" y="200" fill="#DC2626" font-weight="600">СТОП (под уровнем) · −1R</text>
+    <line x1="455" y1="92" x2="720" y2="92" stroke="#16A34A" stroke-width="1.6"/>
+    <text x="560" y="86" fill="#16A34A" font-weight="600">TP1 · +2.4R</text>
+    <line x1="455" y1="45" x2="720" y2="45" stroke="#16A34A" stroke-width="1.6" stroke-dasharray="5 4"/>
+    <text x="560" y="39" fill="#16A34A">TP2 · +4.1R</text>
+    <!-- R olcegi -->
+    <line x1="447" y1="152" x2="447" y2="196" stroke="#8A7F6C" stroke-width="1.2"/>
+    <text x="410" y="178" fill="#8A7F6C" font-size="10">1R</text>
+  </svg>
+  <figcaption><b>ИЛЛ. 3.1</b> · Анатомия формации breakout_retest. (1) Сопротивление пробивается на объёме, (2) цена закрывается выше уровня, создавая «принятие», (3) возвращается и тестирует уровень — вход из этой зоны, стоп под уровнем, цели на отмеренном расстоянии. Зелёная область — зона лимитного входа, которую ждёт бот.</figcaption>
+  </figure><h3>3.2 Свип-возврат: разворот после охоты за стопами</h3>
+  <p>Под очевидными для всех вершинами и впадинами копятся стоп-заявки — крупные
+  игроки об этом знают. <strong>Снятие ликвидности (sweep)</strong> — это когда цена
+  ненадолго прокалывает такой уровень <em>тенью</em>, собирает стопы и быстро
+  возвращается. Ключевой момент — именно возврат: если уровень
+  <strong>отбит обратно (reclaim)</strong>, читается «дешёвый товар собран, дорога свободна»
+  — сильный сигнал разворота. Движок не входит, пока возврат не <em>подтверждён</em>;
+  снятие ликвидности само по себе сигналом не является.</p><figure>
+  <svg viewBox="0 0 760 300" font-family="JetBrains Mono, monospace" font-size="11">
+    <rect width="760" height="300" fill="url(#g1)"/>
+    <line x1="40" y1="190" x2="720" y2="190" stroke="#4A4132" stroke-width="1.6" stroke-dasharray="8 5"/>
+    <text x="44" y="183" fill="#4A4132" font-weight="600">явный уровень дна (под ним скопление стопов)</text>
+    <!-- mumlar -->
+    <g>
+      <line x1="120" y1="120" x2="120" y2="200" stroke="#DC2626" stroke-width="2"/><rect x="108" y="130" width="24" height="52" fill="#DC2626"/>
+      <line x1="170" y1="140" x2="170" y2="205" stroke="#DC2626" stroke-width="2"/><rect x="158" y="150" width="24" height="42" fill="#DC2626"/>
+      <line x1="220" y1="155" x2="220" y2="198" stroke="#DC2626" stroke-width="2"/><rect x="208" y="162" width="24" height="30" fill="#DC2626"/>
+      <!-- sweep mumu: uzun alt fitil -->
+      <line x1="285" y1="150" x2="285" y2="262" stroke="#B45309" stroke-width="2.4"/>
+      <rect x="273" y="158" width="24" height="34" fill="#B45309"/>
+      <!-- reclaim mumu -->
+      <line x1="345" y1="118" x2="345" y2="200" stroke="#16A34A" stroke-width="2"/><rect x="333" y="128" width="24" height="58" fill="#16A34A"/>
+      <line x1="400" y1="95" x2="400" y2="170" stroke="#16A34A" stroke-width="2"/><rect x="388" y="104" width="24" height="52" fill="#16A34A"/>
+    </g>
+    <text x="240" y="282" fill="#B45309" font-weight="600">1· СВИП: тень снимает стопы</text>
+    <path d="M287 258 L 287 272" stroke="#B45309" stroke-width="1.3"/>
+    <text x="330" y="110" fill="#16A34A" font-weight="600">2· ВОЗВРАТ: уровень отбит обратно</text>
+    <!-- giris bolgesi -->
+    <rect x="430" y="178" width="80" height="20" rx="4" fill="#16A34A" opacity="0.18"/>
+    <text x="428" y="222" fill="#16A34A" font-weight="600">3· зона входа (ретест)</text>
+    <polyline points="424,166 470,186 515,170 560,138 615,112 675,72"
+      fill="none" stroke="#2563EB" stroke-width="2.2"/>
+    <line x1="430" y1="240" x2="510" y2="240" stroke="#DC2626" stroke-width="2"/>
+    <text x="518" y="244" fill="#DC2626" font-weight="600">СТОП: под дном тени</text>
+    <line x1="430" y1="96" x2="720" y2="96" stroke="#16A34A" stroke-width="1.6"/>
+    <text x="620" y="90" fill="#16A34A" font-weight="600">TP1</text>
+  </svg>
+  <figcaption><b>ИЛЛ. 3.2</b> · Формация sweep_reclaim. Длинная нижняя тень оранжевой свечи снимает скопление стопов; главный признак — то, что зелёная свеча <em>возвращает уровень обратно</em>. Вход после теста, стоп под дном тени — логика проста: «если это дно увидели снова, история была неверной».</figcaption>
+  </figure><div class="box vaka"><span class="bt">Случай из практики · Одна зона, три попытки</span>
+  Пара PRL за один день дала сигнал трижды из одной и той же зоны: первые две
+  попытки закрылись по стопу (−1R), третья принесла +4.09R. Урок двойной:
+  (1) даже верная зона может не сработать с первого раза — стоп существует
+  именно для этого; (2) вопрос «не добавить ли паузу по паре после убытка?»
+  записан в реестр идей — при закрытой конфигурации система всё равно не
+  перестаёт учиться на собственном поведении (глава 8).</div>
+
+  <details class="quiz"><summary>Проверь себя · Глава 3</summary>
+    <div class="q">1) Цена проколола тенью уровень дна и сразу восстановилась. Войдёт ли движок?</div>
+    <div class="a">Пока нет — снятия ликвидности недостаточно; нужно подтверждение
+    <em>возврата</em> уровня и затем зона теста.</div>
+    <div class="q">2) Почему в формации ретеста стоп ставится сразу под уровнем?</div>
+    <div class="a">Потому что тезис звучит так: «старое сопротивление стало
+    поддержкой». Если цена устойчиво уходит под уровень, тезис разрушен — ждать
+    дальше значит просто увеличивать убыток.</div>
+    <div class="q">3) Какова общая философия обеих формаций?</div>
+    <div class="a">Обе требуют <em>подтверждения</em>: пробой должен получить принятие,
+    свип — возврат уровня. «Красиво выглядит» никогда не является причиной входа.</div>
+  </details>
+</section>
+
+<section class="ch" id="b4">
+  <div class="eyebrow">Глава 4 · Подтверждение и план</div>
+  <h2 class="title">Объём, риск и прибыль</h2>
+  <p class="lede">Формация говорит «что», объём — «кто», математика риска и
+  прибыли — «стоит ли». Без всех трёх плана не существует.</p>
+
+  <h3>4.1 Объём: подпись под движением</h3>
+  <p><strong>Объём</strong> — количество контрактов, сменивших владельца в свече, то есть
+  мера толпы за движением. Пробой без участия похож на вексель без подписи: вид
+  есть, обязательства нет. Правило движка однозначно: объём триггерной свечи
+  должен быть не менее <strong>1.5 среднего за 20 свечей</strong>. Иначе формация
+  отсеивается, как бы красиво она ни выглядела.</p><figure>
+  <svg viewBox="0 0 760 230" font-family="JetBrains Mono, monospace" font-size="11">
+    <rect width="760" height="230" fill="url(#g1)"/>
+    <line x1="50" y1="120" x2="710" y2="120" stroke="#B45309" stroke-width="1.6" stroke-dasharray="6 4"/>
+    <text x="540" y="112" fill="#B45309" font-weight="600">порог = 1.5 × сред(20)</text>
+    <line x1="50" y1="150" x2="710" y2="150" stroke="#8A7F6C" stroke-width="1" stroke-dasharray="3 5"/>
+    <text x="596" y="166" fill="#8A7F6C" font-size="10">среднее(20)</text>
+    <g fill="#C9BFA9">
+      <rect x="60"  y="158" width="26" height="42"/><rect x="100" y="150" width="26" height="50"/>
+      <rect x="140" y="164" width="26" height="36"/><rect x="180" y="146" width="26" height="54"/>
+      <rect x="220" y="156" width="26" height="44"/><rect x="260" y="140" width="26" height="60"/>
+      <rect x="300" y="160" width="26" height="40"/><rect x="340" y="152" width="26" height="48"/>
+      <rect x="380" y="147" width="26" height="53"/><rect x="420" y="158" width="26" height="42"/>
+    </g>
+    <rect x="470" y="52" width="30" height="148" fill="#16A34A" rx="3"/>
+    <text x="440" y="38" fill="#16A34A" font-weight="600">ТРИГГЕРНАЯ СВЕЧА: выше порога ✓</text>
+    <g fill="#C9BFA9"><rect x="520" y="150" width="26" height="50"/><rect x="560" y="160" width="26" height="40"/></g>
+    <rect x="616" y="128" width="30" height="72" fill="#DC2626" opacity="0.55" rx="3"/>
+    <text x="600" y="216" fill="#DC2626" font-size="10">триггер ниже порога → ОТСЕВ</text>
+  </svg>
+  <figcaption><b>ИЛЛ. 4.1</b> · Подтверждение объёмом. Серые столбики — обычное участие; зелёная триггерная свеча превышает порог (проходит), красный пример остаётся ниже (отсев). Порог не абсолютный, а относительный: считается по последним 20 свечам самой пары.</figcaption>
+  </figure><h3>4.2 Диапазон RR: 2.0 – 6.0</h3>
+  <p>После построения плана остаётся один вопрос: <em>стоит ли?</em> <strong>RR</strong> =
+  расстояние до цели ÷ расстояние до стопа. Движок принимает только диапазон
+  <span class="fm">2.0 ≤ RR ≤ 6.0</span>. Нижняя граница интуитивна: прибыль должна вдвое
+  превышать риск, чтобы математика работала даже при низкой точности
+  (глава 1.4). Верхняя граница — урок, извлечённый из собственных данных.</p><figure>
+  <svg viewBox="0 0 760 240" font-family="JetBrains Mono, monospace" font-size="11">
+    <rect width="760" height="240" fill="url(#g1)"/>
+    <text x="40" y="30" fill="#16A34A" font-weight="600" font-size="12">ЗДОРОВЫЙ ПЛАН · RR 2.8</text>
+    <line x1="60" y1="150" x2="300" y2="150" stroke="#2563EB" stroke-width="2"/>
+    <text x="64" y="144" fill="#2563EB">вход</text>
+    <line x1="60" y1="186" x2="300" y2="186" stroke="#DC2626" stroke-width="2"/>
+    <text x="64" y="202" fill="#DC2626">стоп · ЕСТЬ запас на шум</text>
+    <line x1="60" y1="50" x2="300" y2="50" stroke="#16A34A" stroke-width="2"/>
+    <text x="64" y="44" fill="#16A34A">цель</text>
+    <line x1="315" y1="150" x2="315" y2="186" stroke="#DC2626" stroke-width="3"/>
+    <text x="325" y="172" fill="#DC2626">1R</text>
+    <line x1="315" y1="50" x2="315" y2="150" stroke="#16A34A" stroke-width="3"/>
+    <text x="325" y="104" fill="#16A34A">2.8R</text>
+    <text x="430" y="30" fill="#DC2626" font-weight="600" font-size="12">ПЛАН-ЛОВУШКА · RR 8 → ОТСЕВ</text>
+    <line x1="450" y1="150" x2="690" y2="150" stroke="#2563EB" stroke-width="2"/>
+    <text x="454" y="144" fill="#2563EB">вход</text>
+    <line x1="450" y1="162" x2="690" y2="162" stroke="#DC2626" stroke-width="2"/>
+    <text x="454" y="178" fill="#DC2626">стоп · вжат в цену</text>
+    <line x1="450" y1="54" x2="690" y2="54" stroke="#16A34A" stroke-width="2"/>
+    <polyline points="455,150 475,158 495,148 515,160 535,150" fill="none" stroke="#B45309" stroke-width="1.8"/>
+    <text x="545" y="160" fill="#B45309" font-size="10">шум лижет стоп</text>
+    <text x="450" y="212" fill="#8A7F6C">на бумаге отличное соотношение; в реальности выносит первой волной</text>
+  </svg>
+  <figcaption><b>ИЛЛ. 4.2</b> · Почему существует потолок RR. Планы с RR&gt;6 обычно означают «крошечный стоп, вжатый в цену»: соотношение блестит на бумаге, а рыночный шум выносит стоп первой же волной. В теневых данных <strong>все 4 сигнала с RR≥6 проиграли</strong> — потолок поставлен на этом свидетельстве.</figcaption>
+  </figure><div class="box kural"><span class="bt">Итог правил · Рождение плана</span>
+  Когда сошлись структура, формация, объём и диапазон RR, план завершён: зона
+  входа (лимит), стоп (структурный уровень плюс запас на волатильность),
+  TP1/TP2 (отмеренные цели) и две метки — уверенность (HIGH/MEDIUM/LOW по числу
+  подтверждений) и тип формации. Дальше слово за последними двумя фильтрами:
+  компасом рынка и теплотой портфеля.</div>
+
+  <details class="quiz"><summary>Проверь себя · Глава 4</summary>
+    <div class="q">1) Идеальный ретест приходит с объёмом 1.4× от среднего. Результат?</div>
+    <div class="a">Отсев. Порог 1.5× не обсуждается; категории «почти хватило» не существует.</div>
+    <div class="q">2) Почему отклоняется план с RR 9? Соотношение же прекрасное.</div>
+    <div class="a">Обычно это иллюзия узкого стопа: стоп стоит внутри шумового
+    диапазона, и план превращается в машину по производству −1R. В наших данных
+    все сигналы с RR≥6 (4 из 4) проиграли.</div>
+    <div class="q">3) Что означает метка HIGH и является ли она гарантией?</div>
+    <div class="a">Она говорит, что совпало больше независимых подтверждений; это
+    улучшает шансы, но ничего не гарантирует — сигналы с HIGH тоже проигрывали.</div>
+  </details>
+</section><section class="ch" id="b5">
+  <div class="eyebrow">Глава 5 · Линия решений</div>
+  <h2 class="title">Семь фильтров и ворота рынка</h2>
+  <p class="lede">Соберём детали вместе: каждые 15 минут 150 пар текут через
+  эту воронку. Ответ по умолчанию — всегда NO_TRADE; сигнал это исключение,
+  сумевшее семь раз подряд сказать «да».</p><figure>
+  <svg viewBox="0 0 760 430" font-family="JetBrains Mono, monospace" font-size="11.5">
+    <rect width="760" height="430" fill="url(#g1)"/>
+    <text x="60" y="34" fill="#4A4132" font-weight="600" font-size="13">150 ПАР (вселенная дня: топ-150 по обороту за 24ч)</text>
+    <g font-size="11">
+      <rect x="60"  y="48"  width="640" height="34" rx="8" fill="#DC2626" opacity="0.88"/>
+      <text x="76" y="70" fill="#fff" font-weight="600">1 · DATA — без 60 закрытых свечей анализа нет</text>
+      <rect x="88"  y="92"  width="584" height="34" rx="8" fill="#EA580C" opacity="0.88"/>
+      <text x="104" y="114" fill="#fff" font-weight="600">2 · REGIME — ADX &lt; 20: не играем без направления</text>
+      <rect x="116" y="136" width="528" height="34" rx="8" fill="#F59E0B" opacity="0.9"/>
+      <text x="132" y="158" fill="#fff" font-weight="600">3 · HTF STRUCTURE — нет ясной стороны на 4H — не выбираем сторону</text>
+      <rect x="144" y="180" width="472" height="34" rx="8" fill="#D3B411" opacity="0.9"/>
+      <text x="160" y="202" fill="#fff" font-weight="600">4 · LTF SETUP — нет подтверждённого ретеста/свипа — нет истории</text>
+      <rect x="172" y="224" width="416" height="34" rx="8" fill="#84CC16" opacity="0.9"/>
+      <text x="188" y="246" fill="#fff" font-weight="600">5 · VOLUME — объём &lt; 1.5×сред.: вексель без подписи</text>
+      <rect x="200" y="268" width="360" height="34" rx="8" fill="#0EA5A4" opacity="0.9"/>
+      <text x="216" y="290" fill="#fff" font-weight="600">6 · MARKET GATE — не плыть против течения</text>
+      <rect x="228" y="312" width="304" height="34" rx="8" fill="#16A34A" opacity="0.92"/>
+      <text x="244" y="334" fill="#fff" font-weight="600">7 · RISK/REWARD — 2.0 ≤ RR ≤ 6.0</text>
+      <rect x="300" y="366" width="160" height="40" rx="10" fill="#16A34A"/>
+      <text x="330" y="391" fill="#fff" font-weight="700" font-size="14">→ SIGNAL</text>
+    </g>
+    <text x="480" y="391" fill="#8A7F6C">в большинстве дней: 0–2 шт</text>
+  </svg>
+  <figcaption><b>ИЛЛ. 5.1</b> · Воронка решений. Каждый этап — машина по производству «нет»; карточка конвейера фильтров на панели это живой счёт воронки. Причина отсева записывается для каждого решения — ответ на вопрос «почему нет сигналов?» всегда существует в письменном виде.</figcaption>
+  </figure><h3>5.1 Крупный план фильтра 6: ворота рынка</h3>
+  <p>Альткоины не независимы; большинство живёт в тени биткоина. Открывать LONG
+  по альткоину, пока BTC падает, — плыть против течения: даже при верной
+  формации шансы против вас. Урок первых 49 теневых сигналов был горьким:
+  контртрендовая сторона дала суммарно <span class="fm">−6.99R</span>, а сторона по тренду
+  <span class="fm">+28.75R</span>. Ворота родились из этого свидетельства: <strong>в медвежьем
+  режиме блокируются LONG, в бычьем — SHORT.</strong> Режим определяется компасом с
+  гистерезисом из главы 2.3; если компас ослеп (нет данных дольше 2 часов),
+  ворота перекрывают оба направления — <em>fail-closed</em>: не уверены — не проходит
+  никто.</p>
+  <div class="box kavram"><span class="bt">Блок понятий · Ворота не отбрасывают, а записывают</span>
+  Решение, остановленное воротами, не выбрасывается: оно записывается вместе с
+  полным торговым планом в отдельный «контрфактический» журнал и отслеживается
+  по тем же правилам. Так вопрос «ворота нас защитили или лишили прибыли?»
+  получает ответ не из догадок, а из счёта (глава 8). Ранний результат:
+  заблокированные сделки заметно в минусе — ворота с запасом отрабатывают свой
+  хлеб.</div>
+
+  <details class="quiz"><summary>Проверь себя · Глава 5</summary>
+    <div class="q">1) «Сегодня нет ни одного сигнала» — это поломка?</div>
+    <div class="a">Нет, это замысел. Ответ по умолчанию — NO_TRADE; в большинстве
+    дней воронка отсеивает всё. Карточка конвейера показывает, на каком этапе.</div>
+    <div class="q">2) Данных по BTC нет уже 3 часа. Что делают ворота?</div>
+    <div class="a">Последний режим используется максимум 2 часа; после этого
+    блокируются ОБА направления (fail-closed). Полёт вслепую запрещён.</div>
+    <div class="q">3) В бычьем режиме приходит идеальная формация SHORT. Что дальше?</div>
+    <div class="a">Ворота её останавливают; решение с полным планом уходит в
+    контрфактический журнал и отслеживается — возможно, когда-нибудь этот журнал
+    докажет неправоту ворот, но пока счёт в их пользу.</div>
+  </details>
+</section>
+
+<section class="ch" id="b6">
+  <div class="eyebrow">Глава 6 · Бухгалтерия</div>
+  <h2 class="title">Теневой учёт и издержки</h2>
+  <p class="lede">Сигнал родился; дальше его судьба пишется жёсткими правилами.
+  Эта глава о том, как ведётся журнал и почему округление всегда против нас.</p><figure>
+  <svg viewBox="0 0 760 300" font-family="JetBrains Mono, monospace" font-size="11.5">
+    <rect width="760" height="300" fill="url(#g1)"/>
+    <rect x="40" y="40" width="130" height="46" rx="10" fill="#2563EB"/>
+    <text x="63" y="68" fill="#fff" font-weight="700">СИГНАЛ</text>
+    <rect x="230" y="40" width="150" height="46" rx="10" fill="#B45309"/>
+    <text x="248" y="61" fill="#fff" font-weight="700">PENDING</text>
+    <text x="248" y="77" fill="#fff" font-size="10">ожидание входа · макс 6 ч</text>
+    <rect x="440" y="40" width="150" height="46" rx="10" fill="#0EA5A4"/>
+    <text x="466" y="61" fill="#fff" font-weight="700">FILLED</text>
+    <text x="452" y="77" fill="#fff" font-size="10">в сделке · макс 48 ч</text>
+    <path d="M170 63 H 224" stroke="#4A4132" stroke-width="1.6" marker-end="url(#arr)"/>
+    <path d="M380 63 H 434" stroke="#4A4132" stroke-width="1.6" marker-end="url(#arr)"/>
+    <text x="384" y="55" fill="#8A7F6C" font-size="10">цена коснулась зоны</text>
+    <!-- pending cikisi -->
+    <path d="M305 86 V 150" stroke="#8A7F6C" stroke-width="1.4" marker-end="url(#arr)"/>
+    <rect x="230" y="156" width="150" height="44" rx="10" fill="#98907F"/>
+    <text x="244" y="176" fill="#fff" font-weight="700">NOT_FILLED</text>
+    <text x="244" y="192" fill="#fff" font-size="10">не заполнен за 6 ч · в счёт не идёт</text>
+    <text x="238" y="232" fill="#8A7F6C" font-size="10">…но призрак отслеживается: «а если бы вошли?» → hypo_r</text>
+    <!-- filled cikislar -->
+    <path d="M515 86 V 118 H 470 V 150" stroke="#16A34A" stroke-width="1.5" marker-end="url(#arr)" fill="none"/>
+    <rect x="410" y="156" width="120" height="44" rx="10" fill="#16A34A"/>
+    <text x="443" y="176" fill="#fff" font-weight="700">WIN</text>
+    <text x="424" y="192" fill="#fff" font-size="10">сначала TP1 · +RR плана</text>
+    <path d="M515 86 V 118 H 600 V 150" stroke="#DC2626" stroke-width="1.5" marker-end="url(#arr)" fill="none"/>
+    <rect x="548" y="156" width="120" height="44" rx="10" fill="#DC2626"/>
+    <text x="578" y="176" fill="#fff" font-weight="700">LOSS</text>
+    <text x="562" y="192" fill="#fff" font-size="10">сначала стоп · −1R</text>
+    <rect x="620" y="236" width="120" height="44" rx="10" fill="#C9BFA9"/>
+    <text x="638" y="256" fill="#4A4132" font-weight="700">EXPIRED</text>
+    <text x="630" y="272" fill="#4A4132" font-size="10">48 ч истекли · частичный R</text>
+    <path d="M680 200 V 230" stroke="#8A7F6C" stroke-width="1.3" marker-end="url(#arr)"/>
+    <text x="40" y="262" fill="#DC2626" font-weight="600" font-size="12">Правило одной свечи: если в свече и стоп, и цель → LOSS</text>
+    <text x="40" y="282" fill="#8A7F6C" font-size="11">(порядок неизвестен; сомнение всегда трактуем против себя)</text>
+  </svg>
+  <figcaption><b>ИЛЛ. 6.1</b> · Жизненный цикл сигнала. По логике лимитной заявки сначала ждём, пока цена <em>придёт</em> ко входу; после входа начинается 48-часовая гонка: что раньше — стоп или цель? Незаполненные в счёт не идут, но отслеживаются как призраки — этот счётчик отвечает на вопрос «а не лучшими ли были те, что не заполнились?».</figcaption>
+  </figure><h3>6.1 Валовой и чистый: две разные правды</h3>
+  <p>Для каждой закрытой сделки хранятся два числа. <strong>Валовой R</strong> — чистый
+  результат плана; <strong>чистый R</strong> — он же за вычетом реальности: комиссия входа
+  и выхода, штраф за <strong>проскальзывание</strong> при выходе по стопу (на быстром рынке
+  стоп исполняется хуже заявленной цены) и <strong>фандинг</strong> со знаком, зависящий от
+  времени удержания. Пример: валовая прибыль +2.44R превращается в +2.42R, а
+  стоп −1R может стать −1.15R. Витрина валовая, <em>решение слушает чистое</em> —
+  именно поэтому на панели есть E_net.</p>
+
+  <details class="quiz"><summary>Проверь себя · Глава 6</summary>
+    <div class="q">1) Сигнал за 6 часов так и не дошёл до зоны входа. Влияние на счёт?</div>
+    <div class="a">Нулевое — NOT_FILLED не входит в статистику прибыли и убытков.
+    Но «призрачная» оценка считает, что было бы, и пишет в отдельный счётчик.</div>
+    <div class="q">2) В одной 15m свече цена задела и стоп, и цель. Итог?</div>
+    <div class="a">LOSS. Порядок внутри свечи неизвестен; консервативное правило
+    трактует сомнение против нас.</div>
+    <div class="q">3) Почему убытки иногда выглядят как −1.1R, а не −1R?</div>
+    <div class="a">Это чистый учёт: добавлены комиссия, проскальзывание на стопе и
+    фандинг. −1R — это план; −1.1R — приближение к реальности.</div>
+  </details>
+</section>
+
+<section class="ch" id="b7">
+  <div class="eyebrow">Глава 7 · Портфельная дисциплина</div>
+  <h2 class="title">Движок теплоты: сколько огней одновременно?</h2>
+  <p class="lede">Каждая сделка по отдельности может быть верной, а портфель
+  всё равно сгорит. Эта глава о тормозе, рождённом самым дорогим уроком.</p>
+
+  <div class="box vaka"><span class="bt">Случай из практики · Ночь −12R</span>
+  В медвежьей волне в книге одновременно стояли 12 позиций SHORT. Биткоин
+  развернулся на 2%, все 12 вылетели по стопам друг за другом, и кривая отдала
+  −12R от пика. Диагноз: 150 альткоинов — это не 150 независимых ставок,
+  большинство из них копии одной ставки на направление биткоина. 12 шортов =
+  один шорт по BTC с плечом. Решение должно было быть не на уровне сделки, а на
+  уровне <em>портфеля</em>.</div><figure>
+  <svg viewBox="0 0 760 260" font-family="JetBrains Mono, monospace" font-size="11.5">
+    <rect width="760" height="260" fill="url(#g1)"/>
+    <text x="40" y="30" fill="#4A4132" font-weight="600" font-size="12">ОДНОВРЕМЕННАЯ КНИГА — три тормоза сразу</text>
+    <text x="40" y="62" fill="#DC2626" font-weight="600">Направление SHORT (потолок 4):</text>
+    <g>
+      <rect x="230" y="44" width="56" height="28" rx="7" fill="#DC2626"/><text x="244" y="63" fill="#fff">S·1</text>
+      <rect x="294" y="44" width="56" height="28" rx="7" fill="#DC2626"/><text x="308" y="63" fill="#fff">S·2</text>
+      <rect x="358" y="44" width="56" height="28" rx="7" fill="#DC2626"/><text x="372" y="63" fill="#fff">S·3</text>
+      <rect x="422" y="44" width="56" height="28" rx="7" fill="#DC2626"/><text x="436" y="63" fill="#fff">S·4</text>
+      <rect x="486" y="44" width="56" height="28" rx="7" fill="none" stroke="#DC2626" stroke-dasharray="5 4" stroke-width="1.6"/>
+      <text x="497" y="63" fill="#DC2626">S·5?</text>
+    </g>
+    <text x="556" y="63" fill="#B45309" font-weight="600">→ В ОЧЕРЕДЬ (blocked=2)</text>
+    <text x="40" y="112" fill="#16A34A" font-weight="600">Направление LONG (потолок 4):</text>
+    <g>
+      <rect x="230" y="94" width="56" height="28" rx="7" fill="#16A34A"/><text x="244" y="113" fill="#fff">L·1</text>
+      <rect x="294" y="94" width="56" height="28" rx="7" fill="#16A34A"/><text x="308" y="113" fill="#fff">L·2</text>
+      <rect x="358" y="94" width="56" height="28" rx="7" fill="none" stroke="#16A34A" stroke-dasharray="5 4" stroke-width="1.6"/>
+      <rect x="422" y="94" width="56" height="28" rx="7" fill="none" stroke="#16A34A" stroke-dasharray="5 4" stroke-width="1.6"/>
+    </g>
+    <text x="486" y="113" fill="#8A7F6C">есть свободный слот → принято</text>
+    <text x="40" y="164" fill="#4A4132" font-weight="600">Правило кластера:</text>
+    <rect x="230" y="146" width="150" height="28" rx="7" fill="#EAF0FB" stroke="#2563EB"/>
+    <text x="240" y="165" fill="#2563EB">кластер L123982 · 2/2 занято</text>
+    <text x="392" y="165" fill="#B45309">3-я копия той же идеи → в очередь</text>
+    <text x="40" y="216" fill="#4A4132" font-weight="600">Общий потолок:</text>
+    <text x="230" y="216" fill="#4A4132">максимум <tspan font-weight="700">8</tspan> одновременно открытых сигналов</text>
+    <text x="40" y="244" fill="#16A34A" font-weight="600">Итог: худший каскад теперь структурно ограничен −4R.</text>
+  </svg>
+  <figcaption><b>ИЛЛ. 7.1</b> · Движок теплоты. Три тормоза: ≤4 открытых на направление, ≤2 из одного кластера (одна и та же идея в одном 4-часовом окне), ≤8 суммарно. Сигнал, упёршийся в лимит, не отбрасывается, а <em>встаёт в очередь</em>: отслеживается в отдельной когорте и при освобождении слота, если формация ещё действительна, входит в реальную книгу следующим сканом.</figcaption>
+  </figure><p>Карточка <strong>симуляции портфеля</strong> на панели показывает денежную цену этой
+  дисциплины: капитал делится на слоты, и с учётом реальности «при заполненной
+  книге сигнал пропускается» считается сложный баланс. Разница с допущением
+  безграничного капитала — самое быстрое отрезвляющее средство от бумажных
+  фантазий.</p>
+
+  <details class="quiz"><summary>Проверь себя · Глава 7</summary>
+    <div class="q">1) Открыты 4 SHORT, приходит пятый — идеальный. Что произойдёт?</div>
+    <div class="a">В реальную книгу он не попадёт; уйдёт в очередь (когорту
+    теплоты). Освободится слот, а формация останется в силе — войдёт следующим
+    сканом; ровно так случилось с PRL.</div>
+    <div class="q">2) Какова «цена» движка теплоты?</div>
+    <div class="a">Иногда он придерживает и выигрышные сигналы — это страховая
+    премия против катастрофической корреляции, и её счёт ведётся отдельно.</div>
+    <div class="q">3) Почему потолок направления равен 4?</div>
+    <div class="a">Чтобы максимальный одновременный риск в одну сторону составлял
+    около 4R: цена одного макро-разворота фиксируется на переносимом уровне.</div>
+  </details>
+</section><section class="ch" id="b8">
+  <div class="eyebrow">Глава 8 · Научный слой</div>
+  <h2 class="title">Когорты, блокировка и фальсификация</h2>
+  <p class="lede">Самое отличительное свойство этой системы не в том, что она
+  генерирует сигналы, а в том, что делает собственные решения проверяемыми:
+  счёт ведётся по каждому «нет», правила замораживаются, а определение неудачи
+  пишется заранее.</p>
+
+  <h3>8.1 Четыре журнала рядом</h3><figure>
+  <svg viewBox="0 0 760 250" font-family="JetBrains Mono, monospace" font-size="11.5">
+    <rect width="760" height="250" fill="url(#g1)"/>
+    <rect x="40" y="40" width="330" height="80" rx="12" fill="#E7F3EA" stroke="#16A34A" stroke-width="1.5"/>
+    <text x="58" y="66" fill="#16A34A" font-weight="700">РЕАЛЬНАЯ КОГОРТА</text>
+    <text x="58" y="86" fill="#4A4132" font-size="11">все фильтры + теплота → ЕДИНСТВЕННАЯ книга в счёте</text>
+    <text x="58" y="104" fill="#8A7F6C" font-size="10.5">винрейт, суммарный R, E_net — отсюда</text>
+    <rect x="390" y="40" width="330" height="80" rx="12" fill="#EAF0FB" stroke="#2563EB" stroke-width="1.5"/>
+    <text x="408" y="66" fill="#2563EB" font-weight="700">ЗАБЛОКИРОВАНО ВОРОТАМИ (контрфакт)</text>
+    <text x="408" y="86" fill="#4A4132" font-size="11">отсечённые как против режима · отслеживаются по тем же правилам</text>
+    <text x="408" y="104" fill="#8A7F6C" font-size="10.5">что измеряет: чистый вклад ворот</text>
+    <rect x="40" y="140" width="330" height="80" rx="12" fill="#FCF3E3" stroke="#B45309" stroke-width="1.5"/>
+    <text x="58" y="166" fill="#B45309" font-weight="700">ЗАБЛОКИРОВАНО ТЕПЛОТОЙ</text>
+    <text x="58" y="186" fill="#4A4132" font-size="11">попавшие в лимит теплоты и вставшие в очередь</text>
+    <text x="58" y="204" fill="#8A7F6C" font-size="10.5">что измеряет: цену упущенных возможностей (страховая премия)</text>
+    <rect x="390" y="140" width="330" height="80" rx="12" fill="#F1EDE3" stroke="#98907F" stroke-width="1.5"/>
+    <text x="408" y="166" fill="#4A4132" font-weight="700">ПРИЗРАЧНЫЙ ВХОД</text>
+    <text x="408" y="186" fill="#4A4132" font-size="11">расчёт «а если бы вошли?» для незаполненных</text>
+    <text x="408" y="204" fill="#8A7F6C" font-size="10.5">что измеряет: скрытую цену метода входа</text>
+  </svg>
+  <figcaption><b>ИЛЛ. 8.1</b> · Четыре когорты. В счёт идёт только зелёный журнал; остальные три ведут счёт по каждому «нет», которое сказала система. Ранние результаты (могут измениться): когорта ворот заметно в минусе → ворота защищают; когорта теплоты слегка в плюсе → небольшая и осознанная премия; призрачная когорта серьёзно в плюсе → метод входа станет главной темой следующего пересмотра.</figcaption>
+  </figure><h3>8.2 Кривая эквити и максимальная просадка</h3>
+  <p>Сложение R закрытых сделок подряд даёт <strong>кумулятивную кривую (эквити)</strong>.
+  Два ключевых чтения: <em>наклон</em> кривой (есть ли преимущество?) и глубочайшее
+  падение от пика — <strong>макс. просадка</strong> (во что обходится жизнь с этой системой
+  психологически?). Правило жёсткое: если реалистичная просадка превышает 20R,
+  система объявляется «непереносимой», даже если преимущество существует.</p><figure>
+  <svg viewBox="0 0 760 240" font-family="JetBrains Mono, monospace" font-size="11">
+    <rect width="760" height="240" fill="url(#g1)"/>
+    <line x1="50" y1="200" x2="720" y2="200" stroke="#C9BFA9" stroke-width="1.2"/>
+    <text x="54" y="216" fill="#8A7F6C" font-size="10">0R</text>
+    <polyline points="50,196 100,190 150,198 210,182 270,150 330,105 390,72 430,60 470,84 510,100 545,92 585,110 635,88 690,60 720,52"
+      fill="none" stroke="#2563EB" stroke-width="2.6" stroke-linejoin="round"/>
+    <circle cx="430" cy="60" r="5" fill="#16A34A"/>
+    <text x="380" y="46" fill="#16A34A" font-weight="600">пик</text>
+    <circle cx="510" cy="100" r="5" fill="#DC2626"/>
+    <line x1="430" y1="60" x2="430" y2="100" stroke="#DC2626" stroke-width="1.2" stroke-dasharray="4 3"/>
+    <line x1="430" y1="100" x2="510" y2="100" stroke="#DC2626" stroke-width="1.2" stroke-dasharray="4 3"/>
+    <text x="520" y="118" fill="#DC2626" font-weight="600">макс. просадка: глубочайшее падение от пика</text>
+    <text x="520" y="136" fill="#8A7F6C" font-size="10.5">предел: выше 20R эксперимент прекращается</text>
+  </svg>
+  <figcaption><b>ИЛЛ. 8.2</b> · Кривая эквити. Не только подъёмы, но и откаты — характер системы; макс. просадка это измеренный размер худшего периода, число, отвечающее на вопрос «можно ли с этим жить?».</figcaption>
+  </figure><h3>8.3 Блокировка: заморозка правил</h3>
+  <p>У постоянно подстраиваемой системы невозможно понять, чем вызван успех —
+  удачей или подгонкой; это называется <strong>переобучением (overfitting)</strong>: правила
+  подгоняются под прошлое так плотно, что перестают работать в будущем.
+  Противоядие — <strong>блокировка конфигурации</strong>: в определённую дату все пороги
+  заморожены и записано правило — в течение окна ни один параметр не меняется;
+  новые идеи уходят в <code>ideas.md</code> и рассматриваются пакетом в следующем окне.
+  Каждый сигнал несёт отпечаток версии кода (git SHA), которым он рождён: какой
+  результат порождён какими правилами — различимо навсегда.</p>
+
+  <h3>8.4 Фазы и фальсификация: двусторонняя предрегистрация</h3>
+  <p>Ворота перехода к реальным деньгам написаны <em>до</em> появления данных и не
+  подлежат смягчению: <strong>Фаза 1</strong> (микро-режим; цель не прибыль, а <em>измерение</em>
+  разницы между бумажным и реальным исполнением) открывается только при ≥100
+  завершённых сделках с учётом издержек, ≥30 днях, ≥2 режимах, статистическом
+  условии и включённом движке теплоты; размер ≤500$, риск на сделку ≤0.5%.
+  Фазы 2-3 ещё строже. Симметрия тоже записана — <strong>критерии фальсификации</strong>
+  заранее определяют, когда эксперимент признаётся провалившимся:</p>
+  <table>
+    <tr><th>Критерий</th><th>Порог</th><th>Смысл</th></tr>
+    <tr><td>Смерть преимущества</td><td class="fm">верхняя граница ДИ &lt; 0 (n≥60)</td>
+        <td>Статистика исключила положительное ожидание; ждать дальше — упрямство.</td></tr>
+    <tr><td>Нарушение риска</td><td class="fm">макс. просадка &gt; 20R</td>
+        <td>Даже при наличии преимущества его невозможно нести.</td></tr>
+    <tr><td>Голод</td><td class="fm">&lt; 40 сделок за 30 дней</td>
+        <td>Закрытый движок не даёт данных даже для измерения.</td></tr>
+  </table>
+  <p>При срабатывании любого пункта эксперимент достойно закрывается: по четырём
+  когортам и отпечаткам версий проводится вскрытие, после чего открывается новое
+  окно с новой гипотезой. Определена не только победа, но и поражение — именно
+  поэтому система заслуживает эпитет «научная».</p>
+
+  <details class="quiz"><summary>Проверь себя · Глава 8</summary>
+    <div class="q">1) В период блокировки пришла блестящая идея по улучшению. Что с ней делать?</div>
+    <div class="a">Записать не в код, а в <code>ideas.md</code>; рассмотреть пакетом в
+    следующем окне. «Улучшение» порога = порча эксперимента.</div>
+    <div class="q">2) Призрачная когорта показывает большой плюс. Менять метод входа немедленно?</div>
+    <div class="a">Нет — находка идёт в реестр и взвешивается в конце окна.
+    Мгновенное изменение и есть тот самый рефлекс, против которого введена блокировка.</div>
+    <div class="q">3) «Эксперимент провалился» — это плохой финал?</div>
+    <div class="a">Нет; это точный ответ. Мы выходим без потери реальных денег и с
+    набором данных, который указывает, где именно была ошибка, — сырьё для новой гипотезы.</div>
+  </details>
+</section>
+
+<section class="ch" id="b9">
+  <div class="eyebrow">Глава 9 · Эксплуатация</div>
+  <h2 class="title">Панель, инфраструктура и FAQ</h2>
+  <p class="lede">Последняя глава практическая: что где на экране, где живёт
+  система и куда смотреть, если что-то пошло не так.</p>
+
+  <h3>9.1 Быстрое чтение панели</h3>
+  <table>
+    <tr><th>Элемент</th><th>Как читать</th></tr>
+    <tr><td>Винрейт</td><td>Вместе с линией безубыточности под ним: выше — система в плюсе (Г1.4).</td></tr>
+    <tr><td>Суммарный R / чистый</td><td>Валовая витрина; решение слушает чистое (E_net).</td></tr>
+    <tr><td>PF · ожидание · макс. просадка</td><td>Тройка в заголовке эквити: отношение прибыли к убытку, преимущество на сделку, худший период.</td></tr>
+    <tr><td>Баланс по направлениям</td><td>Отдельные сводки LONG и SHORT — откуда берётся преимущество?</td></tr>
+    <tr><td>Конвейер фильтров</td><td>Живая версия иллюстрации 5.1; клик по этапу — список отсеянных.</td></tr>
+    <tr><td>Симуляция портфеля</td><td>Сложный баланс с ограничением по слотам и плечу; строка «допущение без лимита» — только для сравнения.</td></tr>
+    <tr><td>🧮 Калькулятор</td><td>Расчёт размера от риска + проверка «ликвидация против стопа».</td></tr>
+    <tr><td>Нижняя строка</td><td>Связь · время данных · резервная копия gist · время ответа · версия.</td></tr>
+  </table>
+  <p>Значок <strong>ⓘ</strong> на каждой карточке и этапы конвейера рассказывают о себе при
+  наведении — панель это интерактивное резюме этой книги.</p>
+
+  <h3>9.2 Инфраструктура: где живёт бот</h3>
+  <p>Бот работает круглосуточно на постоянном виртуальном сервере Oracle Cloud:
+  он зарегистрирован как системный сервис (при сбое возрождается за 10 секунд,
+  поднимается сам и после перезагрузки сервера), а обновления кода каждые две
+  минуты подтягивает из GitHub. Память двухслойная: постоянная база на сервере
+  плюс ежечасная резервная копия в GitHub Gist. При катастрофе состояние
+  восстанавливается из копии при запуске; после коротких перерывов бот
+  дозагружает пропущенные свечи и выносит по открытым сделкам <em>ретроспективно
+  корректный вердикт</em> (окно восстановления около 50 часов — подтверждено на
+  27-часовом перерыве с точностью пять из пяти). Адрес <code>/health</code> сообщает
+  возраст последнего скана; независимый наблюдатель (UptimeRobot) опрашивает его
+  каждые 5 минут — если бот тихо умрёт, на телефон придёт тревога
+  (<em>dead-man's switch</em>).</p>
+
+  <h3>9.3 Мини-FAQ</h3>
+  <table>
+    <tr><th>Симптом</th><th>Вероятная причина · что делать</th></tr>
+    <tr><td>Панель не открывается</td><td>Сначала проверьте <code>/health</code>; если и он молчит — вопрос к серверу/сети, наблюдатель, скорее всего, уже сообщил.</td></tr>
+    <tr><td>«gist sync» не двигается</td><td>Вероятно, истёк срок токена резервных копий (обновляется раз в 90 дней) — ротация на 3 минуты.</td></tr>
+    <tr><td>Счёт часами не меняется</td><td>Без паники: в части сканов отсеивается вся вселенная; NO_TRADE тоже результат.</td></tr>
+    <tr><td>Сигналы только в одну сторону</td><td>Работают ворота режима: производство идёт туда, куда показывает компас.</td></tr>
+  </table>
+</section>
+
+<hr class="sep">
+
+<section class="ch" id="sozluk">
+  <div class="eyebrow">Приложение · Справочник</div>
+  <h2 class="title">Расширенный словарь</h2>
+  <table>
+    <tr><th>Термин</th><th>Определение</th></tr>
+    <tr><td>ADX</td><td>Индикатор силы тренда; говорит не о направлении, а о его силе. Ниже 20 — рынок без направления.</td></tr>
+    <tr><td>Безубыточность</td><td>Доля выигрышей, приводящая систему к нулю: 1/(1 + средний выигрыш в R).</td></tr>
+    <tr><td>Пробой / Ретест</td><td>Пробитие уровня / проверка новой роли пробитого уровня (илл. 3.1).</td></tr>
+    <tr><td>Пила (chop)</td><td>Рынок без направления, где пробои превращаются в ловушки.</td></tr>
+    <tr><td>Кластер</td><td>Сигналы одного направления в одном 4H окне = одна рыночная идея.</td></tr>
+    <tr><td>Dead-man's switch</td><td>Механизм «если я умру — пусть зазвонит тревога»: /health плюс независимый наблюдатель.</td></tr>
+    <tr><td>EMA200</td><td>Экспоненциальное среднее последних 200 свечей; долгосрочный уровень воды.</td></tr>
+    <tr><td>Эквити / макс. просадка</td><td>Кумулятивная кривая R / глубочайшее падение от пика (илл. 8.2).</td></tr>
+    <tr><td>Fail-open / Fail-closed</td><td>При сбое пропускать / перекрывать. Ворота работают как fail-closed.</td></tr>
+    <tr><td>Фандинг</td><td>Периодический (раз в 8 часов) платёж между сторонами long и short на фьючерсах.</td></tr>
+    <tr><td>Теневой учёт</td><td>Журнал «а если бы вошли?» без единого реального ордера.</td></tr>
+    <tr><td>HH-HL / LH-LL</td><td>Порядок вершин и впадин восходящей / нисходящей структуры (илл. 2.1).</td></tr>
+    <tr><td>Гистерезис</td><td>Правило перехода с двумя условиями, гасящее дрожание у порога (илл. 2.2).</td></tr>
+    <tr><td>Проскальзывание</td><td>Исполнение заявки не по желаемой, а по чуть худшей цене.</td></tr>
+    <tr><td>Плечо / Маржа / Ликвидация</td><td>Заёмная сила / залог / принудительное закрытие при исчерпании залога.</td></tr>
+    <tr><td>Контрфакт</td><td>Отслеживание того, «что было бы, если бы не сделали»; логика когорты ворот.</td></tr>
+    <tr><td>Лимитная заявка</td><td>«Купить/продать только по такой цене»; стиль входа движка.</td></tr>
+    <tr><td>NO_TRADE</td><td>Решение по умолчанию: если условия неполны — сделки нет.</td></tr>
+    <tr><td>Переобучение</td><td>Заучивание правил под прошлое; противоядие — блокировка конфигурации.</td></tr>
+    <tr><td>Perpetual futures</td><td>Бессрочный фьючерс; возможность позиции в обе стороны.</td></tr>
+    <tr><td>R</td><td>Единица риска: расстояние вход-стоп. Общий язык всех показателей.</td></tr>
+    <tr><td>Режим</td><td>Господствующий климат рынка: бык / медведь / боковик.</td></tr>
+    <tr><td>RR</td><td>Расстояние до цели ÷ расстояние до стопа; принимаемый диапазон 2.0–6.0.</td></tr>
+    <tr><td>Свип / Возврат</td><td>Тень охоты за стопами / отбитый обратно уровень (илл. 3.2).</td></tr>
+    <tr><td>Винрейт</td><td>Доля выигрышей среди завершённых; читается только вместе с безубыточностью.</td></tr>
+  </table>
+
+  <div class="box uyari" style="margin-top:34px"><span class="bt">Заключительные предупреждения</span>
+  1&#41; Все результаты — теневой учёт; исполнение входов основано на
+  оптимистичных допущениях. 2&#41; Малая выборка не является доказательством
+  преимущества — решение выносят фазы и статистика. 3&#41; Переход к реальным
+  деньгам рассматривается только по письменным критериям, в микро-размере и с
+  целью измерения. 4&#41; Ничто здесь не является инвестиционной рекомендацией;
+  в крипто-фьючерсах возможна потеря всего капитала.</div>
+
+  <p style="color:var(--muted);font-size:13px;margin-top:28px;font-family:var(--mono)">
+  — Конец книги · вопросы: значки ⓘ на панели + эта книга + Claude —</p>
+</section>
+
+</div>
+</body>
+</html>
