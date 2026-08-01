@@ -362,6 +362,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         <option value="300000">5 dk</option>
       </select>
       <button id="refresh" class="icon" title="Şimdi yenile">⟳</button>
+      <a id="bookBtn" class="icon" href="/kitap" target="_blank" rel="noopener"
+         title="Ders Kitabı: stratejinin tam anlatımı">📗</a>
       <button id="calcBtn" class="icon" title="Pozisyon Hesaplayıcı">🧮</button>
       <button id="howtoBtn" class="icon" title="Nasıl okunur?">⚙</button>
     </div>
@@ -452,14 +454,20 @@ DASHBOARD_HTML = r"""<!doctype html>
       <dt>Win rate ve başabaş</dt>
       <dd>Kazançlar kayıplardan büyükse %50 isabet gerekmez. Başabaş = 1 / (1 + ort. kazanç R).</dd>
       <dt>Filtre boru hattı</dt>
-      <dd>DATA → REGIME → HTF → LTF → VOLUME → RR; herhangi biri geçilemezse NO_TRADE. Aşamaya tıklayınca o aşamada elenen pariteler listelenir.</dd>
+      <dd>DATA → REGIME → HTF → LTF → VOLUME → MARKET GATE → RR; herhangi biri geçilemezse NO_TRADE. Aşamaya tıklayınca o aşamada elenen pariteler listelenir, üzerine gelince aşama açıklanır.</dd>
       <dt>PENDING → FILLED → WIN/LOSS</dt>
-      <dd>Girişe gelmesi 6 saat beklenir; gelirse 48 saat izlenir. Önce stop = LOSS, önce hedef = WIN. NOT_FILLED orana dahil edilmez; AMBIGUOUS sayılmaz.</dd>
+      <dd>Girişe gelmesi 6 saat beklenir; gelirse 48 saat izlenir. Önce stop = LOSS, önce hedef = WIN. NOT_FILLED orana dahil edilmez (hayalet R'si ayrıca izlenir); aynı mumda stop+hedef görülürse muhafazakâr kuralla LOSS sayılır.</dd>
+      <dt>Portföy ısısı</dt>
+      <dd>Aynı yönde en fazla 4, aynı kümede 2, toplamda 8 açık sinyal. Limit doluyken gelen sinyal reddedilmez, sıraya alınır ve ayrı kohortta izlenir.</dd>
       <dt>Piyasa Nabzı / Saatlik Değerlendirme</dt>
       <dd>Kural tabanlı otomatik üretimdir (canlı insan/LLM yorumu değildir). Korku &amp; Açgözlülük: alternative.me.</dd>
     </dl>
     <div class="warn">Tüm sonuçlar <b>gölge muhasebedir</b>: varsayımsal giriş, kayma/komisyon yok, gerçek emir yok. Geçmiş performans garanti değildir; yatırım tavsiyesi değildir. Haber başlıkları dış kaynaktan aynen aktarılır.</div>
-    <div style="text-align:right;margin-top:12px"><button id="howtoClose">Kapat</button></div>
+    <div style="margin-top:12px;display:flex;align-items:center;gap:10px">
+      <a class="booklink" href="/kitap" target="_blank" rel="noopener">📗 Ders Kitabı — stratejinin tam anlatımı</a>
+      <a class="booklink pdf" href="/kitap.pdf" target="_blank" rel="noopener">PDF</a>
+      <button id="howtoClose" style="margin-left:auto">Kapat</button>
+    </div>
   </div>
 </div>
 

@@ -11,12 +11,22 @@ from __future__ import annotations
 import io
 import json
 
-from flask import Flask, jsonify, request
+from pathlib import Path
+
+from flask import Flask, Response, jsonify, request
 
 from app.dashboard import DASHBOARD_HTML
 from app.scheduler import Scheduler
 from app.services.signal_tracker import SignalTracker
 from app.services.state_store import StateStore
+
+
+def _send_doc(name: str, mimetype: str):
+    """docs/ altindaki dokumani servis et; yoksa 404 (kilit disi, saf sunum)."""
+    path = Path(__file__).resolve().parent.parent / "docs" / name
+    if not path.is_file():
+        return jsonify({"error": f"{name} bulunamadi"}), 404
+    return Response(path.read_bytes(), mimetype=mimetype)
 
 
 def create_app(store: StateStore, scheduler: Scheduler,
@@ -33,6 +43,16 @@ def create_app(store: StateStore, scheduler: Scheduler,
     @app.get("/healthz")
     def healthz():
         return jsonify({"status": "ok", **store.get_meta()})
+
+    @app.get("/kitap")
+    def kitap():
+        """Ders kitabi (HTML). Repo ile ayni surum, internet gerektirmez."""
+        return _send_doc("ders-kitabi.html", "text/html; charset=utf-8")
+
+    @app.get("/kitap.pdf")
+    def kitap_pdf():
+        """Ders kitabinin basiliya hazir A4 surumu."""
+        return _send_doc("ders-kitabi.pdf", "application/pdf")
 
     @app.get("/health")
     def health():
