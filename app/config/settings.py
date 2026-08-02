@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     PIVOT_LOOKBACK: int = 3
     ATR_STOP_MULT: float = 1.2
 
+    # Guvenlik (v3.6): bos birakilirsa auth KAPALI - geriye donuk uyumlu.
+    # Doluysa tum veri/tetik rotalari jeton ister; /health ve /healthz daima
+    # aciktir (dead-man's switch izlemesi kirilmasin diye).
+    DASHBOARD_TOKEN: str = ""
+
     # Davranis
     SEND_NO_TRADE: bool = False
     SEND_DATA_MISSING: bool = False

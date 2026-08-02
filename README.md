@@ -107,7 +107,7 @@ git push -u origin main
 2. Build: `pip install -r requirements.txt` — Start: `python -m app.main`
 3. **Environment** sekmesinde en az `TELEGRAM_BOT_TOKEN` ve `TELEGRAM_CHAT_ID` gir.
 4. Deploy sonrası bot "Signal engine online" mesajı atar.
-5. Doğrulama: `https://<app>.onrender.com/scan/dry` → tam contract JSON.
+5. Doğrulama: `curl -X POST https://<host>/scan/dry` → tam contract JSON.
 
 **Free plan notu:** Render free web servisleri 15 dk istek gelmezse uyur → döngü durur.
 Çözüm: UptimeRobot ile `/healthz`'e 5 dk'da bir ping, veya Starter plana geçiş.
@@ -123,11 +123,11 @@ Redis/SQLite sınıfı yazıp `app/main.py`'de tek satır değiştirmek yeterlid
 1. Render dashboard → servis **Live** ve loglarda `event=scheduler_start` görünüyor.
 2. Telegram'a **"Signal engine online"** açılış mesajı düştü (token + chat_id doğru demektir).
 3. `GET /healthz` → `{"status": "ok", ...}` dönüyor.
-4. `GET /scan/dry` → tüm semboller için tam contract JSON dönüyor; `decision` alanları
+4. `POST /scan/dry` → tüm semboller için tam contract JSON dönüyor; `decision` alanları
    `SIGNAL / NO_TRADE / DATA_MISSING`'den biri ve `schema_version` = `1.1`.
 5. `/scan/dry` çıktısında hiçbir sembol `DATA_MISSING` değil (Bybit bağlantısı sağlıklı).
 6. `GET /status` → `meta.scan_count` birkaç dakika arayla artıyor (döngü canlı).
-7. `GET /scan` bir kez çağrıldığında sonuç Telegram'a düşüyor (SEND_NO_TRADE=false ise
+7. `POST /scan` bir kez çağrıldığında sonuç Telegram'a düşüyor (SEND_NO_TRADE=false ise
    yalnızca SIGNAL durumunda mesaj gelir — NO_TRADE dönerse mesaj gelmemesi normaldir).
 8. UptimeRobot monitörü **Up** ve 15+ dk sonra servis hâlâ tarama yapıyor.
 9. Loglarda `event=telegram_failed` veya `event=bybit_failed` tekrarı yok.
@@ -171,8 +171,8 @@ Redis/SQLite sınıfı yazıp `app/main.py`'de tek satır değiştirmek yeterlid
 |---|---|
 | `GET /healthz` | Health check (Render + UptimeRobot hedefi) |
 | `GET /status` | Son sonuçlar + meta (sabit contract JSON) |
-| `GET /scan` | Manuel tarama, Telegram'a gönderir, özet döner |
-| `GET /scan/dry` | Manuel tarama, Telegram'a **göndermez**, tam JSON döner |
+| `POST /scan` | Manuel tarama, Telegram'a gönderir, özet döner. Tarama sürerken **409** |
+| `POST /scan/dry` | Manuel tarama, Telegram'a **göndermez**, tam JSON döner |
 
 ## Output contract (schema v1.1)
 
@@ -219,7 +219,23 @@ slippage yok. Bu **tahmini gölge muhasebesidir**, gerçek işlem sonucu değild
 | `GET /export/candles.csv?symbol=BTCUSDT&interval=15` | Arşivlenen OHLCV — backtest yedeği |
 | `GET /export/decisions.json` | Sinyal kayıtları yedeği |
 | `GET /backup/info` | Gist yedekleme durumu (gist_url, son sync) |
-| `GET /backup/now` | Manuel gist sync tetikle |
+| `POST /backup/now` | Manuel gist sync tetikle |
+
+## Erişim koruması (v3.6)
+
+`DASHBOARD_TOKEN` **boşsa auth kapalıdır** — davranış eskisiyle aynıdır, kimse
+kilitli kalmaz. Doluysa `/health`, `/healthz`, `/manifest.webmanifest` ve
+ikonlar dışındaki tüm rotalar jeton ister:
+
+- Tarayıcı: `https://<host>/?k=<jeton>` ile bir kez gir → jeton HttpOnly çereze
+  yazılır, URL temizlenir (geçmişte/ekran görüntüsünde jeton kalmaz).
+- Program: `X-Auth-Token: <jeton>` başlığı.
+
+Durum değiştiren rotalar **POST**'tur (`/scan`, `/scan/dry`, `/backup/now`):
+tarayıcı ön-yüklemesi, crawler veya kazara yenileme tarama/gist yazımı
+tetikleyemesin diye. Eşzamanlı tarama reddedilir (**409**) — kuyruğa alınmaz,
+çünkü üst üste binen taramalar gölge ölçüm verisini bozar.
+
 
 ### ⚠️ Kalıcılık — Render free plan kısıtı ve çözümü: Gist yedekleme
 

@@ -97,7 +97,8 @@ def main() -> None:
     scheduler = Scheduler(settings, market_data, store, notifier, tracker,
                           gist_backup, universe, commentary=commentary)
     app = create_app(store, scheduler, tracker, gist_backup, universe,
-                     market_info=market_info, commentary=commentary)
+                     market_info=market_info, commentary=commentary,
+                     auth_token=settings.DASHBOARD_TOKEN)
 
     if ws_client is not None:
         ws_client.start()

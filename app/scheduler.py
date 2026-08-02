@@ -21,13 +21,23 @@ from app.integrations.telegram_notifier import TelegramNotifier
 from app.logging_setup import kv
 from app.models.decision import Decision, DecisionType
 from app.services.market_data_service import MarketDataService
-from app.services.signal_tracker import SignalTracker
+from app.services.signal_tracker import SignalTracker, _cluster_id
 from app.services.state_store import StateStore
 from app.services.universe import UniverseProvider
 from app.strategies import signal_engine
 from app.strategies.liquidity_mapper import orderbook_note
 
 log = logging.getLogger("scheduler")
+
+
+class ScanBusy(RuntimeError):
+    """Bir tarama zaten calisiyorken ikinci tarama istendi.
+
+    Arka plan dongusu ile HTTP /scan ayni Scheduler nesnesini paylasir.
+    Es zamanli iki tarama: ayni sinyali iki kez izlemeye alabilir, kararlari
+    mukerrer yazabilir ve rejim durumunu ortada degistirebilir - yani olcum
+    verisini bozar. Kilit bunu engeller; ikinci cagri kuyruga GIRMEZ, reddedilir.
+    """
 
 
 
@@ -49,6 +59,7 @@ class Scheduler:
         self._market_bias = "neutral"   # v3.0: her tam taramada guncellenir
         self._universe = universe    # None -> static SYMBOLS
         self._params = settings.strategy_params
+        self._scan_lock = threading.Lock()   # es zamanli tarama koruma
 
     def symbols(self) -> list[str]:
         if self._universe is not None:
@@ -91,7 +102,6 @@ class Scheduler:
                 self._tracker.record_candles(ltf)
             self._tracker.record_decision(decision)
             if decision.decision is DecisionType.SIGNAL and ltf is not None:
-                from app.services.signal_tracker import _cluster_id
                 heat = self._tracker.heat_check(
                     decision.direction.value, _cluster_id(decision, ltf))
                 if heat is None:
@@ -107,6 +117,23 @@ class Scheduler:
             log.exception(kv(event="shadow_error", symbol=decision.pair))
 
     def scan_all(self, send_telegram: bool = True) -> list[Decision]:
+        """Tam evren taramasi. Ayni anda YALNIZ BIR tarama calisabilir.
+
+        Mesgulse ScanBusy firlatir (beklemez): manuel tetik ile arka plan
+        dongusunun ust uste binmesi veri bozar, kuyruk ise gecikmeyi buyutur.
+        """
+        if not self._scan_lock.acquire(blocking=False):
+            log.warning(kv(event="scan_busy", note="es zamanli tarama reddedildi"))
+            raise ScanBusy("scan already in progress")
+        try:
+            return self._scan_all_locked(send_telegram)
+        finally:
+            self._scan_lock.release()
+
+    def scan_in_progress(self) -> bool:
+        return self._scan_lock.locked()
+
+    def _scan_all_locked(self, send_telegram: bool) -> list[Decision]:
         self._market_bias = self._compute_market_bias()
         if self._commentary is not None:
             self._commentary.market_bias = self._market_bias
@@ -286,7 +313,11 @@ class Scheduler:
         )
         while True:
             try:
-                self.scan_all(send_telegram=True)
+                try:
+                    self.scan_all(send_telegram=True)
+                except ScanBusy:
+                    # manuel tarama suruyor: bu turu atla (15 dk sonra tekrar)
+                    log.warning(kv(event="loop_skip_busy"))
                 if self._commentary is not None:
                     self._commentary.maybe_generate()
                 if self._gist is not None:

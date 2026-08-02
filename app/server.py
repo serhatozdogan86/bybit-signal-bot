@@ -13,10 +13,10 @@ import json
 
 from pathlib import Path
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, jsonify, redirect, request
 
 from app.dashboard import DASHBOARD_HTML
-from app.scheduler import Scheduler
+from app.scheduler import ScanBusy, Scheduler
 from app.services.signal_tracker import SignalTracker
 from app.services.state_store import StateStore
 
@@ -34,16 +34,53 @@ def _send_doc(name: str, mimetype: str):
     return Response(path.read_bytes(), mimetype=mimetype)
 
 
+# Jeton olsa bile daima acik kalan rotalar: izleme zinciri kirilmamali
+# (UptimeRobot /health'i yoklar; 503 = alarm) ve PWA kabugu kimliksiz yuklenir.
+_PUBLIC_PATHS = frozenset({"/health", "/healthz", "/manifest.webmanifest"})
+
+
 def create_app(store: StateStore, scheduler: Scheduler,
                tracker: SignalTracker | None = None,
                gist_backup=None, universe=None,
-               market_info=None, commentary=None) -> Flask:
+               market_info=None, commentary=None,
+               auth_token: str = "") -> Flask:
     app = Flask(__name__)
+    token = (auth_token or "").strip()
+
+    def _authorized() -> bool:
+        """Jeton bos -> auth kapali (geriye donuk uyumlu, kilitlenme yok)."""
+        if not token:
+            return True
+        given = (request.headers.get("X-Auth-Token")
+                 or request.args.get("k")
+                 or request.cookies.get("k") or "")
+        # sabit sureli karsilastirma: jeton uzunlugu sizmasin
+        import hmac
+        return hmac.compare_digest(given, token)
+
+    @app.before_request
+    def _guard():
+        if not token or request.path in _PUBLIC_PATHS:
+            return None
+        if request.path.startswith("/icon-"):
+            return None
+        if _authorized():
+            return None
+        return jsonify({"error": "unauthorized",
+                        "hint": "X-Auth-Token basligi veya ?k= parametresi"}), 401
 
     @app.get("/")
     def dashboard():
         """Operasyon konsolu - sinyaller ve performans buradan izlenir."""
-        return app.response_class(DASHBOARD_HTML, mimetype="text/html")
+        resp = app.response_class(DASHBOARD_HTML, mimetype="text/html")
+        if token and request.args.get("k"):
+            # ?k=... ile gelindi: cereze yaz ve URL'yi temizle ki jeton
+            # tarayici gecmisinde/ekran goruntusunde dolasmasin
+            resp = redirect("/")
+            resp.set_cookie("k", token, max_age=60 * 60 * 24 * 365,
+                            httponly=True, samesite="Lax",
+                            secure=request.is_secure)
+        return resp
 
     @app.get("/healthz")
     def healthz():
@@ -151,18 +188,27 @@ def create_app(store: StateStore, scheduler: Scheduler,
         return app.response_class(json.dumps(payload, indent=2),
                                   mimetype="application/json")
 
-    @app.get("/scan")
+    @app.post("/scan")
     def scan():
-        results = scheduler.scan_all(send_telegram=True)
+        """Manuel tarama. POST: durum degistirir (GET degil - onbellek/prefetch
+        kazara tetiklemesin). Arka plan taramasi surerken 409 doner."""
+        try:
+            results = scheduler.scan_all(send_telegram=True)
+        except ScanBusy:
+            return jsonify({"error": "scan_in_progress",
+                            "hint": "arka plan taramasi suruyor"}), 409
         return jsonify([
             {"pair": d.pair, "decision": d.decision.value,
              "direction": d.direction.value, "reason": d.reject_reason}
             for d in results
         ])
 
-    @app.get("/scan/dry")
+    @app.post("/scan/dry")
     def scan_dry():
-        results = scheduler.scan_all(send_telegram=False)
+        try:
+            results = scheduler.scan_all(send_telegram=False)
+        except ScanBusy:
+            return jsonify({"error": "scan_in_progress"}), 409
         return app.response_class(
             json.dumps([d.contract_dict() for d in results], indent=2),
             mimetype="application/json")
@@ -270,8 +316,9 @@ def create_app(store: StateStore, scheduler: Scheduler,
             return jsonify({"error": "gist sync disabled (GITHUB_TOKEN not set)"}), 404
         return jsonify(gist_backup.info())
 
-    @app.get("/backup/now")
+    @app.post("/backup/now")
     def backup_now():
+        """Manuel gist senkronu - durum degistirir, bu yuzden POST."""
         if gist_backup is None:
             return jsonify({"error": "gist sync disabled (GITHUB_TOKEN not set)"}), 404
         ok = gist_backup.sync()
