@@ -25,6 +25,12 @@ DASHBOARD_HTML = r"""<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="google" content="notranslate">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="signal-engine">
+<meta name="theme-color" content="#6D28D9">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon-180.png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>signal-engine // dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">

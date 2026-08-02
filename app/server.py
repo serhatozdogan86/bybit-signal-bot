@@ -49,6 +49,34 @@ def create_app(store: StateStore, scheduler: Scheduler,
     def healthz():
         return jsonify({"status": "ok", **store.get_meta()})
 
+    @app.get("/manifest.webmanifest")
+    def manifest():
+        """PWA manifesti: pano ana ekrana kurulabilir uygulama olur."""
+        return jsonify({
+            "name": "signal-engine · gölge takip",
+            "short_name": "signal-engine",
+            "description": "Bybit gölge sinyal motoru operasyon panosu",
+            "start_url": "/",
+            "scope": "/",
+            "display": "standalone",
+            "orientation": "portrait",
+            "background_color": "#F6F4FB",
+            "theme_color": "#6D28D9",
+            "icons": [
+                {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png",
+                 "purpose": "any"},
+                {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png",
+                 "purpose": "any maskable"},
+            ],
+        })
+
+    @app.get("/icon-<int:size>.png")
+    def app_icon(size: int):
+        path = (Path(__file__).resolve().parent / "static" / f"icon-{size}.png")
+        if not path.is_file():
+            return jsonify({"error": "icon not found"}), 404
+        return Response(path.read_bytes(), mimetype="image/png")
+
     @app.get("/signal/<int:sig_id>/chart")
     def signal_chart(sig_id: int):
         """Sinyalin kanit paketi (mumlar + plan + teyitler)."""

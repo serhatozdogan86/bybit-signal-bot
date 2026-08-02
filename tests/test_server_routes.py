@@ -38,3 +38,19 @@ def test_signal_chart_route(tmp_path):
     assert ok.get_json()["candles"][0]["close"] == 1.5
     tracker.signal_chart.return_value = None
     assert client.get("/signal/999/chart").status_code == 404
+
+
+def test_pwa_manifest_and_icons():
+    """PWA: manifest ve ikonlar servis edilir (ana ekrana kurulabilirlik)."""
+    from unittest.mock import MagicMock
+    from app.server import create_app
+
+    client = create_app(MagicMock(get_meta=lambda: {"last_scan_utc": None}),
+                        MagicMock(), None).test_client()
+    man = client.get("/manifest.webmanifest")
+    assert man.status_code == 200
+    data = man.get_json()
+    assert data["display"] == "standalone"
+    assert any(i["sizes"] == "512x512" for i in data["icons"])
+    icon = client.get("/icon-192.png")
+    assert icon.status_code == 200 and icon.data[:4] == b"\x89PNG"
