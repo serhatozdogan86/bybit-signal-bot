@@ -246,3 +246,26 @@ def test_portfolio_heat_and_ambiguous(tmp_path):
     assert tracker.stats()["cohorts"]["heat_blocked"] == 2
     blk = [b for b in tracker.blocked_signals(10) if b["blocked"] == 2]
     assert len(blk) == 2 and "cluster cap" in blk[0]["block_reason"]
+
+
+def test_fill_ts_recorded(tmp_path):
+    """Dolus ani (fill_ts) kaydedilir; grafik tahmine muhtac kalmaz."""
+    from app.services.database import Database as _DB
+    from app.config.settings import StrategyParams
+    from app.strategies import signal_engine
+    from tests import fixtures as fx
+
+    db = _DB(str(tmp_path / "fts.db"))
+    tracker = SignalTracker(db, ltf_interval="15")
+    htf = fx.make_series(fx.bullish_htf_closes(), interval="240", seed=3)
+    ltf = fx.make_series(fx.bullish_ltf_closes(), interval="15",
+                         volumes=fx.breakout_volumes(), seed=4)
+    d = signal_engine.evaluate("FTSUSDT", htf, ltf, StrategyParams())
+    assert d.decision.value == "SIGNAL"
+    tracker.maybe_track(d, ltf)
+    tracker.record_candles(ltf)
+    tracker.evaluate_open("FTSUSDT")
+    row = tracker.recent_signals(1)[0]
+    if row["status"] != "PENDING":           # doldu ise zaman damgali olmali
+        assert row["fill_ts"] is not None
+        assert row["fill_ts"] >= row["entry_candle_ts"]

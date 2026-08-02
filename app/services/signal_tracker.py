@@ -108,6 +108,7 @@ class SignalTracker:
                     "blocked INTEGER NOT NULL DEFAULT 0",
                     "cluster_id TEXT", "engine_sha TEXT",
                     "block_reason TEXT", "ambiguous INTEGER DEFAULT 0",
+                    "fill_ts INTEGER",
                     "hypo_r REAL", "hypo_done INTEGER DEFAULT 0"):
             try:
                 self._db.execute(f"ALTER TABLE signals ADD COLUMN {ddl}")
@@ -295,8 +296,9 @@ class SignalTracker:
                     fill_price = sig["entry_max"] if is_long else sig["entry_min"]
                     filled_at_idx = i
                     self._db.execute(
-                        "UPDATE signals SET status='FILLED', fill_price=? WHERE id=?",
-                        (fill_price, sig["id"]))
+                        "UPDATE signals SET status='FILLED', fill_price=?, "
+                        "fill_ts=? WHERE id=?",
+                        (fill_price, c["ts"], sig["id"]))
                 elif i + 1 >= self._fill_window:
                     self._close(sig["id"], "NOT_FILLED", None, 0.0)
                     return
@@ -405,8 +407,9 @@ class SignalTracker:
         rows = self._db.query(
             "SELECT id,pair,direction,created_utc,entry_candle_ts,status,outcome,"
             "entry_min,entry_max,stop_loss,tp1,tp2,rr,fill_price,exit_price,"
-            "r_multiple,closed_utc,confidence,setup_type,cluster_id,engine_sha "
-            "FROM signals WHERE blocked=0 ORDER BY id DESC LIMIT ?", (limit,))
+            "r_multiple,closed_utc,confidence,setup_type,cluster_id,engine_sha,"
+            "fill_ts FROM signals WHERE blocked=0 ORDER BY id DESC LIMIT ?",
+            (limit,))
         for r in rows:
             c = cost_r(r)
             r["r_net"] = (round(r["r_multiple"] - c, 2)
@@ -440,6 +443,7 @@ class SignalTracker:
         return {
             "signal": {k: sig.get(k) for k in (
                 "id", "pair", "direction", "created_utc", "entry_candle_ts",
+                "fill_ts",
                 "entry_min", "entry_max", "stop_loss", "tp1", "tp2", "rr",
                 "status", "outcome", "fill_price", "exit_price", "r_multiple",
                 "closed_utc", "confidence", "setup_type")},

@@ -1648,9 +1648,15 @@ function drawEvidence(d){
   if(s.fill_price!=null){
     const lo=Math.min(s.entry_min,s.entry_max), hiE=Math.max(s.entry_min,s.entry_max);
     let fi=-1;
-    for(let i=0;i<cs.length;i++){
-      if(cs[i].ts < s.entry_candle_ts) continue;
-      if(cs[i].low<=hiE && cs[i].high>=lo){ fi=i; break; }
+    if(s.fill_ts){                       // kesin: motorun kaydettigi dolus mumu
+      fi=cs.findIndex(c=>c.ts===s.fill_ts);
+      if(fi<0) fi=cs.findIndex(c=>c.ts>=s.fill_ts);
+    }
+    if(fi<0){                            // eski kayitlar: mumlardan tahmin
+      for(let i=0;i<cs.length;i++){
+        if(cs[i].ts < s.entry_candle_ts) continue;
+        if(cs[i].low<=hiE && cs[i].high>=lo){ fi=i; break; }
+      }
     }
     if(fi>=0){
       const py=Math.min(hiE,Math.max(lo,s.fill_price));   // nokta bant icinde

@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS signals(
   closed_utc TEXT, contract_json TEXT,
   confidence TEXT, setup_type TEXT,
   blocked INTEGER NOT NULL DEFAULT 0,
-  cluster_id TEXT, engine_sha TEXT
+  cluster_id TEXT, engine_sha TEXT,
+  fill_ts INTEGER
 );
 CREATE TABLE IF NOT EXISTS cooldowns(key TEXT PRIMARY KEY, ts REAL);
 CREATE TABLE IF NOT EXISTS results(pair TEXT PRIMARY KEY, json TEXT);
