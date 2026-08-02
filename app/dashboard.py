@@ -1607,7 +1607,8 @@ function drawEvidence(d){
   if(s.entry_min!=null&&s.entry_max!=null){
     const y1=Y(Math.max(s.entry_min,s.entry_max)), y2=Y(Math.min(s.entry_min,s.entry_max));
     out+=`<rect x="0" y="${y1}" width="${W-PADR}" height="${Math.max(2,y2-y1)}" fill="#2563EB" opacity="0.13"/>
-      <text x="${W-PADR+4}" y="${(y1+y2)/2+3}" fill="#2563EB">${ru?"вход":"giriş"}</text>`;
+      <text x="${W-PADR+4}" y="${(y1+y2)/2-2}" fill="#2563EB">${ru?"план:":"plan:"}</text>
+      <text x="${W-PADR+4}" y="${(y1+y2)/2+9}" fill="#2563EB">${ru?"зона входа":"giriş bölgesi"}</text>`;
   }
   const line=(v,col,lbl,dash)=>v==null?"":`<line x1="0" y1="${Y(v)}" x2="${W-PADR}" y2="${Y(v)}"
       stroke="${col}" stroke-width="1.4" ${dash?'stroke-dasharray="5 4"':""}/>
@@ -1641,13 +1642,14 @@ function drawEvidence(d){
     let idx=cs.findIndex(c=>c.ts>=ts); if(idx<0) idx=cs.length-1;
     return `<circle cx="${X(idx)+BW/2}" cy="${Y(px)}" r="4" fill="${col}" stroke="#FFFEFA" stroke-width="1.5"/>
       <text x="${X(idx)+BW/2+7}" y="${Y(px)-6}" fill="${col}">${lbl}</text>`;};
-  if(s.fill_price!=null) out+=mark(s.entry_candle_ts,s.fill_price,"#2563EB",ru?"вход":"doluş");
+  if(s.fill_price!=null) out+=mark(s.entry_candle_ts,s.fill_price,"#2563EB",
+    ru?"фактический вход":"gerçekleşen giriş");
   if(s.exit_price!=null&&s.closed_utc)
     out+=mark(Date.parse(s.closed_utc.replace(" ","T"))||cs[cs.length-1].ts,s.exit_price,
       (s.outcome==="WIN"?"#16A34A":"#DC2626"),s.outcome||"");
   out+="</svg>";
   const lg=(c,t)=>`<span><i style="background:${c}"></i>${t}</span>`;
-  out+=`<div class="lgd">${lg("#2563EB",ru?"зона входа / триггер":"giriş bölgesi / tetik")}
+  out+=`<div class="lgd">${lg("#2563EB",ru?"план входа · фактический вход · триггер":"giriş planı · gerçekleşen giriş · tetik")}
     ${lg("#DC2626","STOP")}${lg("#16A34A","TP1/TP2")}
     ${lg("#B45309",ru?"порог объёма 1.5×":"hacim eşiği 1.5×")}</div>`;
   return out;
