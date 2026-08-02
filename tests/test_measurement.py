@@ -193,3 +193,136 @@ def test_backfill_funding_uses_real_rates(tmp_path):
     assert row["funding_done"] == 1
     # LONG oder: +0.0002 / stop_frac(3/101) = +0.00673R
     assert abs(row["funding_r_real"] - 0.0067) < 0.0005
+
+
+# ------------------------------------- v3.6 duzeltme: kume etiketi kurtarma
+def test_cluster_backfill_matches_live_labeling(tmp_path):
+    """Geriye donuk etiket, canli yolun urettigi etiketle AYNI olmali."""
+    tracker, db = _make_tracker(tmp_path)
+    d = _signal()
+    ltf = fx.make_series(np.full(70, 101.5))
+    ltf.candles[-1].ts = 1_000_000_000
+    tracker.maybe_track(d, ltf)
+    live = db.query_one("SELECT cluster_id FROM signals")["cluster_id"]
+    # etiketi sil -> eski/gist kaydini taklit et
+    db.execute("UPDATE signals SET cluster_id=NULL")
+    assert tracker._backfill_cluster_ids() == 1
+    assert db.query_one("SELECT cluster_id FROM signals")["cluster_id"] == live
+
+
+def test_cluster_backfill_uses_created_utc_when_no_candle_ts(tmp_path):
+    tracker, db = _make_tracker(tmp_path)
+    db.execute(
+        "INSERT INTO signals(pair,direction,created_utc,entry_min,entry_max,"
+        "stop_loss,tp1,tp2,rr) VALUES('XUSDT','SHORT','2026-07-30T09:00:00Z',"
+        "10,11,12,8,7,2.0)")
+    assert tracker._backfill_cluster_ids() == 1
+    cid = db.query_one("SELECT cluster_id FROM signals")["cluster_id"]
+    from app.services.signal_tracker import _cluster_key
+    ms = 1785402000000  # 2026-07-30T09:00:00Z
+    assert cid == _cluster_key("SHORT", ms) and cid.startswith("S")
+
+
+def test_cluster_backfill_idempotent_and_skips_timeless(tmp_path):
+    tracker, db = _make_tracker(tmp_path)
+    db.execute(
+        "INSERT INTO signals(pair,direction,created_utc,entry_candle_ts) "
+        "VALUES('AUSDT','LONG','2026-07-30T09:00:00Z',1785402000000)")
+    db.execute("INSERT INTO signals(pair,direction) VALUES('BUSDT','LONG')")
+    assert tracker._backfill_cluster_ids() == 1      # zamansiz kayit atlanir
+    assert tracker._backfill_cluster_ids() == 0      # ikinci tur: is yok
+    left = db.query_one("SELECT cluster_id FROM signals WHERE pair='BUSDT'")
+    assert left["cluster_id"] is None                # uydurma etiket yok
+
+
+def test_unlabeled_rows_excluded_not_counted_as_clusters(tmp_path):
+    """Etiketsiz kayit 'kendi basina kume' SAYILMAZ; sayisi raporlanir."""
+    tracker, db = _make_tracker(tmp_path)
+    for i in range(3):
+        db.execute(
+            "INSERT INTO signals(pair,direction,created_utc,entry_min,"
+            "entry_max,stop_loss,tp1,tp2,rr,status,outcome,fill_price,"
+            "r_multiple,closed_utc,blocked) VALUES(?,'LONG',"
+            "'2026-07-30T09:00:00Z',100,101,98,106,110,2.0,'CLOSED','WIN',"
+            "101,1.67,'2026-07-30T12:00:00Z',0)", (f"P{i}USDT",))
+    db.execute("UPDATE signals SET cluster_id=NULL")   # etiketleri sil
+    m = tracker.stats()["measurement"]
+    assert m["unclustered_excluded"] == 3
+    assert m["bootstrap_all"] is None                 # gecerli kume yok
+    assert m["faz1"]["clusters_since_lock"] == 0
+    assert m["faz1"]["gate_met"] is False
+    # etiketler geri kazanilinca: 3 islem TEK kumede toplanir (ayni 4H, LONG)
+    tracker._backfill_cluster_ids()
+    m2 = tracker.stats()["measurement"]
+    assert m2["unclustered_excluded"] == 0
+    assert m2["bootstrap_all"]["n_clusters"] == 1
+    assert m2["bootstrap_all"]["n_trades"] == 3
+
+
+def test_mfe_mae_ignores_pre_fill_candles_on_reevaluation(tmp_path):
+    """Onceki turda dolan sinyal yeniden degerlendirilince, dolus ONCESI
+    mumlar MFE/MAE'ye karismamali (v3.6 duzeltmesi)."""
+    tracker, db = _make_tracker(tmp_path)
+    d = _signal()                       # LONG, entry 100-101, stop 98
+    ltf = fx.make_series(np.full(70, 101.5))
+    ltf.candles[-1].ts = 1_000_000
+    tracker.maybe_track(d, ltf)
+    # 1. tur: bar0 dolusu tetiklemez (yuksek), bar1 doldurur
+    _feed(tracker, closes=[103.0, 100.8],
+          lows=[102.5, 100.5], highs=[104.9, 101.2], start_ts=1_000_000)
+    tracker.evaluate_open("TESTUSDT")
+    row = db.query_one("SELECT * FROM signals")
+    assert row["status"] == "FILLED" and row["fill_ts"] == 1_900_000
+    # 2. tur: yeni mum eklenip yeniden degerlendirilir. bar0'in 104.9
+    # tepesi dolustan ONCE oldugu icin MFE'ye girmemeli.
+    _feed(tracker, closes=[103.0, 100.8, 102.0],
+          lows=[102.5, 100.5, 101.5], highs=[104.9, 101.2, 102.6],
+          start_ts=1_000_000)
+    tracker.evaluate_open("TESTUSDT")
+    row = db.query_one("SELECT * FROM signals")
+    # dolus 101, risk 3 -> dogru MFE (102.6-101)/3 = 0.533
+    # hatali olsaydi (104.9-101)/3 = 1.30 cikardi
+    assert abs(row["mfe_r"] - 0.533) < 0.01
+    assert row["mfe_r"] < 1.0
+
+
+def test_backup_restore_preserves_measurement_columns(tmp_path):
+    """Yedek->restore turunda olcum verisi kaybolmamali (v3.6 kapatilan delik).
+
+    Bu kolonlar payload'a girmezse her yeniden baslatmada SESSIZCE silinir
+    ve yeniden uretilemez (mumlar arsivden dusmus olabilir).
+    """
+    from app.services.database import Database
+    from app.services.signal_tracker import SignalTracker
+    db = Database(str(tmp_path / "a.db"))
+    tr = SignalTracker(db, "15")
+    db.execute(
+        "INSERT INTO signals(pair,direction,created_utc,entry_candle_ts,"
+        "entry_min,entry_max,stop_loss,tp1,tp2,rr,status,outcome,fill_price,"
+        "r_multiple,closed_utc,fill_ts,ambiguous,mfe_r,mae_r,hypo_r,hypo_done,"
+        "nf_gap_r,nf_touch_bars,nf_crossed,nf_done,funding_r_real,funding_done)"
+        " VALUES('AUSDT','LONG','2026-07-30T09:00:00Z',1785402000000,100,101,"
+        "98,106,110,2.0,'CLOSED','WIN',101,1.67,'2026-07-30T12:00:00Z',"
+        "1785402900000,1,1.8,0.4,2.1,1,0.05,3,1,1,0.007,1)")
+    payload = tr.recent_signals(500)
+    db2 = Database(str(tmp_path / "b.db"))
+    tr2 = SignalTracker(db2, "15")
+    assert tr2.import_signals(payload) == 1
+    a, b = payload[0], tr2.recent_signals(1)[0]
+    for k in ("fill_ts", "ambiguous", "mfe_r", "mae_r", "hypo_r", "hypo_done",
+              "nf_gap_r", "nf_touch_bars", "nf_crossed", "nf_done",
+              "funding_r_real", "funding_done", "r_multiple", "outcome"):
+        assert a[k] == b[k], f"{k} restore'da kayboldu: {a[k]} != {b[k]}"
+
+
+def test_blocked_cohort_backup_carries_measurement_columns(tmp_path):
+    tracker, db = _make_tracker(tmp_path)
+    db.execute(
+        "INSERT INTO signals(pair,direction,created_utc,blocked,mfe_r,hypo_r,"
+        "nf_gap_r,funding_r_real) VALUES('BUSDT','SHORT',"
+        "'2026-07-30T09:00:00Z',1,0.9,1.2,0.03,-0.004)")
+    row = tracker.blocked_signals(10)[0]
+    for k in ("mfe_r", "hypo_r", "nf_gap_r", "funding_r_real", "fill_ts",
+              "nf_done", "funding_done"):
+        assert k in row, k
+    assert row["mfe_r"] == 0.9 and row["funding_r_real"] == -0.004

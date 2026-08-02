@@ -711,6 +711,7 @@ const RU={
 "Küme-CI (E_net)":"Кластерный CI (E_net)","E_net · örneklem":"E_net · выборка",
 "Faz-1 kapısı":"Гейт Фазы-1","Hayalet R · kayma":"Призрачный R · проскальз.",
 "ölçüm verisi yok":"нет данных измерения","küme":"кластеров",
+"Etiketsiz (hariç)":"Без метки (исключено)",
 "v3.6 ölçüm paketi. Resmî güven aralığı KÜME-blok bootstrap ile hesaplanır: gözlem birimi işlem değil kümedir (aynı yön + aynı 4H penceresi = tek fikir), çünkü aynı kümedeki işlemler bağımlıdır ve işlem-düzeyi CI aralığı yapay daraltır. Faz-1 kapısı: kilitten itibaren ≥50 bağımsız kapanmış küme VE küme-CI alt sınırı > 0 (2026-08-02 sıkılaştırması). Hayalet R satırı, dolmayan sinyallerin ideal-doluş varsayımlı toplamını %0.3 kayma senaryosuyla birlikte gösterir — ideal rakamın yanılsama payını görünür kılar. Tümü gölge muhasebedir; yatırım tavsiyesi değildir.":
  "Пакет измерений v3.6. Официальный доверительный интервал считается КЛАСТЕРНЫМ блочным бутстрапом: единица наблюдения — не сделка, а кластер (одно направление + одно 4H-окно = одна идея), потому что сделки внутри кластера зависимы, и CI на уровне сделок искусственно сужается. Гейт Фазы-1: с момента фиксации конфигурации ≥50 независимых закрытых кластеров И нижняя граница кластерного CI > 0 (ужесточение от 2026-08-02). Строка «Призрачный R» показывает сумму незаполненных сигналов при допущении идеального входа вместе со сценарием проскальзывания 0.3% — делает видимой долю иллюзии в идеальной цифре. Всё это теневой учёт; не инвестиционная рекомендация.",
 "Sinyaller · Gölge Takip":"Сигналы · Теневой учёт","satıra tıkla → detay":"клик по строке → детали",
@@ -1072,11 +1073,14 @@ function renderMeasure(perf){
   const fazTxt=`<b class="num">${f.clusters_since_lock??"—"}/${f.target_clusters??50}</b> küme · CI ${f.ci_ok?'<span class="pos">✓</span>':'<span class="neg">✗</span>'}`;
   const s30=g["sum_r_slip_30bps"];
   const gTxt=(g.n?`<b class="num">${sgn(g.sum_r_ideal)}R</b> → s30 <b class="num">${sgn(s30)}R</b>`:"<b>—</b>");
+  // etiketsiz kayit varsa GIZLEME: kume sayaci eksik demektir
+  const unc=m.unclustered_excluded||0;
+  const uncRow=unc?`<div class="srow"><span>Etiketsiz (hariç)</span><span><b class="num neg">${unc}</b></span></div>`:"";
   el.innerHTML=
     `<div class="srow"><span>Küme-CI (E_net)</span><span>${ciTxt}</span></div>`+
     `<div class="srow"><span>E_net · örneklem</span><span>${eTxt}</span></div>`+
     `<div class="srow"><span>Faz-1 kapısı</span><span>${fazTxt}</span></div>`+
-    `<div class="srow"><span>Hayalet R · kayma</span><span>${gTxt}</span></div>`;
+    `<div class="srow"><span>Hayalet R · kayma</span><span>${gTxt}</span></div>`+uncRow;
 }
 
 /* ---------- KPI (tiklanabilir -> tablo filtresi) ---------- */

@@ -45,3 +45,20 @@ metrikleri v0 ile hesaplanmaya devam eder), güven etiketi permütasyon testi
 (sonuç negatifse etiket kilit-v2'de kaldırılır).
 Faz-1 eşiği go-live-criteria.md 2026-08-02 ekiyle sıkılaştırıldı:
 ≥50 kapanmış küme + küme-CI alt sınırı > 0. Sıkılaştırma kurala uygundur.
+
+## v3.6 düzeltme notu (2026-08-02, aynı gün): küme sayacı hatası
+İlk v3.6 sürümünde küme-bootstrap, `cluster_id` etiketi BOŞ olan kayıtları
+"kendi başına küme" sayıyordu. Etiket kolonu v3.5'te eklendiği için ondan
+önce doğan / eski gist yedeğinden geri yüklenen 84 kayıt etiketsizdi ve
+sayaç 53 küme gösteriyordu — gerçek sayı 16'ydı. Bu, konseyin eleştirdiği
+"bağımsız kanıt şişirmesi" hatasının kodun içinde tekrarıydı.
+Düzeltme (aynı gün, veri kaybı yok):
+- Etiketler geriye dönük üretildi: yön + 4H penceresi zaten kayıtlıydı
+  (entry_candle_ts, yoksa created_utc); canlı yolla AYNI fonksiyon kullanılır.
+- Etiketi olmayan kayıt artık kümeden SAYILMAZ; sayısı `unclustered_excluded`
+  ile raporlanır ve panoda görünür (sessiz kayıp yok).
+- Ölçüm kolonları (hypo/nf/mfe/mae/funding/fill_ts/ambiguous) yedek
+  payload'ına eklendi; önceden her restore'da sessizce siliniyorlardı.
+Düzeltme sonrası gerçek tablo: 33 küme (114 işlem), kilit sonrası 21 küme
+(67 işlem). Faz-1: 21/50. Küme-CI kilit sonrası [−0.41, +0.70] — sıfırı
+kesiyor, kapı KAPALI.

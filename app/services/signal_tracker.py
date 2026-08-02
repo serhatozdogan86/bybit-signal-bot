@@ -42,13 +42,21 @@ _ENGINE_SHA = (os.environ.get("RENDER_GIT_COMMIT")
                or os.environ.get("ENGINE_SHA") or "dev")[:7]
 
 
+def _cluster_key(direction: str, ts_ms: int) -> str:
+    """Kume kimligi: yon harfi + 4H pencere numarasi.
+
+    Tek dogruluk kaynagi - hem canli kayitta hem geriye donuk doldurmada
+    AYNI fonksiyon kullanilir ki iki yol asla ayrisamasin.
+    """
+    return f"{direction[0]}{int(ts_ms // 14_400_000)}"
+
+
 def _cluster_id(d, ltf) -> str:
     """Ayni yon + ayni 4H penceresi = tek 'fikir' (konsey P0-4).
 
     Kume istatistigi icin gozlem birimi; n_eff tartismasinin altyapisi.
     """
-    bucket = int(ltf.candles[-1].ts // 14_400_000)   # 4H ms penceresi
-    return f"{d.direction.value[0]}{bucket}"
+    return _cluster_key(d.direction.value, ltf.candles[-1].ts)
 
 
 # ---------------- v3.5 maliyet motoru v0 (konsey P0-1) ----------------
@@ -125,6 +133,46 @@ class SignalTracker:
             "CREATE TABLE IF NOT EXISTS gate_log("
             "id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "ts_utc TEXT, kind TEXT, detail TEXT)")
+        self._backfill_cluster_ids()
+
+    def _backfill_cluster_ids(self) -> int:
+        """cluster_id'si bos kayitlari geriye donuk etiketle (v3.6 duzeltme).
+
+        NEDEN: kolon v3.5'te eklendi; oncesinde dogan ve gist'ten geri
+        yuklenen kayitlarda bos. Bos etiketi 'kendi basina kume' saymak
+        bagimsiz kanit sayisini SISIRIR - konseyin elestirdigi hatanin ta
+        kendisi. Etiket kayipsizdir: yon + 4H penceresi zaten kayitli
+        (entry_candle_ts, yoksa created_utc), canli yolla AYNI fonksiyondan
+        yeniden uretilir.
+
+        Idempotent: yalniz NULL/bos olanlara dokunur, her acilista guvenle
+        calisir. Zamani okunamayan kayit etiketsiz KALIR (uydurma yok) ve
+        istatistikten disarida tutulur.
+        """
+        rows = self._db.query(
+            "SELECT id,direction,entry_candle_ts,created_utc FROM signals "
+            "WHERE cluster_id IS NULL OR cluster_id=''")
+        updates: list[tuple] = []
+        for r in rows:
+            if not r.get("direction"):
+                continue
+            ts = r.get("entry_candle_ts")
+            if not ts and r.get("created_utc"):
+                try:
+                    ts = int(datetime.strptime(
+                        r["created_utc"], "%Y-%m-%dT%H:%M:%SZ")
+                        .replace(tzinfo=timezone.utc).timestamp() * 1000)
+                except (ValueError, TypeError):
+                    ts = None
+            if not ts:
+                continue                      # zaman yok -> etiketsiz birak
+            updates.append((_cluster_key(r["direction"], ts), r["id"]))
+        if updates:
+            self._db.executemany(
+                "UPDATE signals SET cluster_id=? WHERE id=?", updates)
+            log.info(kv(event="cluster_backfill", filled=len(updates),
+                        scanned=len(rows)))
+        return len(updates)
 
     def record_candles(self, series: KlineSeries) -> None:
         """Kapanmis mumlari arsivle. Son bar henuz olusuyor -> atlanir."""
@@ -347,14 +395,21 @@ class SignalTracker:
             if risk <= 0:
                 self._close(sig["id"], "AMBIGUOUS", fill_price, 0.0)
                 return
-            # v3.6: bu mumun lehte/aleyhte gezinmesi (dolus mumu dahil)
-            seen_fill = True
-            fav = ((c["high"] - fill_price) if is_long
-                   else (fill_price - c["low"])) / risk
-            adv = ((fill_price - c["low"]) if is_long
-                   else (c["high"] - fill_price)) / risk
-            mfe = max(mfe, fav)
-            mae = max(mae, adv)
+            # v3.6: lehte/aleyhte gezinme YALNIZ dolus anindan itibaren.
+            # DIKKAT: sinyal onceki turda dolduysa fill_price DB'den gelir ve
+            # dongu entry_candle_ts'ten baslar - dolus ONCESI mumlar da bu
+            # bloga girer. fill_ts ile filtrelenmezse MFE/MAE sisirilir.
+            at_or_after_fill = (filled_at_idx is not None
+                                or (sig.get("fill_ts") is not None
+                                    and c["ts"] >= sig["fill_ts"]))
+            if at_or_after_fill:
+                seen_fill = True
+                fav = ((c["high"] - fill_price) if is_long
+                       else (fill_price - c["low"])) / risk
+                adv = ((fill_price - c["low"]) if is_long
+                       else (c["high"] - fill_price)) / risk
+                mfe = max(mfe, fav)
+                mae = max(mae, adv)
             hit_stop = (c["low"] <= sig["stop_loss"] if is_long
                         else c["high"] >= sig["stop_loss"])
             hit_tp = (c["high"] >= sig["tp1"] if is_long
@@ -499,12 +554,19 @@ class SignalTracker:
         net_vals = []
         cluster_map_all: dict[str, list[float]] = {}
         cluster_map_lock: dict[str, list[float]] = {}
+        unclustered = 0
         for r in closed_rows:
             cst = cost_r(r)
             if cst is not None and r.get("r_multiple") is not None:
                 net = r["r_multiple"] - cst
                 net_vals.append(net)
-                cid = r.get("cluster_id") or f"solo{r['id']}"
+                cid = r.get("cluster_id")
+                if not cid:
+                    # v3.6 DUZELTME: etiketsiz kaydi 'kendi basina kume'
+                    # saymak bagimsiz kanit sayisini sisirir. Disarida
+                    # birakilir ve sayisi raporlanir (sessiz kayip yok).
+                    unclustered += 1
+                    continue
                 cluster_map_all.setdefault(cid, []).append(net)
                 if (r.get("created_utc") or "") >= measurement.LOCK_UTC:
                     cluster_map_lock.setdefault(cid, []).append(net)
@@ -544,6 +606,7 @@ class SignalTracker:
                              >= measurement.FAZ1_TARGET_CLUSTERS) and ci_ok,
             },
             "not_filled_hypo_slip": measurement.hypo_slip_summary(ghost_rows),
+            "unclustered_excluded": unclustered,
         }
         return {
             "note": "Shadow accounting: estimated fills, no slippage. Not real trading results.",
@@ -596,7 +659,9 @@ class SignalTracker:
             net = (r["r_multiple"] - cst
                    if cst is not None and r.get("r_multiple") is not None
                    else None)
-            cid = r.get("cluster_id") or f"solo{r['id']}"
+            # v3.6: etiketsizler tek bir '?' kovasinda toplanir; her biri
+            # ayri kume sayilmaz (bagimsiz kanit sisirmesi olmasin).
+            cid = r.get("cluster_id") or "?etiketsiz"
             agg = per_cluster.setdefault(cid, {"n": 0, "net_r": 0.0})
             agg["n"] += 1
             if net is not None:
@@ -630,7 +695,9 @@ class SignalTracker:
             ({"cluster": k, "n": v["n"], "net_r": round(v["net_r"], 2)}
              for k, v in per_cluster.items()),
             key=lambda x: x["net_r"], reverse=True)
-        conc = measurement.top_share([c["net_r"] for c in cluster_list])
+        # yogunlasma yalniz GERCEK kumeler uzerinden (etiketsiz kova haric)
+        conc = measurement.top_share([c["net_r"] for c in cluster_list
+                                      if c["cluster"] != "?etiketsiz"])
         # isi-bloklu kohortun kume dagilimi
         heat_dist = self._db.query(
             "SELECT COALESCE(cluster_id,'?') cluster, COUNT(*) n "
@@ -712,7 +779,11 @@ class SignalTracker:
             "SELECT id,pair,direction,created_utc,entry_candle_ts,status,outcome,"
             "entry_min,entry_max,stop_loss,tp1,tp2,rr,fill_price,exit_price,"
             "r_multiple,closed_utc,confidence,setup_type,cluster_id,engine_sha,"
-            "fill_ts FROM signals WHERE blocked=0 ORDER BY id DESC LIMIT ?",
+            # v3.6: olcum kolonlari yedege girmezse her restore'da SESSIZCE
+            # kaybolur - hypo/nf/mfe/funding verisi yeniden uretilemez.
+            "fill_ts,ambiguous,hypo_r,hypo_done,mfe_r,mae_r,nf_gap_r,"
+            "nf_touch_bars,nf_crossed,nf_done,funding_r_real,funding_done "
+            "FROM signals WHERE blocked=0 ORDER BY id DESC LIMIT ?",
             (limit,))
         for r in rows:
             c = cost_r(r)
@@ -769,7 +840,11 @@ class SignalTracker:
             "SELECT id,pair,direction,created_utc,entry_candle_ts,status,outcome,"
             "entry_min,entry_max,stop_loss,tp1,tp2,rr,fill_price,exit_price,"
             "r_multiple,closed_utc,confidence,setup_type,blocked,"
-            "cluster_id,engine_sha,block_reason "
+            "cluster_id,engine_sha,block_reason,"
+            # v3.6: bloklu kohort da degerlendiriliyor -> olcum kolonlari
+            # yedege girmezse restore'da kaybolur (gercek kohortla ayni kural)
+            "fill_ts,ambiguous,hypo_r,hypo_done,mfe_r,mae_r,nf_gap_r,"
+            "nf_touch_bars,nf_crossed,nf_done,funding_r_real,funding_done "
             "FROM signals WHERE blocked>=1 ORDER BY id DESC LIMIT ?", (limit,))
 
     def recent_decisions(self, limit: int = 2000) -> list[dict]:
@@ -821,8 +896,10 @@ class SignalTracker:
                 "entry_min,entry_max,stop_loss,tp1,tp2,rr,status,outcome,"
                 "fill_price,exit_price,r_multiple,closed_utc,confidence,"
                 "setup_type,blocked,cluster_id,engine_sha,block_reason,"
-                "hypo_r,hypo_done) "
-                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "hypo_r,hypo_done,fill_ts,ambiguous,mfe_r,mae_r,nf_gap_r,"
+                "nf_touch_bars,nf_crossed,nf_done,funding_r_real,funding_done) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,"
+                "?,?,?,?,?,?,?,?,?,?)",
                 (r.get("pair"), r.get("direction"), r.get("created_utc"),
                  r.get("entry_candle_ts"), r.get("entry_min"), r.get("entry_max"),
                  r.get("stop_loss"), r.get("tp1"), r.get("tp2"), r.get("rr"),
@@ -832,6 +909,15 @@ class SignalTracker:
                  r.get("confidence"), r.get("setup_type"),
                  r.get("blocked", 0), r.get("cluster_id"),
                  r.get("engine_sha"), r.get("block_reason"),
-                 r.get("hypo_r"), r.get("hypo_done", 0)))
+                 r.get("hypo_r"), r.get("hypo_done", 0),
+                 r.get("fill_ts"), r.get("ambiguous", 0),
+                 r.get("mfe_r"), r.get("mae_r"), r.get("nf_gap_r"),
+                 r.get("nf_touch_bars"), r.get("nf_crossed"),
+                 r.get("nf_done", 0), r.get("funding_r_real"),
+                 r.get("funding_done", 0)))
             imported += 1
+        if imported:
+            # gist yedekteki eski kayitlarda cluster_id bos olabilir;
+            # geri yukler yuklemez etiketle ki istatistik disi kalmasin
+            self._backfill_cluster_ids()
         return imported
