@@ -1642,8 +1642,23 @@ function drawEvidence(d){
     let idx=cs.findIndex(c=>c.ts>=ts); if(idx<0) idx=cs.length-1;
     return `<circle cx="${X(idx)+BW/2}" cy="${Y(px)}" r="4" fill="${col}" stroke="#FFFEFA" stroke-width="1.5"/>
       <text x="${X(idx)+BW/2+7}" y="${Y(px)-6}" fill="${col}">${lbl}</text>`;};
-  if(s.fill_price!=null) out+=mark(s.entry_candle_ts,s.fill_price,"#2563EB",
-    ru?"фактический вход":"gerçekleşen giriş");
+  /* Dolus ani: sinyal mumundan SONRA fiyatin giris bolgesine ilk degdigi mum.
+     (Sinyal ani ile dolus ani ayni degildir; fiyatin bolgeye gelmesi saatler
+     surebilir - nokta o muma konur.) */
+  if(s.fill_price!=null){
+    const lo=Math.min(s.entry_min,s.entry_max), hiE=Math.max(s.entry_min,s.entry_max);
+    let fi=-1;
+    for(let i=0;i<cs.length;i++){
+      if(cs[i].ts < s.entry_candle_ts) continue;
+      if(cs[i].low<=hiE && cs[i].high>=lo){ fi=i; break; }
+    }
+    if(fi>=0){
+      const py=Math.min(hiE,Math.max(lo,s.fill_price));   // nokta bant icinde
+      out+=`<circle cx="${X(fi)+BW/2}" cy="${Y(py)}" r="4.5" fill="#2563EB"
+              stroke="#FFFEFA" stroke-width="1.5"/>
+        <text x="${X(fi)+BW/2+7}" y="${Y(py)-7}" fill="#2563EB">${ru?"фактический вход":"gerçekleşen giriş"}</text>`;
+    }
+  }
   if(s.exit_price!=null&&s.closed_utc)
     out+=mark(Date.parse(s.closed_utc.replace(" ","T"))||cs[cs.length-1].ts,s.exit_price,
       (s.outcome==="WIN"?"#16A34A":"#DC2626"),s.outcome||"");
