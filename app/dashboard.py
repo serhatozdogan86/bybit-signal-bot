@@ -550,7 +550,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       <div class="kpis" id="kpis"></div>
       <div class="midrow">
         <div class="card">
-          <div class="chead">Kümülatif R (Equity) <span class="tag" id="eqStats">yeşil WIN · kırmızı LOSS</span></div>
+          <div class="chead"><span class="tipwrap" tabindex="0" data-tip="Sonuçlanan işlemlerin R toplamının zaman içindeki birikimi. Kalın mavi çizgi NET eğridir (komisyon, stop kayması ve fonlama düşülmüş); kesikli gri çizgi aynı işlemlerin brüt hâlidir. İki çizgi arasındaki makas, maliyetin zamanla biriken yüküdür — işlem sayısı arttıkça açılır. Noktalar tek tek işlemler: yeşil WIN, kırmızı LOSS. Başlıktaki PF (kâr faktörü), beklenti ve maksDD de net seriden hesaplanır; brüt yalnız kıyas için gösterilir.">Kümülatif R (Equity) <span class="i">ⓘ</span></span> <span class="tag" id="eqStats">yeşil WIN · kırmızı LOSS</span></div>
           <div class="cbody fill chartwrap curve" id="curveWrap"><canvas id="eqChart"></canvas></div>
         </div>
         <div class="card">
@@ -704,6 +704,10 @@ const RU={
 "Yön Bilançosu":"Баланс по направлениям","tıkla → yön filtresi":"клик → фильтр направления",
 /* v3.6 olcum karti */
 "Ölçüm · v3.6":"Измерение · v3.6","küme istatistiği":"кластерная статистика",
+"Kümülatif R (Equity)":"Накопленный R (эквити)",
+"Sonuçlanan işlemlerin R toplamının zaman içindeki birikimi. Kalın mavi çizgi NET eğridir (komisyon, stop kayması ve fonlama düşülmüş); kesikli gri çizgi aynı işlemlerin brüt hâlidir. İki çizgi arasındaki makas, maliyetin zamanla biriken yüküdür — işlem sayısı arttıkça açılır. Noktalar tek tek işlemler: yeşil WIN, kırmızı LOSS. Başlıktaki PF (kâr faktörü), beklenti ve maksDD de net seriden hesaplanır; brüt yalnız kıyas için gösterilir.":
+ "Накопление суммы R по завершённым сделкам во времени. Жирная синяя линия — ЧИСТАЯ кривая (за вычетом комиссии, проскальзывания на стопе и фондирования); пунктирная серая — те же сделки без издержек. Зазор между линиями и есть накапливающийся вес затрат: он расширяется по мере роста числа сделок. Точки — отдельные сделки: зелёная WIN, красная LOSS. PF (профит-фактор), ожидание и макс. просадка в заголовке тоже считаются по чистому ряду; валовая величина показана лишь для сравнения.",
+"brüt":"валовый","net":"чисто",
 "Küme-CI (E_net)":"Кластерный CI (E_net)","E_net · örneklem":"E_net · выборка",
 "Faz-1 kapısı":"Гейт Фазы-1","Hayalet R · kayma":"Призрачный R · проскальз.",
 "ölçüm verisi yok":"нет данных измерения","küme":"кластеров",
@@ -1081,21 +1085,30 @@ function renderKpis(perf,status,uni,signals){
   const cbo=(perf&&perf.closed_by_outcome)||{};
   const w=cbo.WIN||{count:0,sum_r:0},l=cbo.LOSS||{count:0,sum_r:0};
   const wrV=perf&&perf.win_rate!=null?perf.win_rate*100:null;
-  const be=w.count?(100/(1+(w.sum_r/w.count))).toFixed(1):null;
-  const trV=perf?perf.total_r_multiple:null;
+  // v3.6: basabas esigi NET ortalama kazanca gore (maliyet cikinca cita yukselir)
+  const netWins=(signals||[]).filter(s=>OUT(s)==="WIN"&&s.r_net!=null)
+    .map(s=>s.r_net);
+  const avgWinNet=netWins.length?netWins.reduce((a,b)=>a+b,0)/netWins.length:null;
+  const be=avgWinNet!=null&&avgWinNet>-1?(100/(1+avgWinNet)).toFixed(1)
+    :(w.count?(100/(1+(w.sum_r/w.count))).toFixed(1):null);
+  const beNet=avgWinNet!=null;
+  // v3.6: buyuk rakam NET (kararlarin verildigi sayi), brut alt satirda
+  const trNet=perf?perf.total_r_net:null;
+  const trGross=perf?perf.total_r_multiple:null;
+  const trV=trNet!=null?trNet:trGross;
   const filled=(signals||[]).filter(s=>["WIN","LOSS","AMBIGUOUS","FILLED"].includes(OUT(s))).length;
   const nf=(signals||[]).filter(s=>OUT(s)==="NOT_FILLED").length;
   const frV=(filled+nf)?100*filled/(filled+nf):null;
   const openV=perf?perf.open_signals:null;
   const TIPS_RU={
-    "Win Rate":"Доля выигрышных среди завершённых (WIN+LOSS) сигналов — NOT_FILLED не учитывается. Строка ниже — точка безубыточности: 1 / (1 + средний выигрыш в R). Если винрейт выше этого порога, система в плюсе. · клик → фильтр завершённых",
-    "Toplam R":"Сумма R по всем завершённым сделкам. R = единица риска: убыток −1R, прибыль равна отношению вознаграждения к риску (например +2.2R). Ниже: валовая прибыль / валовой убыток. Считает не деньги, а единицы риска — так сравнимы любые пары. · клик → фильтр завершённых",
+    "Win Rate":"Доля выигрышных среди завершённых (WIN+LOSS) сигналов — NOT_FILLED не учитывается. Строка ниже — точка безубыточности: 1 / (1 + средний выигрыш в R); с версии v3.6 считается по ЧИСТОМУ среднему выигрышу: после вычета комиссии, проскальзывания и фондирования порог выхода в плюс становится выше. Если винрейт выше этого порога, система в плюсе. · клик → фильтр завершённых",
+    "Toplam R":"Сумма R по всем завершённым сделкам. R = единица риска: убыток −1R, прибыль равна отношению вознаграждения к риску (например +2.2R). С версии v3.6 крупное число — ЧИСТОЕ: вычтены комиссия (2×тейкер 0.055%), проскальзывание на стопе и фондирование. Именно по этому числу определены гейт Фазы-1, доверительный интервал и критерии фальсификации, поэтому оно и вынесено на первый план. Строка ниже — валовая величина без издержек; разница между ними и есть реальный вес затрат. Считает не деньги, а единицы риска — так сравнимы любые пары. · клик → фильтр завершённых",
     "Açık Pozisyon":"Сигналы в теневом учёте, ещё не завершённые: PENDING (ждём подхода к зоне входа, 6 ч) + FILLED (вход исполнен, наблюдение 48 ч). · клик → фильтр открытых",
     "Giriş İsabeti":"Доля сигналов, у которых цена дошла до зоны входа. NOT_FILLED = за 6 часов цена так и не пришла; в статистику прибыли/убытка не входит. · клик → фильтр незаполненных",
     "Taranan Evren":"Число пар, отбираемых ежедневно по 24-часовому обороту, и счётчик сканов. Каждый цикл (~15 минут) прогоняет всю вселенную через 7 фильтров. · клик → все сигналы"};
   const TIPS_TR={
-    "Win Rate":"Sonuçlanan (WIN+LOSS) sinyaller içinde kazananların oranı — NOT_FILLED hesaba katılmaz. Alt satırdaki başabaş, kâra geçiş eşiğidir: 1 / (1 + ortalama kazanç R). Win rate bu eşiğin üzerindeyse sistem artıdadır. · tıkla → sonuçlananları filtrele",
-    "Toplam R":"Tüm sonuçlanan işlemlerin R toplamı. R = riske atılan birim: kayıp −1R, kazanç ödül/risk oranı kadar (+2.2R gibi). Alt satır: brüt kazanç / brüt kayıp. Para değil, risk birimi sayar — pariteler böyle karşılaştırılır. · tıkla → sonuçlananları filtrele",
+    "Win Rate":"Sonuçlanan (WIN+LOSS) sinyaller içinde kazananların oranı — NOT_FILLED hesaba katılmaz. Alt satırdaki başabaş, kâra geçiş eşiğidir: 1 / (1 + ortalama kazanç R) ve v3.6'dan beri NET ortalama kazançla hesaplanır: komisyon, kayma ve fonlama düşülünce kâra geçme çıtası yükselir. Win rate bu eşiğin üzerindeyse sistem artıdadır. · tıkla → sonuçlananları filtrele",
+    "Toplam R":"Tüm sonuçlanan işlemlerin R toplamı. R = riske atılan birim: kayıp −1R, kazanç ödül/risk oranı kadar (+2.2R gibi). v3.6'dan beri büyük rakam NET'tir: komisyon (2×taker %0.055), stop kayması ve fonlama düşülmüştür — Faz-1 çıtası, güven aralığı ve yanlışlama kriterleri hep bu sayı üzerinden tanımlı olduğu için panonun ana rakamı da odur. Alt satırdaki brüt, maliyetsiz hâlidir; ikisi arasındaki fark maliyetin gerçek yüküdür. Para değil, risk birimi sayar — pariteler böyle karşılaştırılır. · tıkla → sonuçlananları filtrele",
     "Açık Pozisyon":"Gölge takipte hâlâ sonuçlanmamış sinyaller: PENDING (girişe gelmesi bekleniyor, 6 sa) + FILLED (dolu, 48 sa izlemede). · tıkla → açıkları filtrele",
     "Giriş İsabeti":"Üretilen sinyallerden fiyatı giriş bölgesine gelip dolanların oranı. NOT_FILLED = 6 saat içinde fiyat girişe hiç uğramadı; kazanç/kayıp oranına dahil edilmez. · tıkla → dolmayanları filtrele",
     "Taranan Evren":"24s hacme göre her gün yeniden seçilen parite sayısı ve bugüne kadarki tarama turu. Her tur ~15 dakikada bir tüm evreni 7 aşamalı filtreden geçirir. · tıkla → tüm sinyaller"};
@@ -1106,9 +1119,11 @@ function renderKpis(perf,status,uni,signals){
     <div class="sub">${sub||""}</div></div>`;
   $("kpis").innerHTML=
     kpi("DONE","Win Rate",wrV==null?"—":wrV.toFixed(1)+"%","",
-        be?`başabaş ~%${be}`:"",arrow("wr",wrV))+
+        be?`başabaş ~%${be}`+(beNet?" (net)":""):"",arrow("wr",wrV))+
     kpi("DONE","Toplam R",trV==null?"—":(trV>0?"+":"")+num(trV),
-        trV>0?"pos":trV<0?"neg":"",`+${num(w.sum_r)} / −${num(Math.abs(l.sum_r))}`,
+        trV>0?"pos":trV<0?"neg":"",
+        trNet!=null?`net · brüt ${(trGross>0?"+":"")+num(trGross)}R`
+                   :`+${num(w.sum_r)} / −${num(Math.abs(l.sum_r))}`,
         arrow("tr",trV))+
     kpi("OPEN","Açık Pozisyon",openV==null?"—":openV,"amb","gölge takipte",
         arrow("open",openV))+
@@ -1135,19 +1150,29 @@ function renderCurve(signals){
   const wrap=$("curveWrap");
   if(!done.length){wrap.innerHTML='<div class="empty">henüz sonuçlanan sinyal yok</div>';eqChart=null;return;}
   let c=0;const data=done.map(s=>c+=(s.r_multiple||0));
+  // v3.6: NET kumulatif egri (maliyet dusulmus). r_net yoksa brute duser;
+  // iki cizgi arasindaki makas maliyetin zaman icindeki birikimidir.
+  let cn=0;const hasNet=done.some(s=>s.r_net!=null);
+  const dataNet=done.map(s=>cn+=(s.r_net!=null?s.r_net:(s.r_multiple||0)));
   // kurumsal metrikler: profit factor, beklenti, maks. drawdown
-  const gw=done.filter(s=>s.r_multiple>0).reduce((a,s)=>a+s.r_multiple,0);
-  const gl=Math.abs(done.filter(s=>s.r_multiple<0).reduce((a,s)=>a+s.r_multiple,0));
+  // v3.6: PF ve maksDD de NET seriden - karar kriterleriyle ayni dilde.
+  const rOf=s=>(hasNet&&s.r_net!=null)?s.r_net:(s.r_multiple||0);
+  const gw=done.filter(s=>rOf(s)>0).reduce((a,s)=>a+rOf(s),0);
+  const gl=Math.abs(done.filter(s=>rOf(s)<0).reduce((a,s)=>a+rOf(s),0));
   const pf=gl?gw/gl:null;
-  const exp=data[data.length-1]/done.length;
+  const series=hasNet?dataNet:data;
+  const exp=series[series.length-1]/done.length;
   let peak=0,maxDD=0;
-  for(const v of data){peak=Math.max(peak,v);maxDD=Math.max(maxDD,peak-v);}
+  for(const v of series){peak=Math.max(peak,v);maxDD=Math.max(maxDD,peak-v);}
   const st=$("eqStats");
-  const netTxt=(PERF&&PERF.expectancy_net!=null)?` · net <b class="num">${(PERF.expectancy_net>0?"+":"")+num(PERF.expectancy_net,2)}R</b>`:"";
-  if(st)st.innerHTML=`PF <b class="num">${pf==null?"∞":num(pf,2)}</b> · beklenti <b class="num">${(exp>0?"+":"")+num(exp,2)}R</b>/${LANG==="ru"?"сделку":"işlem"}${netTxt} · maksDD <b class="num neg">−${num(maxDD,2)}R</b>`;
+  const grossTxt=hasNet?` · brüt <b class="num">${(data[data.length-1]>0?"+":"")+num(data[data.length-1],2)}R</b>`:"";
+  if(st)st.innerHTML=`PF <b class="num">${pf==null?"∞":num(pf,2)}</b> · beklenti <b class="num">${(exp>0?"+":"")+num(exp,2)}R</b>/${LANG==="ru"?"сделку":"işlem"}${hasNet?" (net)":""} · maksDD <b class="num neg">−${num(maxDD,2)}R</b>${grossTxt}`;
   const labels=done.map((s,i)=>i+1);
   const ptCol=done.map(s=>OUT(s)==="WIN"?"#16A34A":"#DC2626");
-  const tips=done.map(s=>`${s.pair} ${s.direction} ${OUT(s)} ${(s.r_multiple>0?"+":"")+num(s.r_multiple)}R`);
+  const tips=done.map((s,i)=>{
+    const rn=(hasNet&&s.r_net!=null)?s.r_net:null;
+    const base=`${s.pair} ${s.direction} ${OUT(s)} ${(rOf(s)>0?"+":"")+num(rOf(s))}R`;
+    return rn!=null?base+" (net)":base;});
   if(window.Chart){
     if(!document.getElementById("eqChart")){wrap.innerHTML='<canvas id="eqChart"></canvas>';eqChart=null;}
     const ctx=$("eqChart").getContext("2d");
@@ -1156,19 +1181,26 @@ function renderCurve(signals){
     grad.addColorStop(0,"rgba(37,99,235,.26)");
     grad.addColorStop(.55,"rgba(37,99,235,.10)");
     grad.addColorStop(1,"rgba(37,99,235,0)");
-    const cfg={type:"line",
-      data:{labels,datasets:[
-        {data,borderColor:"#2563EB",borderWidth:2.5,fill:true,
+    // v3.6: ana cizgi NET, ikinci ince cizgi BRUT -> makas = maliyet birikimi
+    const sets=[
+        {data:series,borderColor:"#2563EB",borderWidth:2.5,fill:true,
          backgroundColor:grad,tension:.35,
          pointRadius:4,pointHoverRadius:6,
          pointBackgroundColor:ptCol,pointBorderColor:"#FFFEFA",
-         pointBorderWidth:2},
+         pointBorderWidth:2}];
+    if(hasNet)sets.push(
+        {data,borderColor:"#B7AE9A",borderWidth:1.4,borderDash:[5,4],
+         pointRadius:0,fill:false,tension:.35});
+    sets.push(
         {data:labels.map(()=>0),borderColor:"#B7AE9A",borderWidth:1,
-         borderDash:[4,4],pointRadius:0,fill:false}]},
+         borderDash:[4,4],pointRadius:0,fill:false});
+    const cfg={type:"line",
+      data:{labels,datasets:sets},
       options:{responsive:true,maintainAspectRatio:false,animation:false,
         plugins:{legend:{display:false},
           tooltip:{callbacks:{label:i=>i.datasetIndex===0?tips[i.dataIndex]+
-            " · küm "+(data[i.dataIndex]>0?"+":"")+num(data[i.dataIndex])+"R":""}}},
+            " · küm "+(series[i.dataIndex]>0?"+":"")+num(series[i.dataIndex])+"R"
+            :(hasNet&&i.datasetIndex===1?"brüt "+(data[i.dataIndex]>0?"+":"")+num(data[i.dataIndex])+"R":"")}}},
         scales:{x:{display:false},
           y:{grid:{color:"#F0EAD9"},border:{display:false},
              ticks:{font:{size:10},color:"#8A7F6C",
@@ -1179,17 +1211,21 @@ function renderCurve(signals){
     return;
   }
   const W=560,H2=220,P=34;
-  const pts=[[0,0]].concat(data.map((v,i)=>[i+1,v]));
-  const ys=pts.map(p=>p[1]);const ymin=Math.min(0,...ys),ymax=Math.max(0,...ys);
+  const pts=[[0,0]].concat(series.map((v,i)=>[i+1,v]));
+  const ptsG=[[0,0]].concat(data.map((v,i)=>[i+1,v]));
+  const ys=pts.concat(hasNet?ptsG:[]).map(p=>p[1]);
+  const ymin=Math.min(0,...ys),ymax=Math.max(0,...ys);
   const yr=(ymax-ymin)||1;
   const X=i=>P+(W-P-8)*i/(pts.length-1||1);
   const Y=v=>10+(H2-24)*(1-(v-ymin)/yr);
-  const path=pts.map((p,i)=>(i?"L":"M")+X(p[0]).toFixed(1)+" "+Y(p[1]).toFixed(1)).join(" ");
-  const dots=done.map((s,i)=>`<circle cx="${X(i+1)}" cy="${Y(data[i])}" r="4" fill="${ptCol[i]}" stroke="#FFFEFA" stroke-width="2"><title>${tips[i]}</title></circle>`).join("");
+  const mk=a=>a.map((p,i)=>(i?"L":"M")+X(p[0]).toFixed(1)+" "+Y(p[1]).toFixed(1)).join(" ");
+  const path=mk(pts);
+  const pathG=hasNet?`<path d="${mk(ptsG)}" fill="none" stroke="#B7AE9A" stroke-width="1.4" stroke-dasharray="5 4"/>`:"";
+  const dots=done.map((s,i)=>`<circle cx="${X(i+1)}" cy="${Y(series[i])}" r="4" fill="${ptCol[i]}" stroke="#FFFEFA" stroke-width="2"><title>${tips[i]}</title></circle>`).join("");
   wrap.innerHTML=`<svg viewBox="0 0 ${W} ${H2}" preserveAspectRatio="none">
     <defs><filter id="ds"><feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#2563EB" flood-opacity=".3"/></filter></defs>
     <line x1="${P}" y1="${Y(0)}" x2="${W-8}" y2="${Y(0)}" stroke="#B7AE9A" stroke-dasharray="4 4"/>
-    <path d="${path}" fill="none" stroke="#2563EB" stroke-width="2.5" filter="url(#ds)"/>${dots}</svg>`;
+    ${pathG}<path d="${path}" fill="none" stroke="#2563EB" stroke-width="2.5" filter="url(#ds)"/>${dots}</svg>`;
 }
 
 /* ---------- yon bilancosu (tiklanabilir yon filtresi) ---------- */
