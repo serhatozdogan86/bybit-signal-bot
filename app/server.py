@@ -184,6 +184,16 @@ def create_app(store: StateStore, scheduler: Scheduler,
         return app.response_class(json.dumps(tracker.stats(), indent=2),
                                   mimetype="application/json")
 
+    @app.get("/measurement")
+    def measurement_view():
+        """v3.6 teshis paketi: kume P&L, kohort dagilimlari, NF anatomisi,
+        MFE/MAE, guven permutasyonu, funding v1 onizleme, kapi gunlugu."""
+        if tracker is None:
+            return jsonify({"error": "shadow tracking disabled"}), 404
+        return app.response_class(
+            json.dumps(tracker.diagnostics(), indent=2),
+            mimetype="application/json")
+
     @app.get("/signals")
     def signals():
         if tracker is None:

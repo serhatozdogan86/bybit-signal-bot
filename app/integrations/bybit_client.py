@@ -84,3 +84,20 @@ class BybitClient:
         data = self._get("/v5/market/orderbook",
                          {"category": _CATEGORY, "symbol": symbol, "limit": depth})
         return data.get("result") if data else None
+
+    def get_funding_history(self, symbol: str, start_ms: int | None = None,
+                            end_ms: int | None = None) -> list[dict] | None:
+        """Gercek funding oranlari (v3.6: maliyet modeli v1 verisi).
+
+        Donen liste: [{"fundingRate": "...", "fundingRateTimestamp": "..."}].
+        Hata -> None (cagiran taraf sonraki turda tekrar dener).
+        """
+        params: dict = {"category": _CATEGORY, "symbol": symbol, "limit": 200}
+        if start_ms is not None:
+            params["startTime"] = int(start_ms)
+        if end_ms is not None:
+            params["endTime"] = int(end_ms)
+        data = self._get("/v5/market/funding/history", params)
+        if data is None:
+            return None
+        return data.get("result", {}).get("list") or []

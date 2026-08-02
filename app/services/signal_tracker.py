@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 from app.logging_setup import kv
 from app.models.candle import KlineSeries
 from app.models.decision import Decision, DecisionType, Direction
+from app.services import measurement
 from app.services.database import Database
 
 log = logging.getLogger("tracker")
@@ -109,11 +110,21 @@ class SignalTracker:
                     "cluster_id TEXT", "engine_sha TEXT",
                     "block_reason TEXT", "ambiguous INTEGER DEFAULT 0",
                     "fill_ts INTEGER",
-                    "hypo_r REAL", "hypo_done INTEGER DEFAULT 0"):
+                    "hypo_r REAL", "hypo_done INTEGER DEFAULT 0",
+                    # v3.6 olcum paketi (yalniz olcum; davranis degismez)
+                    "mfe_r REAL", "mae_r REAL",
+                    "nf_gap_r REAL", "nf_touch_bars INTEGER",
+                    "nf_crossed INTEGER", "nf_done INTEGER DEFAULT 0",
+                    "funding_r_real REAL", "funding_done INTEGER DEFAULT 0"):
             try:
                 self._db.execute(f"ALTER TABLE signals ADD COLUMN {ddl}")
             except Exception:
                 pass  # kolon zaten var
+        # v3.6: kapi gecis/TTL olay gunlugu (histerezis gecikmesi olcumu)
+        self._db.execute(
+            "CREATE TABLE IF NOT EXISTS gate_log("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "ts_utc TEXT, kind TEXT, detail TEXT)")
 
     def record_candles(self, series: KlineSeries) -> None:
         """Kapanmis mumlari arsivle. Son bar henuz olusuyor -> atlanir."""
@@ -245,6 +256,28 @@ class SignalTracker:
                 "ORDER BY ts ASC", (pair, self._ltf, sig["entry_candle_ts"]))
             if candles:
                 self._evaluate_hypo(sig, candles)
+        # v3.6-P0: NOT_FILLED anatomisi (bosluk, temas, sonradan gecis)
+        pending_nf = self._db.query(
+            "SELECT * FROM signals WHERE pair=? AND outcome='NOT_FILLED' "
+            "AND nf_done=0", (pair,))
+        for sig in pending_nf:
+            candles = self._db.query(
+                "SELECT ts,low,high FROM candles WHERE symbol=? AND interval=? "
+                "AND ts>=? ORDER BY ts ASC",
+                (pair, self._ltf, sig["entry_candle_ts"]))
+            if len(candles) < self._fill_window:
+                continue  # pencere tamamlanmadan anatomi cikarilamaz
+            a = measurement.nf_anatomy(sig, candles, self._fill_window)
+            if a is None:
+                self._db.execute("UPDATE signals SET nf_done=1 WHERE id=?",
+                                 (sig["id"],))
+                continue
+            self._db.execute(
+                "UPDATE signals SET nf_gap_r=?, nf_touch_bars=?, nf_crossed=?, "
+                "nf_done=1 WHERE id=?",
+                (a["gap_r"], a["touch_bars"], a["crossed"], sig["id"]))
+            log.info(kv(event="nf_anatomy", pair=sig["pair"],
+                        gap_r=a["gap_r"], crossed=a["crossed"]))
 
     def _evaluate_hypo(self, sig: dict, candles: list[dict]) -> None:
         """NOT_FILLED sinyali 'kenardan dolmus' varsayip hayalet R hesaplar.
@@ -286,6 +319,11 @@ class SignalTracker:
         is_long = sig["direction"] == Direction.LONG.value
         fill_price = sig["fill_price"]
         filled_at_idx: int | None = None
+        # v3.6-P0: MFE/MAE - dolus sonrasi en iyi/en kotu gezinme, R cinsinden.
+        # Her degerlendirmede sifirdan yeniden hesaplanir (idempotent).
+        mfe = 0.0
+        mae = 0.0
+        seen_fill = False
 
         for i, c in enumerate(candles):
             # --- 1) fill kontrolu ---
@@ -309,6 +347,14 @@ class SignalTracker:
             if risk <= 0:
                 self._close(sig["id"], "AMBIGUOUS", fill_price, 0.0)
                 return
+            # v3.6: bu mumun lehte/aleyhte gezinmesi (dolus mumu dahil)
+            seen_fill = True
+            fav = ((c["high"] - fill_price) if is_long
+                   else (fill_price - c["low"])) / risk
+            adv = ((fill_price - c["low"]) if is_long
+                   else (c["high"] - fill_price)) / risk
+            mfe = max(mfe, fav)
+            mae = max(mae, adv)
             hit_stop = (c["low"] <= sig["stop_loss"] if is_long
                         else c["high"] >= sig["stop_loss"])
             hit_tp = (c["high"] >= sig["tp1"] if is_long
@@ -318,20 +364,32 @@ class SignalTracker:
                 # kural LOSS sayar; ambiguous=1 ile ayrica raporlanabilir.
                 self._db.execute(
                     "UPDATE signals SET ambiguous=1 WHERE id=?", (sig["id"],))
+                self._save_excursion(sig["id"], mfe, mae)
                 self._close(sig["id"], "LOSS", sig["stop_loss"], -1.0)
                 return
             if hit_stop:
+                self._save_excursion(sig["id"], mfe, mae)
                 self._close(sig["id"], "LOSS", sig["stop_loss"], -1.0)
                 return
             if hit_tp:
                 reward = (sig["tp1"] - fill_price) if is_long else (fill_price - sig["tp1"])
+                self._save_excursion(sig["id"], mfe, mae)
                 self._close(sig["id"], "WIN", sig["tp1"], round(reward / risk, 2))
                 return
             bars_held = i - (filled_at_idx if filled_at_idx is not None else 0)
             if bars_held >= self._max_track:
                 pnl = (c["close"] - fill_price) if is_long else (fill_price - c["close"])
+                self._save_excursion(sig["id"], mfe, mae)
                 self._close(sig["id"], "EXPIRED", c["close"], round(pnl / risk, 2))
                 return
+        # kapanmadan cikti: acik FILLED sinyalin guncel MFE/MAE'sini yaz
+        if seen_fill:
+            self._save_excursion(sig["id"], mfe, mae)
+
+    def _save_excursion(self, signal_id: int, mfe: float, mae: float) -> None:
+        self._db.execute(
+            "UPDATE signals SET mfe_r=?, mae_r=? WHERE id=?",
+            (round(mfe, 3), round(mae, 3), signal_id))
 
     def _close(self, signal_id: int, outcome: str,
                exit_price: float | None, r_multiple: float) -> None:
@@ -341,6 +399,78 @@ class SignalTracker:
             (outcome, exit_price, r_multiple, _now_iso(), signal_id))
         log.info(kv(event="shadow_close", signal_id=signal_id,
                     outcome=outcome, r=r_multiple))
+
+    # ----------------------- v3.6-P1: kapi olay gunlugu (histerezis/TTL)
+    def log_gate_event(self, kind: str, detail: str) -> None:
+        """Market gate gecis/bekleme/TTL olaylarini kalici gunlukle.
+
+        Amac olcum: histerezis kac saat gecikme uretiyor, TTL gercekte
+        kac kez tetikleniyor? (Konsey: '2x4H fazla yavas olabilir; olc
+        ama simdi degistirme', 'TTL 2 saat keyfi; kesinti loglariyla
+        gerekcelendir'.)
+        """
+        try:
+            self._db.execute(
+                "INSERT INTO gate_log(ts_utc,kind,detail) VALUES(?,?,?)",
+                (_now_iso(), kind, detail))
+        except Exception:
+            log.exception(kv(event="gate_log_error", kind=kind))
+
+    # ------------------- v3.6-P1: gercek funding yakalama (maliyet v1 verisi)
+    def backfill_funding(self, md, budget: int = 2) -> int:
+        """Kapanan WIN/LOSS sinyalleri icin GERCEK funding maliyetini cek.
+
+        v0 maliyet modeli sabit %0.01/8s varsayar (kilitli; degismez).
+        Burada Bybit funding gecmisinden tutus suresindeki gercek oranlar
+        toplanir ve funding_r_real'e yazilir -> v1 maliyet modeli kilit-v2
+        penceresinde bu veriyle kurulur. Tarama basina en fazla `budget`
+        API cagrisi; hata bir sonraki tura birakilir (fail-soft).
+        Isaret kurali cost_r ile ayni: pozitif = maliyet (LONG pozitif
+        funding oder, SHORT alir).
+        """
+        # fill_ts'i olmayan eski kayitlar olculemez -> tek seferde isaretle
+        self._db.execute(
+            "UPDATE signals SET funding_done=1 WHERE status='CLOSED' "
+            "AND funding_done=0 AND (fill_ts IS NULL "
+            "OR outcome NOT IN ('WIN','LOSS'))")
+        rows = self._db.query(
+            "SELECT id,pair,direction,fill_ts,closed_utc,fill_price,"
+            "entry_min,entry_max,stop_loss FROM signals "
+            "WHERE status='CLOSED' AND blocked=0 AND funding_done=0 "
+            "AND outcome IN ('WIN','LOSS') ORDER BY id DESC LIMIT ?",
+            (budget,))
+        done = 0
+        for r in rows:
+            try:
+                end_ms = int(datetime.strptime(
+                    r["closed_utc"], "%Y-%m-%dT%H:%M:%SZ")
+                    .replace(tzinfo=timezone.utc).timestamp() * 1000)
+                hist = md.get_funding_history(r["pair"], r["fill_ts"], end_ms)
+                if hist is None:
+                    continue  # API hatasi: sonraki turda tekrar dene
+                rate_sum = 0.0
+                for h in hist:
+                    ts = int(h.get("fundingRateTimestamp", 0))
+                    if r["fill_ts"] <= ts <= end_ms:
+                        rate_sum += float(h.get("fundingRate", 0.0))
+                signed = rate_sum if r["direction"] == "LONG" else -rate_sum
+                entry = r["fill_price"] or (
+                    r["entry_max"] if r["direction"] == "LONG"
+                    else r["entry_min"])
+                stop_frac = (abs(entry - r["stop_loss"]) / entry
+                             if entry else 0.0)
+                funding_r = (round(signed / stop_frac, 4)
+                             if stop_frac > 0 else None)
+                self._db.execute(
+                    "UPDATE signals SET funding_r_real=?, funding_done=1 "
+                    "WHERE id=?", (funding_r, r["id"]))
+                done += 1
+                log.info(kv(event="funding_real", pair=r["pair"],
+                            funding_r=funding_r))
+            except Exception:
+                log.exception(kv(event="funding_backfill_error",
+                                 pair=r.get("pair")))
+        return done
 
     # ------------------------------------------------------- istatistik
     def stats(self) -> dict:
@@ -362,15 +492,22 @@ class SignalTracker:
             "SELECT (SELECT COUNT(*) FROM decisions) d, (SELECT COUNT(*) FROM candles) c")
         # v3.5: maliyet-sonrasi net metrikler + kume sayisi (n_eff altyapisi)
         closed_rows = self._db.query(
-            "SELECT direction,outcome,entry_min,entry_max,stop_loss,"
+            "SELECT id,direction,outcome,entry_min,entry_max,stop_loss,"
             "fill_price,r_multiple,created_utc,closed_utc,cluster_id "
             "FROM signals WHERE status='CLOSED' AND blocked=0 "
             "AND outcome IN ('WIN','LOSS')")
         net_vals = []
+        cluster_map_all: dict[str, list[float]] = {}
+        cluster_map_lock: dict[str, list[float]] = {}
         for r in closed_rows:
             cst = cost_r(r)
             if cst is not None and r.get("r_multiple") is not None:
-                net_vals.append(r["r_multiple"] - cst)
+                net = r["r_multiple"] - cst
+                net_vals.append(net)
+                cid = r.get("cluster_id") or f"solo{r['id']}"
+                cluster_map_all.setdefault(cid, []).append(net)
+                if (r.get("created_utc") or "") >= measurement.LOCK_UTC:
+                    cluster_map_lock.setdefault(cid, []).append(net)
         total_r_net = round(sum(net_vals), 2) if net_vals else None
         clusters = len({r["cluster_id"] for r in closed_rows
                         if r.get("cluster_id")}) or None
@@ -381,6 +518,33 @@ class SignalTracker:
             "THEN hypo_r ELSE 0 END) hr,"
             "SUM(CASE WHEN outcome='NOT_FILLED' AND hypo_r IS NOT NULL "
             "THEN 1 ELSE 0 END) hn FROM signals")
+        # ---- v3.6 olcum blogu: RESMI CI = kume-blok bootstrap ----
+        boot_all = measurement.cluster_bootstrap(cluster_map_all)
+        boot_lock = measurement.cluster_bootstrap(cluster_map_lock)
+        lock_clusters = len(cluster_map_lock)
+        ci_low_lock = (boot_lock or {}).get("ci_low")
+        ci_ok = ci_low_lock is not None and ci_low_lock > 0
+        ghost_rows = self._db.query(
+            "SELECT direction,entry_min,entry_max,stop_loss,hypo_r "
+            "FROM signals WHERE outcome='NOT_FILLED' AND hypo_r IS NOT NULL")
+        meas = {
+            "note": ("Resmi CI kume-blok bootstrap'tir; islem-duzeyi CI "
+                     "otokorelasyon nedeniyle raporlarda KULLANILMAZ "
+                     "(konsey 2. tur, 5/5)."),
+            "bootstrap_all": boot_all,
+            "bootstrap_since_lock": boot_lock,
+            "faz1": {
+                "rule": (">=50 bagimsiz kapanmis kume VE kume-CI alt "
+                         "siniri > 0 (sikilastirma: 2026-08-02)"),
+                "target_clusters": measurement.FAZ1_TARGET_CLUSTERS,
+                "clusters_since_lock": lock_clusters,
+                "ci_low_since_lock": ci_low_lock,
+                "ci_ok": ci_ok,
+                "gate_met": (lock_clusters
+                             >= measurement.FAZ1_TARGET_CLUSTERS) and ci_ok,
+            },
+            "not_filled_hypo_slip": measurement.hypo_slip_summary(ghost_rows),
+        }
         return {
             "note": "Shadow accounting: estimated fills, no slippage. Not real trading results.",
             "open_signals": open_row["n"] if open_row else 0,
@@ -398,8 +562,148 @@ class SignalTracker:
             "not_filled_hypo": {"n": (heat["hn"] or 0),
                                 "sum_r": round(heat["hr"] or 0, 2),
                                 "note": "teshis verisi; pismanlik sayaci degil"},
+            "measurement": meas,
             "per_pair": per_pair,
             "dataset": {"decisions_recorded": counts["d"], "candles_archived": counts["c"]},
+        }
+
+    # ---------------------------------------- v3.6: teshis dagilimlari
+    def diagnostics(self) -> dict:
+        """Konsey P0-3 teshisleri. Yalniz OKUMA; hicbir esik degistirmez.
+
+        Cevaplanan sorular: bir kume tum kari mi tasiyor? Isi-bloklu kohort
+        hangi kumelerde yigildi? Kapi-bloklu kohort hangi rejimlerde dogdu?
+        Kar tek paritede mi? WIN'ler LOSS'lardan uzun mu tutuluyor?
+        Guven etiketi gercekten ayristiriyor mu? Dolmayanlar kil payi mi
+        kacti? MFE/MAE ne soyluyor? Gercek funding v0 varsayimindan ne
+        kadar sapiyor?
+        """
+        rows = self._db.query(
+            "SELECT id,pair,direction,outcome,r_multiple,cluster_id,"
+            "created_utc,closed_utc,fill_ts,fill_price,entry_min,entry_max,"
+            "stop_loss,confidence,ambiguous,mfe_r,mae_r,funding_r_real,"
+            "funding_done FROM signals WHERE status='CLOSED' AND blocked=0 "
+            "AND outcome IN ('WIN','LOSS')")
+        per_cluster: dict[str, dict] = {}
+        by_conf: dict[str, list[float]] = {}
+        hold_h = {"WIN": [], "LOSS": []}
+        mfe_by = {"WIN": [], "LOSS": []}
+        mae_by = {"WIN": [], "LOSS": []}
+        funding_pairs = []   # (v0 varsayim, gercek) ayni sinyal icin
+        fmt = "%Y-%m-%dT%H:%M:%SZ"
+        for r in rows:
+            cst = cost_r(r)
+            net = (r["r_multiple"] - cst
+                   if cst is not None and r.get("r_multiple") is not None
+                   else None)
+            cid = r.get("cluster_id") or f"solo{r['id']}"
+            agg = per_cluster.setdefault(cid, {"n": 0, "net_r": 0.0})
+            agg["n"] += 1
+            if net is not None:
+                agg["net_r"] += net
+                by_conf.setdefault(r.get("confidence") or "?", []).append(net)
+            if r.get("fill_ts") and r.get("closed_utc"):
+                try:
+                    t1 = datetime.strptime(r["closed_utc"], fmt).replace(
+                        tzinfo=timezone.utc)
+                    hours = (t1.timestamp() - r["fill_ts"] / 1000) / 3600
+                    if 0 <= hours <= 96:
+                        hold_h[r["outcome"]].append(round(hours, 2))
+                except ValueError:
+                    pass
+            if r.get("mfe_r") is not None:
+                mfe_by[r["outcome"]].append(r["mfe_r"])
+                mae_by[r["outcome"]].append(r["mae_r"] or 0.0)
+            if r.get("funding_r_real") is not None and cst is not None:
+                # v0 funding bileseni = cost - fee - slip
+                fee = 2 * TAKER_FEE
+                entry = r["fill_price"] or (
+                    r["entry_max"] if r["direction"] == "LONG"
+                    else r["entry_min"])
+                sf = abs(entry - r["stop_loss"]) / entry if entry else 0
+                if sf > 0:
+                    slip = (STOP_SLIP if r["outcome"] == "LOSS" else 0) / sf
+                    v0_f = cst - fee / sf - slip
+                    funding_pairs.append((round(v0_f, 4),
+                                          r["funding_r_real"]))
+        cluster_list = sorted(
+            ({"cluster": k, "n": v["n"], "net_r": round(v["net_r"], 2)}
+             for k, v in per_cluster.items()),
+            key=lambda x: x["net_r"], reverse=True)
+        conc = measurement.top_share([c["net_r"] for c in cluster_list])
+        # isi-bloklu kohortun kume dagilimi
+        heat_dist = self._db.query(
+            "SELECT COALESCE(cluster_id,'?') cluster, COUNT(*) n "
+            "FROM signals WHERE blocked=2 GROUP BY cluster_id "
+            "ORDER BY n DESC LIMIT 15")
+        # kapi-bloklu kohortun rejim dagilimi (contract_json'dan)
+        gate_regime: dict[str, int] = {}
+        for g in self._db.query(
+                "SELECT contract_json FROM signals WHERE blocked=1"):
+            try:
+                regime = (json.loads(g["contract_json"] or "{}")
+                          .get("regime") or "unknown")
+            except (json.JSONDecodeError, TypeError):
+                regime = "unknown"
+            gate_regime[regime] = gate_regime.get(regime, 0) + 1
+        # parite yogunlasmasi
+        pair_rows = self._db.query(
+            "SELECT pair, COUNT(*) n, ROUND(SUM(r_multiple),2) gross_r "
+            "FROM signals WHERE status='CLOSED' AND blocked=0 "
+            "AND outcome IN ('WIN','LOSS') GROUP BY pair "
+            "ORDER BY gross_r DESC")
+        pair_conc = measurement.top_share(
+            [p["gross_r"] or 0.0 for p in pair_rows])
+        # guven etiketi permutasyonu: HIGH vs digerleri
+        high = by_conf.get("HIGH", [])
+        rest = [x for k, v in by_conf.items() if k != "HIGH" for x in v]
+        # NOT_FILLED anatomi ozeti
+        nf = self._db.query(
+            "SELECT nf_gap_r, nf_touch_bars, nf_crossed FROM signals "
+            "WHERE outcome='NOT_FILLED' AND nf_done=1 "
+            "AND nf_gap_r IS NOT NULL")
+        # kapi olay gunlugu
+        gate_counts = {r["kind"]: r["n"] for r in self._db.query(
+            "SELECT kind, COUNT(*) n FROM gate_log GROUP BY kind")}
+        gate_recent = self._db.query(
+            "SELECT ts_utc,kind,detail FROM gate_log "
+            "ORDER BY id DESC LIMIT 20")
+        return {
+            "note": ("v3.6 teshis paketi - yalniz olcum; motor/kilit "
+                     "degismez. Golge muhasebe; yatirim tavsiyesi degildir."),
+            "per_cluster_pnl": {"clusters": cluster_list[:30],
+                                "concentration": conc},
+            "heat_blocked_cluster_dist": heat_dist,
+            "gate_blocked_regime_dist": gate_regime,
+            "pair_concentration": {"top": pair_rows[:10],
+                                   "concentration": pair_conc},
+            "holding_hours": {
+                "win_median": measurement.median_or_none(hold_h["WIN"]),
+                "loss_median": measurement.median_or_none(hold_h["LOSS"]),
+                "win_n": len(hold_h["WIN"]), "loss_n": len(hold_h["LOSS"])},
+            "mfe_mae": {
+                "win_mfe_median": measurement.median_or_none(mfe_by["WIN"]),
+                "win_mae_median": measurement.median_or_none(mae_by["WIN"]),
+                "loss_mfe_median": measurement.median_or_none(mfe_by["LOSS"]),
+                "loss_mae_median": measurement.median_or_none(mae_by["LOSS"]),
+                "note": "yeni sinyallerde birikir; eski kayitlar bos olabilir"},
+            "confidence_permutation": measurement.permutation_pvalue(
+                high, rest),
+            "nf_anatomy": {
+                "n": len(nf),
+                "gap_r_median": measurement.median_or_none(
+                    [x["nf_gap_r"] for x in nf]),
+                "touch_bars_median": measurement.median_or_none(
+                    [float(x["nf_touch_bars"] or 0) for x in nf]),
+                "crossed_ratio": (round(sum(x["nf_crossed"] or 0
+                                            for x in nf) / len(nf), 3)
+                                  if nf else None)},
+            "funding_v1_preview": {
+                "n": len(funding_pairs),
+                "v0_assumed_sum": round(sum(a for a, _ in funding_pairs), 3),
+                "real_sum": round(sum(b for _, b in funding_pairs), 3),
+                "note": "maliyet modeli v1 icin veri; v0 kilitli kalir"},
+            "gate_log": {"counts": gate_counts, "recent": gate_recent},
         }
 
     def recent_signals(self, limit: int = 50) -> list[dict]:

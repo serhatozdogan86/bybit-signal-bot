@@ -127,6 +127,11 @@ class Scheduler:
 
         if self._tracker is not None:
             self._evaluate_orphans(scanned)
+            try:
+                # v3.6-P1: gercek funding yakalama (tarama basina <=2 cagri)
+                self._tracker.backfill_funding(self._md)
+            except Exception:
+                log.exception(kv(event="funding_backfill_loop_error"))
         self._store.record_scan(
             datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
         return results
@@ -169,6 +174,8 @@ class Scheduler:
             self._bias_ts = now
             log.info(kv(event="market_bias", bias=bias,
                         votes="/".join(votes)))
+            # v3.6-P1: histerezis gecikmesini olcmek icin kalici gunluk
+            self._log_gate(prev, bias, votes)
             return bias
         except Exception:
             log.exception(kv(event="market_bias_error"))
@@ -177,8 +184,32 @@ class Scheduler:
                 log.warning(kv(event="market_bias_stale",
                                bias=self._bias_state,
                                age_s=int(now - last_ts)))
+                self._log_gate_event("ttl_stale",
+                                     f"bias={self._bias_state} "
+                                     f"age_s={int(now - last_ts)}")
                 return self._bias_state              # TTL icinde: son rejim
+            self._log_gate_event("halt", "fail-closed: veri yok, TTL asildi")
             return "halt"                            # fail-closed
+
+    def _log_gate(self, prev: str, bias: str, votes: list[str]) -> None:
+        """Gecis ve bekleyen-gecis olaylarini tracker gunlugune yaz."""
+        if prev != bias:
+            self._log_gate_event("transition",
+                                 f"{prev}->{bias} votes={'/'.join(votes)}")
+        elif votes[-1] not in ("neutral", bias):
+            # son mum karsi oy verdi ama histerezis teyit bekliyor:
+            # bu kayitlarin suresi = histerezisin urettigi gecikme
+            self._log_gate_event("pending_flip",
+                                 f"state={bias} votes={'/'.join(votes)}")
+
+    def _log_gate_event(self, kind: str, detail: str) -> None:
+        tracker = getattr(self, "_tracker", None)
+        if tracker is None:
+            return
+        try:
+            tracker.log_gate_event(kind, detail)
+        except Exception:
+            log.exception(kv(event="gate_log_write_error"))
 
     def _evaluate_orphans(self, scanned: set[str]) -> None:
         """Evren disina dusen paritelerin acik sinyallerini yasat (v3.0).

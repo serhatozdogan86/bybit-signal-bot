@@ -30,6 +30,23 @@ Boyut: ≤2.000 USDT · risk ≤%0.5 · ≤3 slot.
 - [ ] Risk-of-ruin (%1 risk, E_net, σ) < %5 @ 1 yıl
 Boyut kademeli; risk asla >%1/işlem.
 
+## Ek — 2026-08-02: Faz-1 eşiği SIKILAŞTIRILDI (konsey 2. tur, 5/5)
+Gerekçe: "Elinde 112 işlem yok, 16 bağımsız karar var." Gözlem birimi işlem
+değil KÜMEDİR (aynı yön + aynı 4H penceresi); işlem sayısı bağımsız kanıt
+sayısını şişirir. Bu ek yalnız SIKILAŞTIRIR (dosya kuralı: sıkılaştırma
+serbest, yumuşatma yasak):
+
+- Faz-1 doluş kriteri "≥100 maliyet-modelli sonuçlanan doluş" yerine:
+  **≥50 bağımsız KAPANMIŞ küme** (kilit anından itibaren; gözlenen oran
+  ~7 doluş/küme ile bu, 100 doluş kriterini fiilen kapsar ve aşar).
+- CI kriteri netleştirildi: **küme-blok bootstrap %95 CI(E_net) alt
+  sınırı > 0, kilit-sonrası kohort üzerinde.** İşlem-düzeyi CI hiçbir
+  raporda ve hiçbir kapı kararında KULLANILMAZ.
+- Diğer tüm Faz-1 koşulları (≥30 gün, ≥2 rejim, ısı motoru, dead-man's
+  switch) aynen geçerlidir.
+- Denetim: /performance → measurement.faz1 bloğu bu kapıyı otomatik
+  raporlar (clusters_since_lock, ci_ok, gate_met).
+
 ## Her fazda geçerli
 Gölge motor paralel çalışmaya devam eder (canlı-gölge farkı = gerçek maliyet
 ölçümü). Tüm sonuçlar için: geçmiş performans gelecek garantisi değildir;

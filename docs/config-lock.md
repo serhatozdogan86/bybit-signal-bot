@@ -33,3 +33,15 @@ kriterleridir, ayar izni değildir.
 
 Denetim: her "durum" raporunda bu üç kriter kontrol edilir (bootstrap dahil);
 tetiklenme yoksa rapora tek satır "yanlışlama: temiz" düşülür.
+
+## v3.6 Ölçüm Paketi notu (eklendi: 2026-08-02 — kilit İHLAL EDİLMEDİ)
+Konsey 2. turunun tüm P0 talepleri ÖLÇÜMDÜR, davranış değildir; motor aynı
+sinyalleri aynı eşiklerle üretmeye devam eder. Bu commit'te eklenenler:
+küme-blok bootstrap CI (resmî CI; işlem-düzeyi CI raporlardan kaldırıldı),
+NOT_FILLED anatomisi (boşluk/temas/geçiş + kaymalı hayalet R), teşhis
+dağılımları (/measurement), MFE/MAE kaydı, kapı geçiş/TTL günlüğü, gerçek
+funding yakalama (maliyet v1 VERİSİ — v0 modeli kilitli kalır, başlık
+metrikleri v0 ile hesaplanmaya devam eder), güven etiketi permütasyon testi
+(sonuç negatifse etiket kilit-v2'de kaldırılır).
+Faz-1 eşiği go-live-criteria.md 2026-08-02 ekiyle sıkılaştırıldı:
+≥50 kapanmış küme + küme-CI alt sınırı > 0. Sıkılaştırma kurala uygundur.

@@ -528,6 +528,10 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="lbl"><span>elenen →</span><span id="plbl">SIGNAL</span></div>
         </div>
       </div>
+      <div class="card">
+        <div class="chead"><span class="tipwrap" tabindex="0" data-tip="v3.6 ölçüm paketi. Resmî güven aralığı KÜME-blok bootstrap ile hesaplanır: gözlem birimi işlem değil kümedir (aynı yön + aynı 4H penceresi = tek fikir), çünkü aynı kümedeki işlemler bağımlıdır ve işlem-düzeyi CI aralığı yapay daraltır. Faz-1 kapısı: kilitten itibaren ≥50 bağımsız kapanmış küme VE küme-CI alt sınırı > 0 (2026-08-02 sıkılaştırması). Hayalet R satırı, dolmayan sinyallerin ideal-doluş varsayımlı toplamını %0.3 kayma senaryosuyla birlikte gösterir — ideal rakamın yanılsama payını görünür kılar. Tümü gölge muhasebedir; yatırım tavsiyesi değildir.">Ölçüm · v3.6 <span class="i">ⓘ</span></span> <span class="tag">küme istatistiği</span></div>
+        <div class="cbody strat" id="measure"><div class="empty">yükleniyor…</div></div>
+      </div>
       <div class="card fill pf" id="pfCard">
         <div class="chead"><span class="tipwrap" tabindex="0" data-tip="Gölge sinyalleri para yönetimi diline çevirir. Model: her kapanan işlemde bakiyenin, girdiğin Risk % kadarı riske atılır; sonuç bakiye × (1 + risk × R) olarak İŞLEM KAPANIŞ SIRASIYLA bileşik işler (örn. 10.000$ ve %1 riskte +2.2R kazanç = +220$, −1R kayıp = −100$). Bugün / 7 gün / 30 gün satırları, o pencerede kapanan işlemlerin bakiyeye net etkisidir; 'açılan' o gün üretilen sinyal sayısıdır (günler UTC). Başlangıç $ ve Risk % alanlarını buradan değiştirebilirsin — tarayıcında saklanır. Kayma/komisyon yoktur; simülasyondur, gerçek para değildir. KAPASİTE MODU: Slot ve Kaldıraç alanları gerçek sermaye kısıtını modeller — sermaye slotlara bölünür, defter doluyken gelen sinyal atlanır (atlanan sayısı gösterilir); 'sınırsız varsayım' satırı kısıtsız teorik bakiyeyi kıyas için verir.">Portföy Simülasyonu <span class="i">ⓘ</span></span> <span class="tag">gölge · bileşik</span></div>
         <div class="cbody fill scroll" id="pf">
@@ -698,6 +702,13 @@ const RU={
 "Filtre Boru Hattı":"Конвейер фильтров","Kümülatif R (Equity)":"Кумулятивный R (эквити)",
 "yeşil WIN · kırmızı LOSS":"зелёный WIN · красный LOSS",
 "Yön Bilançosu":"Баланс по направлениям","tıkla → yön filtresi":"клик → фильтр направления",
+/* v3.6 olcum karti */
+"Ölçüm · v3.6":"Измерение · v3.6","küme istatistiği":"кластерная статистика",
+"Küme-CI (E_net)":"Кластерный CI (E_net)","E_net · örneklem":"E_net · выборка",
+"Faz-1 kapısı":"Гейт Фазы-1","Hayalet R · kayma":"Призрачный R · проскальз.",
+"ölçüm verisi yok":"нет данных измерения","küme":"кластеров",
+"v3.6 ölçüm paketi. Resmî güven aralığı KÜME-blok bootstrap ile hesaplanır: gözlem birimi işlem değil kümedir (aynı yön + aynı 4H penceresi = tek fikir), çünkü aynı kümedeki işlemler bağımlıdır ve işlem-düzeyi CI aralığı yapay daraltır. Faz-1 kapısı: kilitten itibaren ≥50 bağımsız kapanmış küme VE küme-CI alt sınırı > 0 (2026-08-02 sıkılaştırması). Hayalet R satırı, dolmayan sinyallerin ideal-doluş varsayımlı toplamını %0.3 kayma senaryosuyla birlikte gösterir — ideal rakamın yanılsama payını görünür kılar. Tümü gölge muhasebedir; yatırım tavsiyesi değildir.":
+ "Пакет измерений v3.6. Официальный доверительный интервал считается КЛАСТЕРНЫМ блочным бутстрапом: единица наблюдения — не сделка, а кластер (одно направление + одно 4H-окно = одна идея), потому что сделки внутри кластера зависимы, и CI на уровне сделок искусственно сужается. Гейт Фазы-1: с момента фиксации конфигурации ≥50 независимых закрытых кластеров И нижняя граница кластерного CI > 0 (ужесточение от 2026-08-02). Строка «Призрачный R» показывает сумму незаполненных сигналов при допущении идеального входа вместе со сценарием проскальзывания 0.3% — делает видимой долю иллюзии в идеальной цифре. Всё это теневой учёт; не инвестиционная рекомендация.",
 "Sinyaller · Gölge Takip":"Сигналы · Теневой учёт","satıra tıkla → detay":"клик по строке → детали",
 "Piyasa Nabzı":"Пульс рынка","canlı metrikler":"живые метрики",
 "Saatlik Değerlendirme":"Часовой обзор","hourly_review · otomatik":"hourly_review · автоматически",
@@ -854,6 +865,7 @@ const RU_PAT=[
  [/başabaş ~%([\d.]+)/, (m,n)=>`безубыток ~${n}%`],
  [/hepsi \((\d+)\)/, (m,n)=>`все (${n})`],
  [/güven (HIGH|MEDIUM|LOW)/, (m,g)=>`уверенность ${g}`],
+ [/(\d+) küme \/ (\d+)/, (m,a,b)=>`${a} кластеров / ${b}`],
  [/riskin %([\d.]+)'i/, (m,n)=>`${n}% от риска`],
  [/~([\d]+)x/, (m,n)=>`~${n}x`]
 ];
@@ -1038,6 +1050,29 @@ function renderHeader(perf,status){
   const be=w.count?(100/(1+(w.sum_r/w.count))).toFixed(1):null;
   const pos=be&&Number(wr)>Number(be);
   el.innerHTML=`<b>${perf.decided_trades}</b> sinyal sonuçlandı · isabet <b>%${wr}</b>${be?" (başabaş ~%"+be+")":""} · toplam <b class="${tr>=0?"pos":"neg"}">${(tr>0?"+":"")+num(tr)}R</b> · ${pos?'<span class="pos">eşiğin üzerinde</span>':'<span class="neg">eşiğin altında</span>'} · n<30, hüküm için erken`;
+}
+
+/* ---------- v3.6 olcum karti: kume-CI + Faz-1 kapisi ---------- */
+function renderMeasure(perf){
+  const el=$("measure");if(!el)return;
+  const m=perf&&perf.measurement;
+  if(!m){el.innerHTML='<div class="empty">ölçüm verisi yok</div>';return;}
+  const b=m.bootstrap_since_lock||m.bootstrap_all;
+  const f=m.faz1||{};
+  const g=m.not_filled_hypo_slip||{};
+  const sgn=v=>v==null?"—":(v>0?"+":"")+num(v,2);
+  const ciTxt=(b&&b.ci_low!=null)
+    ?`<b class="num ${b.ci_low>0?"pos":"neg"}">[${sgn(b.ci_low)}, ${sgn(b.ci_high)}]</b>`
+    :"<b>—</b>";
+  const eTxt=b?`<b class="num ${b.e_net>0?"pos":b.e_net<0?"neg":""}">${sgn(b.e_net)}R</b> · ${b.n_clusters} küme / ${b.n_trades}`:"<b>—</b>";
+  const fazTxt=`<b class="num">${f.clusters_since_lock??"—"}/${f.target_clusters??50}</b> küme · CI ${f.ci_ok?'<span class="pos">✓</span>':'<span class="neg">✗</span>'}`;
+  const s30=g["sum_r_slip_30bps"];
+  const gTxt=(g.n?`<b class="num">${sgn(g.sum_r_ideal)}R</b> → s30 <b class="num">${sgn(s30)}R</b>`:"<b>—</b>");
+  el.innerHTML=
+    `<div class="srow"><span>Küme-CI (E_net)</span><span>${ciTxt}</span></div>`+
+    `<div class="srow"><span>E_net · örneklem</span><span>${eTxt}</span></div>`+
+    `<div class="srow"><span>Faz-1 kapısı</span><span>${fazTxt}</span></div>`+
+    `<div class="srow"><span>Hayalet R · kayma</span><span>${gTxt}</span></div>`;
 }
 
 /* ---------- KPI (tiklanabilir -> tablo filtresi) ---------- */
@@ -1793,6 +1828,7 @@ async function refresh(){
   SIGNALS=(signals||[]).slice().sort((a,b)=>(b.id||0)-(a.id||0));
   renderHeader(perf,status);
   renderKpis(perf,status,uni,SIGNALS);
+  renderMeasure(perf);
   renderCurve(SIGNALS);
   renderDuel(SIGNALS);
   renderChips();renderSignals();

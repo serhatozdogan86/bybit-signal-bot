@@ -55,3 +55,8 @@ class MarketDataService:
     def get_orderbook(self, symbol: str, depth: int = 50) -> dict | None:
         """Orderbook snapshot (Phase 2 - ORDERBOOK_ENRICH icin)."""
         return self._client.get_orderbook(symbol, depth)
+
+    def get_funding_history(self, symbol: str, start_ms: int | None = None,
+                            end_ms: int | None = None) -> list[dict] | None:
+        """Gercek funding oranlari (v3.6 maliyet-v1 veri toplama)."""
+        return self._client.get_funding_history(symbol, start_ms, end_ms)
