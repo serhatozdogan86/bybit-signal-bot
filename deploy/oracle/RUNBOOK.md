@@ -59,3 +59,25 @@ Render'daki son değerlerle birebir olmalı (86 sonuçlanan vb.).
 - Ubuntu güvenlik yamaları otomatik (unattended-upgrades).
 - DB artık kalıcı: /opt/bybit-signal-bot/data/bot.db (gist = felaket sigortası).
 - VM yeniden başlarsa her şey otomatik ayağa kalkar (systemd enable).
+
+
+## Pano şifresi açma / değiştirme (v3.6)
+```
+sudo nano /etc/bybit-bot.env      # DASHBOARD_TOKEN=<jeton> satırını ekle/değiştir
+sudo chmod 600 /etc/bybit-bot.env
+sudo systemctl restart bybit-bot
+systemctl status bybit-bot        # active (running)
+curl -s -o /dev/null -w '%{http_code}\n' localhost:8080/status          # 401 bekleniyor
+curl -s -o /dev/null -w '%{http_code}\n' localhost:8080/healthz         # 200 (muaf)
+curl -s -o /dev/null -w '%{http_code}\n' "localhost:8080/status?k=<jeton>"  # 200
+```
+Tarayıcı: `https://<adres>/?k=<jeton>` → jeton HttpOnly çereze yazılır, adres
+temizlenir. Sonraki girişlerde düz adres yeter.
+
+Kapatmak: satırı `DASHBOARD_TOKEN=` (boş) yap → restart. Kilitlenme riski yok.
+
+Durum değiştiren rotalar POST'tur:
+```
+curl -X POST -H "X-Auth-Token: <jeton>" https://<adres>/scan/dry
+curl -X POST -H "X-Auth-Token: <jeton>" https://<adres>/backup/now
+```
