@@ -1,0 +1,75 @@
+# Challenger Stratejiler — Tasarım Belgesi (v0, 2026-08-03)
+
+## Amaç
+Şampiyon (breakout-retest motoru) Faz-1'i geçemezse elde ölçülmüş
+alternatifler olsun. Kurumsal adı **champion/challenger**: sistematik
+fonların standart pratiği — mevcut strateji yayında ölçülürken adaylar
+paralel gölge modda aynı standartla ölçülür.
+
+**Dürüstlük notu:** Büyük şirketlerin gerçek algoritmaları kamuya açık
+değildir. Kamuya açık ve on yıllardır belgeli olan şey strateji AİLELERİDİR:
+trend takibi (CTA/managed futures), ortalamaya dönüş (stat-arb ailesi),
+taşıma/carry, kesitsel momentum. Market-making ve HFT de kurumların ana işi
+ama bizim altyapıyla (emir defteri eşleşmesi, gecikme, envanter yönetimi)
+imkânsız — kapsam dışı.
+
+## Aday stratejiler (4 tam + 1 ikinci dalga)
+
+| # | Aile | Kural özeti (v1) | Neden |
+|---|------|------------------|-------|
+| S1 | **Trend takibi (TSMOM)** | 4H kapanış EMA200 üstünde VE son 12×4H getiri > 0 → LONG (tersi SHORT). Giriş LTF kapanışta (market). Stop 2×ATR(14,4H). Çıkış: 3×ATR chandelier (4H kapanışta) veya karşı rejim. | En çok belgelenmiş kurumsal aile (managed futures). Bizim kapı zaten yarısını yapıyor; bu, tam hâli. |
+| S2 | **Donchian kırılımı (Turtle)** | 20×4H yüksek kırılımında LONG, 20×4H düşük kırılımında SHORT; giriş kırılım mumu kapanışında. Stop 2×ATR. Çıkış: 10×4H karşı Donchian. | Klasik trend; şampiyonun "retest bekle" yaklaşımının tersi — retest beklemenin maliyetini ölçer (hayalet R bulgusuyla doğrudan konuşur). |
+| S3 | **Kısa vadeli ortalamaya dönüş** | Yalnız range rejiminde (4H ADX<20): 15m kapanış 20-SMA'dan 2σ saptığında ters yön. Stop 1.5×ATR(15m). TP: orta banda dönüş. Zaman aşımı 96 bar. | Şampiyonun sustuğu chop rejiminde çalışır — portföy açısından en tamamlayıcı bahis. |
+| S4 | **Funding carry** | 8s funding penceresinde yıllıklandırılmış \|oran\| > %30 olan parite: pozitif → SHORT, negatif → LONG. Stop 2×ATR(4H). Çıkış: funding normalleşince veya 48 saat. | Kripto fonlarının fiilen işlettiği taşıma stratejisi. Gerçek funding verisini v3.6'da toplamaya başladık — doğrudan sinerji. |
+| S5 | **Kesitsel momentum** (2. dalga) | Evrende 24s göreli güç sıralaması; en güçlü %10 LONG / en zayıf %10 SHORT, 8 saatte bir yeniden denge. | Farklı bahis türü (mutlak değil göreli yön). R-muhasebesine oturmaz; kendi Sharpe'ıyla raporlanmalı → implementasyonu ayrı dalga. |
+
+Hepsi **kapanış-bazlı giriş** kullanır: limit-bölge doluşu yok →
+NOT_FILLED belirsizliği yok → hem gölge takip hem geçmiş test şampiyondan
+daha dürüst ölçülür. Karşılaştırmada bu asimetri açıkça not edilecek
+(şampiyonun hayalet R'si limit-giriş bedelini zaten gösteriyor).
+
+## Ölçüm standardı (şampiyonla birebir aynı)
+- Maliyet modeli v0 (2×taker + stop kayması + funding varsayımı) her aday için.
+- Küme tanımı aynı: yön + 4H penceresi; küme-blok bootstrap CI.
+- Karar eşiği aynı: **≥50 kapanmış küme + küme-CI alt sınırı > 0.**
+- Bağımsız denetçi (verifier) her adayın kayıtlarını da yeniden oynatır.
+
+## Çoklu karşılaştırma tuzağı (kritik)
+5 stratejiden en iyisini seçmek, kazananın görünür performansını şişirir
+(seçim yanlılığı). Kural:
+1. **Seçim penceresi** ve **doğrulama penceresi** ayrılır.
+2. Kazanan aday, seçildikten SONRA toplanan veride de küme-CI > 0 vermek
+   zorundadır (walk-forward). Seçim penceresindeki rakamı hüküm değildir.
+3. Ara sıralamalar rapor edilir ama "başarılı" etiketi yalnız doğrulama
+   penceresinden çıkar.
+
+## Geçmiş test (backtest) gerçekliği
+- Gist arşivi ~2–8.5 gün derinliğinde (parite başına 262–818×15m mum) —
+  dürüst backtest için YETERSİZ.
+- VM üzerinden (Claude Code) Bybit kline geçmişi aylar geriye çekilebilir;
+  kapanış-bazlı adaylar bu veriyle dürüst backtest edilebilir.
+- Backtest yalnız BUDAMA için kullanılır (bariz çöpü ele); karar her zaman
+  ileriye dönük gölge veriden çıkar.
+
+## İzolasyon şartları (implementasyon ön koşulu)
+1. Adaylar **saf fonksiyon**dur: aynı taramada zaten çekilmiş mum serileri
+   üzerinde değerlendirilir — **ekstra API çağrısı sıfır** (funding zaten
+   çekiliyor). Şampiyonun veri toplama zamanlaması etkilenemez.
+2. Aday kayıtları **ayrı tabloya** yazılır (`challenger_signals`);
+   şampiyon tablolarına tek satır yazım yok.
+3. Değişmezlik testi: adaylar açıkken ve kapalıyken şampiyonun `stats()`
+   çıktısı **bayt-bayt aynı** olmalı — test bunu zorlar.
+4. Aday kodundaki hiçbir hata taramayı düşüremez (fail-soft, hata sayaçlı).
+
+## Zamanlama
+- **Faz A (şimdi):** bu belge. Kod yok, kilit ihlali yok.
+- **Faz B tetikleyicisi:** otomatik denetim art arda 2 temiz tur + #57/#6
+  kapanışı. Sonra S1–S4 implementasyonu (izolasyon şartlarıyla) + VM'de
+  backtest verisi çekimi.
+- **Karşılaştırma raporu:** şampiyonun Faz-1 hükmü çıktığında (≈50 küme)
+  adayların ara sıralaması hazır olur. Adaylar için kesin hüküm kendi 50
+  kümelerini doldurunca verilir — 8 günde kimseye madalya yok.
+
+## Kilit uyumu
+Şampiyon motoruna, eşiklerine, ölçüm penceresine dokunulmaz. Adaylar ayrı
+kohort, ayrı tablo, sıfır etkileşim. Bu belge docs-only'dir.
