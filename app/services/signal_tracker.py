@@ -135,6 +135,7 @@ class SignalTracker:
             "id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "ts_utc TEXT, kind TEXT, detail TEXT)")
         self._backfill_cluster_ids()
+        self._backfill_fill_ts()
         self._repair_bad_outcomes()
 
     def verify_outcomes(self, limit: int = 400) -> dict:
@@ -224,6 +225,44 @@ class SignalTracker:
         if reopened:
             log.warning(kv(event="outcome_repair_done", reopened=reopened))
         return reopened
+
+    def _backfill_fill_ts(self) -> int:
+        """fill_ts'i olmayan DOLMUS kayitlara dolus anini ham mumlardan turet.
+
+        NEDEN: fill_ts kolonu sonradan eklendi; oncesinde dolan kayitlarda
+        NULL. "Dolus oncesi mum karara giremez" kapisi fill_ts'e bagli
+        oldugundan, bu eski kayitlar degerlendirmede HER mumu atlayip zombi
+        kaliyordu (#57, #6). Uydurma degil TURETMEDIR: giris bolgesi ve
+        mumlar kayitli; canli dolus kuraliyla (kenara ilk temas, dolus
+        penceresi icinde) birebir ayni kosul uygulanir. Temas bulunamazsa
+        NULL birakilir ve sayisi loglanir - sessiz kabul yok.
+        """
+        rows = self._db.query(
+            "SELECT id,pair,direction,entry_candle_ts,entry_min,entry_max "
+            "FROM signals WHERE fill_price IS NOT NULL AND fill_ts IS NULL "
+            "AND entry_candle_ts IS NOT NULL")
+        fixed = 0
+        for r in rows:
+            candles = self._db.query(
+                "SELECT ts,high,low FROM candles WHERE symbol=? AND interval=? "
+                "AND ts>=? ORDER BY ts ASC LIMIT ?",
+                (r["pair"], self._ltf, r["entry_candle_ts"],
+                 self._fill_window))
+            is_long = r["direction"] == Direction.LONG.value
+            edge = r["entry_max"] if is_long else r["entry_min"]
+            if edge is None:
+                continue
+            for c in candles:
+                if (c["low"] <= edge) if is_long else (c["high"] >= edge):
+                    self._db.execute(
+                        "UPDATE signals SET fill_ts=? WHERE id=?",
+                        (c["ts"], r["id"]))
+                    fixed += 1
+                    break
+        if rows:
+            log.info(kv(event="fill_ts_backfill", scanned=len(rows),
+                        fixed=fixed))
+        return fixed
 
     def _backfill_cluster_ids(self) -> int:
         """cluster_id'si bos kayitlari geriye donuk etiketle (v3.6 duzeltme).
@@ -457,6 +496,11 @@ class SignalTracker:
         is_long = sig["direction"] == Direction.LONG.value
         fill_price = sig["fill_price"]
         filled_at_idx: int | None = None
+        # Zombi kilidi (ayni sinifin son kapisi): dolmus ama fill_ts'i
+        # olmayan kayitta dolus ani yuruyus sirasinda ayni temas kuraliyla
+        # tespit edilir; kapi sonsuza dek kapali kalamaz.
+        derive_fill = fill_price is not None and sig.get("fill_ts") is None
+        edge = sig["entry_max"] if is_long else sig["entry_min"]
         # v3.6-P0: MFE/MAE - dolus sonrasi en iyi/en kotu gezinme, R cinsinden.
         # Her degerlendirmede sifirdan yeniden hesaplanir (idempotent).
         mfe = 0.0
@@ -489,6 +533,13 @@ class SignalTracker:
             # DIKKAT: sinyal onceki turda dolduysa fill_price DB'den gelir ve
             # dongu entry_candle_ts'ten baslar - dolus ONCESI mumlar da bu
             # bloga girer. fill_ts ile filtrelenmezse MFE/MAE sisirilir.
+            if (derive_fill and filled_at_idx is None and edge is not None
+                    and ((c["low"] <= edge) if is_long
+                         else (c["high"] >= edge))):
+                filled_at_idx = i
+                self._db.execute("UPDATE signals SET fill_ts=? WHERE id=?",
+                                 (c["ts"], sig["id"]))
+                sig["fill_ts"] = c["ts"]
             at_or_after_fill = (filled_at_idx is not None
                                 or (sig.get("fill_ts") is not None
                                     and c["ts"] >= sig["fill_ts"]))

@@ -13,7 +13,18 @@ taşıma/carry, kesitsel momentum. Market-making ve HFT de kurumların ana işi
 ama bizim altyapıyla (emir defteri eşleşmesi, gecikme, envanter yönetimi)
 imkânsız — kapsam dışı.
 
-## Aday stratejiler (4 tam + 1 ikinci dalga)
+**SMC hakkında dürüstlük (S6):** "Smart Money Concepts" kurumsal bir yöntem
+değil, perakende eğitim dünyasının (ICT kökenli) fiyat-aksiyonu SÖZLÜĞÜDÜR.
+Kurumsal akrabası emir-akışı/likidite sağlayıcılığıdır — kapsam dışı. İkinci
+gerçek: şampiyonumuz zaten SMC lehçesi konuşuyor (süpürme teyidi, yapı
+kırılımı, kabul, retest ≈ BOS + order-block dönüşü). Bu yüzden S6, SMC'nin
+şampiyonla ÖRTÜŞMEYEN tek çekirdeğine indirgendi: süpürme-dönüşü (stop avı
+sonrası ters yön). Order block / FVG v1'de bilinçli olarak YOK — tanımları
+esnek olduğu için ölçülemez; mekanik tanım bulunursa v2'de confluence olarak
+denenir. Kural: takdire dayalı hiçbir öğe ölçüme giremez (yanlışlanamaz
+strateji, strateji değildir).
+
+## Aday stratejiler (5 tam + 1 ikinci dalga)
 
 | # | Aile | Kural özeti (v1) | Neden |
 |---|------|------------------|-------|
@@ -22,6 +33,7 @@ imkânsız — kapsam dışı.
 | S3 | **Kısa vadeli ortalamaya dönüş** | Yalnız range rejiminde (4H ADX<20): 15m kapanış 20-SMA'dan 2σ saptığında ters yön. Stop 1.5×ATR(15m). TP: orta banda dönüş. Zaman aşımı 96 bar. | Şampiyonun sustuğu chop rejiminde çalışır — portföy açısından en tamamlayıcı bahis. |
 | S4 | **Funding carry** | 8s funding penceresinde yıllıklandırılmış \|oran\| > %30 olan parite: pozitif → SHORT, negatif → LONG. Stop 2×ATR(4H). Çıkış: funding normalleşince veya 48 saat. | Kripto fonlarının fiilen işlettiği taşıma stratejisi. Gerçek funding verisini v3.6'da toplamaya başladık — doğrudan sinerji. |
 | S5 | **Kesitsel momentum** (2. dalga) | Evrende 24s göreli güç sıralaması; en güçlü %10 LONG / en zayıf %10 SHORT, 8 saatte bir yeniden denge. | Farklı bahis türü (mutlak değil göreli yön). R-muhasebesine oturmaz; kendi Sharpe'ıyla raporlanmalı → implementasyonu ayrı dalga. |
+| S6 | **Likidite süpürme dönüşü (SMC'nin ölçülebilir çekirdeği)** | Fiyat son 96×15m swing ekstremumunu aşar AMA mum o seviyenin gerisinde kapanır (yukarı süpürme → SHORT adayı, ayna LONG). Teyit: aynı/sonraki mum süpürme öncesi aralığa geri kapanır + hacim ≥1.5×SMA20. Giriş teyit kapanışında. Stop: ekstremum ±0.5×ATR. TP 2R sabit, zaman aşımı 96 bar. | Şampiyon kırılım DEVAMINI oynar; S6 süpürme DÖNÜŞÜNÜ oynar — stop avını satın alan taraf. Portföyde gerçek çeşitlendirme. |
 
 Hepsi **kapanış-bazlı giriş** kullanır: limit-bölge doluşu yok →
 NOT_FILLED belirsizliği yok → hem gölge takip hem geçmiş test şampiyondan
@@ -64,7 +76,7 @@ daha dürüst ölçülür. Karşılaştırmada bu asimetri açıkça not edilece
 ## Zamanlama
 - **Faz A (şimdi):** bu belge. Kod yok, kilit ihlali yok.
 - **Faz B tetikleyicisi:** otomatik denetim art arda 2 temiz tur + #57/#6
-  kapanışı. Sonra S1–S4 implementasyonu (izolasyon şartlarıyla) + VM'de
+  kapanışı. Sonra S1–S4 + S6 implementasyonu (izolasyon şartlarıyla) + VM'de
   backtest verisi çekimi.
 - **Karşılaştırma raporu:** şampiyonun Faz-1 hükmü çıktığında (≈50 küme)
   adayların ara sıralaması hazır olur. Adaylar için kesin hüküm kendi 50

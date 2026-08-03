@@ -146,3 +146,42 @@ def test_expiry_counts_bars_from_fill_not_from_signal(tmp_path):
     row = db.query_one("SELECT status,outcome FROM signals")
     assert row["outcome"] is None, (
         f"erken EXPIRED: sure sinyal aninden sayilmis ({row['outcome']})")
+
+
+def test_legacy_filled_rows_without_fill_ts_cannot_become_zombies(tmp_path):
+    """HATA SINIFI: 'dolus oncesi' kapisini fill_ts'e baglamak, fill_ts
+    kolonundan ONCE dolmus eski kayitlari sonsuz zombiye cevirdi (#57, #6:
+    kapi hic acilmiyor, hicbir mum sayilmiyor, sinyal asla kapanmiyor).
+    Kural: eksik alan turetilebiliyorsa ham veriden turetilir (kume
+    backfill ilkesi); turetilemese bile degerlendirme kilitlenemez."""
+    tracker, db = _make_tracker(tmp_path)
+    # fill_ts YOK ama fill_price VAR olan eski usul dolmus kayit
+    db.execute(
+        "INSERT INTO signals(pair,direction,created_utc,entry_candle_ts,"
+        "entry_min,entry_max,stop_loss,tp1,tp2,rr,status,fill_price) "
+        "VALUES('ESKIUSDT','LONG','2026-07-28T00:00:00Z',1000000,100,101,"
+        "98,106,110,2.0,'FILLED',101)")
+    mum = [(1000000, 103.0, 100.5),   # dolus temasi (low<=101)
+           (1900000, 103.0, 100.8),
+           (2800000, 101.0, 97.5)]    # stop
+    for ts, hi, lo in mum:
+        db.execute("INSERT INTO candles(symbol,interval,ts,open,high,low,"
+                   "close,volume) VALUES('ESKIUSDT','15',?,102,?,?,100,1)",
+                   (ts, hi, lo))
+    # yol 1: migration backfill'i fill_ts'i mumlardan turetir
+    assert tracker._backfill_fill_ts() == 1
+    assert db.query_one("SELECT fill_ts FROM signals")["fill_ts"] == 1000000
+    tracker.evaluate_open("ESKIUSDT")
+    row = db.query_one("SELECT status,outcome,r_multiple FROM signals")
+    assert row["outcome"] == "LOSS", f"zombi kaldi: {dict(row)}"
+    # yol 2: backfill hic kosmasa bile degerlendirici kilitlenmemeli
+    db.execute("DELETE FROM signals")
+    db.execute(
+        "INSERT INTO signals(pair,direction,created_utc,entry_candle_ts,"
+        "entry_min,entry_max,stop_loss,tp1,tp2,rr,status,fill_price) "
+        "VALUES('ESKIUSDT','LONG','2026-07-28T00:00:00Z',1000000,100,101,"
+        "98,106,110,2.0,'FILLED',101)")
+    tracker.evaluate_open("ESKIUSDT")
+    row = db.query_one("SELECT status,outcome,fill_ts FROM signals")
+    assert row["outcome"] == "LOSS" and row["fill_ts"] == 1000000, (
+        f"yuruyus-ici turetme calismadi: {dict(row)}")
