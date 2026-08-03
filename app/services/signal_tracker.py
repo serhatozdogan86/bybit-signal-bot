@@ -529,7 +529,18 @@ class SignalTracker:
                 self._save_excursion(sig["id"], mfe, mae)
                 self._close(sig["id"], "WIN", sig["tp1"], round(reward / risk, 2))
                 return
-            bars_held = i - (filled_at_idx if filled_at_idx is not None else 0)
+            # v3.6: tutus suresi DOLUSTAN sayilir. Onceki turda dolan
+            # sinyalde filled_at_idx=None'dir; 0'a dusmek suresi
+            # entry_candle_ts'ten saymak demektir ve izleme penceresini
+            # gecikme kadar ERKEN bitirir (ayni "dolus oncesi bulasma"
+            # sinifi - kural 6: ornegi degil sinifi duzelt).
+            if filled_at_idx is not None:
+                bars_held = i - filled_at_idx
+            elif sig.get("fill_ts") is not None:
+                bars_held = len([1 for cc in candles[:i + 1]
+                                 if cc["ts"] >= sig["fill_ts"]]) - 1
+            else:
+                bars_held = i                      # eski kayit: fill_ts yok
             if bars_held >= self._max_track:
                 pnl = (c["close"] - fill_price) if is_long else (fill_price - c["close"])
                 self._save_excursion(sig["id"], mfe, mae)

@@ -60,3 +60,13 @@ Serhat'ın ekran görüntüsüyle hata bulması **güvenlik ağı değil, örnek
 denetimi** olmalı. Ağ artık `/verify` ve 6 saatlik otomatik denetimdir.
 İnsan denetimi bulduğunda soru şudur: *bu hatayı hangi otomatik kontrol
 yakalamalıydı ve neden yoktu?* Cevap bu dosyaya yeni bir kural olarak yazılır.
+
+## Kural 6'nın ilk uygulaması (2026-08-02, aynı gün)
+"Örneği değil sınıfı düzelt" kuralı yazıldıktan sonra aynı bulaşma sınıfı
+üçüncü bir yerde daha arandı ve bulundu: **izleme süresi sayımı.** Gecikmeli
+dolan bir sinyal ikinci turda değerlendirilirken tutuş süresi doluştan değil
+sinyal anından sayılıyordu; bu, izleme penceresini gecikme kadar erken
+bitirip haksız EXPIRED üretiyordu. Aynı kök, üçüncü tezahür:
+MFE/MAE → sonuç kararı → süre sayımı.
+Ders: bir bulaşma bulunduğunda o değişkenin geçtiği TÜM satırlar taranmalı,
+sadece hatanın göründüğü satır değil.

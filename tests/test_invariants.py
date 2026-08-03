@@ -117,3 +117,32 @@ def test_verifier_does_not_import_tracker_logic():
               if l.startswith("import ") or l.startswith("from ")]
     assert disari == ["from __future__ import annotations"], (
         f"denetci disaridan mantik cekiyor: {disari}")
+
+
+def test_expiry_counts_bars_from_fill_not_from_signal(tmp_path):
+    """HATA SINIFI (kural 6): 'dolus oncesi bulasma' sadece MFE ve sonuc
+    kararinda degil, IZLEME SURESI sayiminda da vardi. Gecikmeli dolan
+    sinyal, ikinci turda degerlendirilince suresi sinyal anindan sayilip
+    erken EXPIRED oluyordu."""
+    tracker, db = _make_tracker(tmp_path, max_track=3)
+    ltf = fx.make_series(np.full(70, 108.0))
+    ltf.candles[-1].ts = 1_000_000
+    tracker.maybe_track(_signal(), ltf)          # entry 100-101, stop 98, tp 106
+    # tur A: 3 mum bolgeye inmez (dolus yok)
+    ust = dict(closes=[107.0] * 3, lows=[106.0] * 3, highs=[107.5] * 3)
+    _feed(tracker, **ust, start_ts=1_000_000)
+    tracker.evaluate_open("TESTUSDT")
+    assert db.query_one("SELECT status FROM signals")["status"] == "PENDING"
+    # tur B: 4. mumda dolar
+    _feed(tracker, closes=[107.0] * 3 + [100.9], lows=[106.0] * 3 + [100.2],
+          highs=[107.5] * 3 + [101.2], start_ts=1_000_000)
+    tracker.evaluate_open("TESTUSDT")
+    assert db.query_one("SELECT status FROM signals")["status"] == "FILLED"
+    # tur C: dolustan sonra 2 mum daha (toplam tutus 2 < max_track 3)
+    _feed(tracker, closes=[107.0] * 3 + [100.9, 100.8, 100.7],
+          lows=[106.0] * 3 + [100.2, 100.3, 100.4],
+          highs=[107.5] * 3 + [101.2, 101.0, 100.9], start_ts=1_000_000)
+    tracker.evaluate_open("TESTUSDT")
+    row = db.query_one("SELECT status,outcome FROM signals")
+    assert row["outcome"] is None, (
+        f"erken EXPIRED: sure sinyal aninden sayilmis ({row['outcome']})")
