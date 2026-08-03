@@ -159,6 +159,20 @@ class Scheduler:
                 self._tracker.backfill_funding(self._md)
             except Exception:
                 log.exception(kv(event="funding_backfill_loop_error"))
+            try:
+                # v3.6: periyodik BAGIMSIZ sonuc denetimi (~6 saatte bir).
+                # Amac: muhasebe hatasini insanin fark etmesini BEKLEMEMEK.
+                self._audit_tick = getattr(self, "_audit_tick", 0) + 1
+                if self._audit_tick % 24 == 1:
+                    rep = self._tracker.verify_outcomes()
+                    log.info(kv(event="outcome_audit", checked=rep["checked"],
+                                mismatches=rep["mismatches"]))
+                    if rep["mismatches"]:
+                        self._tracker.log_gate_event(
+                            "audit_mismatch",
+                            f"{rep['mismatches']} kayit mum arsiviyle celisiyor")
+            except Exception:
+                log.exception(kv(event="outcome_audit_error"))
         self._store.record_scan(
             datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
         return results

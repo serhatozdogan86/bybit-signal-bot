@@ -240,6 +240,15 @@ def create_app(store: StateStore, scheduler: Scheduler,
             json.dumps(tracker.diagnostics(), indent=2),
             mimetype="application/json")
 
+    @app.get("/verify")
+    def verify_view():
+        """Bagimsiz sonuc denetimi: kayitlar mum arsiviyle celisiyor mu?"""
+        if tracker is None:
+            return jsonify({"error": "shadow tracking disabled"}), 404
+        return app.response_class(
+            json.dumps(tracker.verify_outcomes(), indent=2),
+            mimetype="application/json")
+
     @app.get("/signals")
     def signals():
         if tracker is None:

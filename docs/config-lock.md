@@ -91,3 +91,24 @@ sessizce doğru varsayılmaz.
 **Sonuç:** kilit öncesi/sonrası tüm başlık rakamları bu onarımdan sonra
 yeniden okunmalıdır. Faz-1 sayacı etkilenir (bazı kayıtlar geçici olarak
 açığa döner).
+
+## v3.6: kalıcı bağımsız sonuç denetimi (2026-08-02)
+Dört ölçüm hatasının dördüncüsünü kod değil **insan** yakaladı (ekran
+görüntüsündeki grafik tutarsızlığı). Bu, sürecin eksiğiydi: kayıtları ham mum
+arşiviyle karşılaştıran hiçbir otomatik kontrol yoktu.
+
+`app/services/verifier.py` — tracker'ın döngüsünü KULLANMAYAN, ayrı ve sade
+bir yeniden-oynatma. Aynı hata iki bağımsız yolda birden bulunamayacağı için
+uyuşmazlık gerçek bir sinyaldir. Kurallar kasten en muhafazakâr hâlde:
+doluş öncesi mum asla karara giremez; aynı mumda TP ve STOP varsa AMBIGUOUS.
+
+- `/verify` ve `/measurement → outcome_audit`: her an denetlenebilir.
+- Tarayıcı döngüsü ~6 saatte bir otomatik denetler; uyuşmazlıkta ERROR log
+  ve `gate_log`'a `audit_mismatch` kaydı düşer.
+- Açılışta `_repair_bad_outcomes()`: arşivle çelişen kapanmış kayıtları
+  yeniden açar, düzeltilmiş motor doluştan itibaren yeniden karara bağlar;
+  denetlenemeyen kayıt `prefill_repaired=2` ile işaretlenir.
+
+**İlk tam tarama sonucu (156 denetlenebilir kapanmış sinyal):** 5 uyuşmazlık,
+hepsi kayıt=WIN / denetçi=LOSS — #382, #359, #341, #57, #6. Brüt şişme
+yaklaşık +14.7R. Onarım sonrası başlık rakamları yeniden okunmalıdır.

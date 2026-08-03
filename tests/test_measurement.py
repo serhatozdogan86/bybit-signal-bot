@@ -389,34 +389,76 @@ def test_pre_fill_candles_cannot_decide_outcome(tmp_path):
     assert row["status"] == "FILLED"
 
 
-def test_repair_reopens_contaminated_outcomes(tmp_path):
-    """Onarim: dolus oncesi TP dokunusuyla kapatilmis kayit geri acilir;
-    temiz kayda dokunulmaz; mumu olmayan kayit '2' ile isaretlenir."""
+def test_repair_reopens_outcomes_that_contradict_archive(tmp_path):
+    """Onarim bagimsiz denetciye dayanir: kayit mum arsiviyle celisiyorsa
+    yeniden acilir; uyusuyorsa dokunulmaz; denetlenemiyorsa '2' isaretlenir."""
     tracker, db = _make_tracker(tmp_path)
-    base = "INSERT INTO signals(pair,direction,created_utc,entry_candle_ts," \
-           "entry_min,entry_max,stop_loss,tp1,tp2,rr,status,outcome," \
-           "fill_price,exit_price,r_multiple,closed_utc,fill_ts,blocked) " \
-           "VALUES(?,'LONG','2026-08-01T00:00:00Z',?,100,101,98,106,110,2.0," \
-           "'CLOSED','WIN',101,106,1.67,'2026-08-01T04:00:00Z',?,0)"
-    db.execute(base, ("KIRLIUSDT", 1_000_000, 2_800_000))   # gecikmeli dolus
-    db.execute(base, ("TEMIZUSDT", 1_000_000, 2_800_000))
-    db.execute(base, ("MUMSUZUSDT", 1_000_000, 2_800_000))
-    # KIRLI: dolus oncesi mumda TP'ye degmis (uydurma WIN)
-    for ts, hi in ((1_000_000, 107.0), (1_900_000, 103.0)):
+    base = ("INSERT INTO signals(pair,direction,created_utc,entry_candle_ts,"
+            "entry_min,entry_max,stop_loss,tp1,tp2,rr,status,outcome,"
+            "fill_price,exit_price,r_multiple,closed_utc,fill_ts,blocked) "
+            "VALUES(?,'LONG','2026-08-01T00:00:00Z',1000000,100,101,98,106,"
+            "110,2.0,'CLOSED','WIN',101,106,1.67,'2026-08-01T04:00:00Z',?,0)")
+    db.execute(base, ("KIRLIUSDT", 2800000))
+    db.execute(base, ("TEMIZUSDT", 1000000))
+    db.execute(base, ("MUMSUZUSDT", 1000000))
+
+    def mum(pair, ts, hi, lo):
         db.execute("INSERT INTO candles(symbol,interval,ts,open,high,low,"
-                   "close,volume) VALUES('KIRLIUSDT','15',?,102,?,101.5,102,1)",
-                   (ts, hi))
-    # TEMIZ: dolus oncesi ne TP ne STOP
-    for ts in (1_000_000, 1_900_000):
-        db.execute("INSERT INTO candles(symbol,interval,ts,open,high,low,"
-                   "close,volume) VALUES('TEMIZUSDT','15',?,102,103,101.5,"
-                   "102,1)", (ts,))
-    assert tracker._repair_prefill_outcomes() == 1
+                   "close,volume) VALUES(?,'15',?,102,?,?,102,1)",
+                   (pair, ts, hi, lo))
+    # KIRLI: 0. mumda TP'ye degdi ama dolus 3. mumda; sonra STOP -> gercek LOSS
+    mum("KIRLIUSDT", 1000000, 107.0, 102.0)     # TP dokunusu (dolus ONCESI)
+    mum("KIRLIUSDT", 1900000, 103.0, 102.0)
+    mum("KIRLIUSDT", 2800000, 102.5, 100.5)     # dolus
+    mum("KIRLIUSDT", 3700000, 100.8, 97.0)      # STOP
+    # TEMIZ: 0. mumda hem dolus hem TP -> kayit dogru
+    mum("TEMIZUSDT", 1000000, 106.5, 100.5)
+    assert tracker._repair_bad_outcomes() == 1
     kirli = db.query_one("SELECT * FROM signals WHERE pair='KIRLIUSDT'")
     temiz = db.query_one("SELECT * FROM signals WHERE pair='TEMIZUSDT'")
     mumsuz = db.query_one("SELECT * FROM signals WHERE pair='MUMSUZUSDT'")
     assert kirli["outcome"] is None and kirli["status"] == "FILLED"
     assert kirli["r_multiple"] is None and kirli["prefill_repaired"] == 1
     assert temiz["outcome"] == "WIN" and temiz["prefill_repaired"] == 1
-    assert mumsuz["outcome"] == "WIN" and mumsuz["prefill_repaired"] == 2
-    assert tracker._repair_prefill_outcomes() == 0     # idempotent
+    assert mumsuz["prefill_repaired"] == 2      # mum yok: dogru varsayilmaz
+    assert tracker._repair_bad_outcomes() == 0  # idempotent
+
+
+def test_verify_outcomes_flags_disagreement(tmp_path):
+    """Denetci, uydurma WIN'i bagimsiz olarak yakalamali."""
+    tracker, db = _make_tracker(tmp_path)
+    db.execute(
+        "INSERT INTO signals(pair,direction,created_utc,entry_candle_ts,"
+        "entry_min,entry_max,stop_loss,tp1,tp2,rr,status,outcome,fill_price,"
+        "exit_price,r_multiple,closed_utc,fill_ts,blocked,prefill_repaired) "
+        "VALUES('ZUSDT','LONG','2026-08-01T00:00:00Z',1000000,100,101,98,106,"
+        "110,2.0,'CLOSED','WIN',101,106,1.67,'2026-08-01T04:00:00Z',2800000,"
+        "0,1)")
+    for ts, hi, lo in ((1000000, 107.0, 102.0), (1900000, 103.0, 102.0),
+                       (2800000, 102.5, 100.5), (3700000, 100.8, 97.0)):
+        db.execute("INSERT INTO candles(symbol,interval,ts,open,high,low,"
+                   "close,volume) VALUES('ZUSDT','15',?,102,?,?,102,1)",
+                   (ts, hi, lo))
+    rep = tracker.verify_outcomes()
+    assert rep["checked"] == 1 and rep["mismatches"] == 1
+    d = rep["details"][0]
+    assert "kayit=WIN" in d["problems"][0] and "LOSS" in d["problems"][0]
+
+
+def test_verifier_replay_rules():
+    """Denetcinin kendi kurallari: dolus oncesi asla sayilmaz."""
+    from app.services import verifier
+    sig = {"direction": "LONG", "entry_candle_ts": 0, "entry_min": 100,
+           "entry_max": 101, "stop_loss": 98, "tp1": 106}
+    c = lambda ts, hi, lo: {"ts": ts, "high": hi, "low": lo, "open": 100,
+                            "close": 100}
+    # dolus oncesi TP -> WIN OLMAMALI
+    out = verifier.replay(sig, [c(0, 107, 102), c(1, 102, 100.5),
+                                c(2, 101, 97)], 24, 192)
+    assert out["outcome"] == "LOSS"
+    # ayni mumda TP ve STOP -> AMBIGUOUS
+    out2 = verifier.replay(sig, [c(0, 107, 97)], 24, 192)
+    assert out2["outcome"] == "AMBIGUOUS"
+    # bolgeye hic dokunulmadi -> NOT_FILLED
+    out3 = verifier.replay(sig, [c(i, 105, 103) for i in range(24)], 24, 192)
+    assert out3["outcome"] == "NOT_FILLED"

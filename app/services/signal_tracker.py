@@ -28,7 +28,7 @@ from datetime import datetime, timezone
 from app.logging_setup import kv
 from app.models.candle import KlineSeries
 from app.models.decision import Decision, DecisionType, Direction
-from app.services import measurement
+from app.services import measurement, verifier
 from app.services.database import Database
 
 log = logging.getLogger("tracker")
@@ -135,49 +135,81 @@ class SignalTracker:
             "id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "ts_utc TEXT, kind TEXT, detail TEXT)")
         self._backfill_cluster_ids()
-        self._repair_prefill_outcomes()
+        self._repair_bad_outcomes()
 
-    def _repair_prefill_outcomes(self) -> int:
-        """Dolus ONCESI mumlarla karara baglanmis sonuclari geri ac (v3.6).
+    def verify_outcomes(self, limit: int = 400) -> dict:
+        """BAGIMSIZ DENETIM: her kapanmis sinyali mumlardan yeniden oynat.
 
-        HATA: sinyal onceki turda doldugunda fill_price DB'den geliyor,
-        dolus dallanmasi atlaniyor ve sonuc dongusu entry_candle_ts'ten
-        basliyordu. LONG'ta fiyat once TP'ye kosup sonra giris bolgesine
-        inerse, KACIRILAN hareket WIN olarak yaziliyordu (ornek: ELSAUSDT
-        #390, +1.58R uydurma).
-
-        Onarim: gecikmeli dolan kapanmis sinyallerde, dolus oncesi pencerede
-        TP veya STOP'a deginilmis mi diye arsiv mumlarina bakilir; deginmisse
-        kayit yeniden acilir (outcome/r/exit temizlenir) ve duzeltilmis motor
-        bir sonraki turda dolustan itibaren yeniden karara baglar.
-        Mumlari arsivde olmayan kayit DOKUNULMADAN birakilir ve isaretlenir
-        (prefill_repaired=2) - sessizce dogru varsayilmaz.
+        Tracker'in kendi dongusunu KULLANMAZ (app/services/verifier.py ayri
+        ve sade bir implementasyondur) - yoksa hata kendini dogrular.
+        Uyusmazlik = en az biri yanlis; insana getirilir.
         """
         rows = self._db.query(
-            "SELECT id,pair,direction,entry_candle_ts,fill_ts,tp1,stop_loss "
-            "FROM signals WHERE status='CLOSED' AND prefill_repaired=0 "
-            "AND outcome IN ('WIN','LOSS') AND fill_ts IS NOT NULL "
-            "AND entry_candle_ts IS NOT NULL AND fill_ts > entry_candle_ts")
+            "SELECT * FROM signals WHERE outcome IS NOT NULL AND blocked=0 "
+            "ORDER BY id DESC LIMIT ?", (limit,))
+        checked = 0
+        skipped = 0
+        issues: list[dict] = []
+        for r in rows:
+            if not r.get("entry_candle_ts"):
+                skipped += 1
+                continue
+            candles = self._db.query(
+                "SELECT ts,open,high,low,close FROM candles WHERE symbol=? "
+                "AND interval=? AND ts>=? ORDER BY ts ASC",
+                (r["pair"], self._ltf, r["entry_candle_ts"]))
+            if not candles:
+                skipped += 1
+                continue
+            rep = verifier.replay(r, candles, self._fill_window,
+                                  self._max_track)
+            if rep.get("outcome") is None:
+                skipped += 1
+                continue
+            checked += 1
+            diff = verifier.compare(r, rep)
+            if diff:
+                issues.append(diff)
+        if issues:
+            log.error(kv(event="outcome_audit_mismatch", n=len(issues),
+                         ids=",".join(str(i["id"]) for i in issues)))
+        return {"checked": checked, "unauditable": skipped,
+                "mismatches": len(issues), "details": issues[:25],
+                "note": ("bagimsiz yeniden oynatma; uyusmazlik = kayit ile "
+                         "mum arsivi celisiyor, elle incelenmeli")}
+
+    def _repair_bad_outcomes(self) -> int:
+        """Denetimde celisen kapanmis kayitlari geri ac (v3.6).
+
+        Kok neden (duzeltildi): sinyal onceki turda doldugunda sonuc dongusu
+        entry_candle_ts'ten basliyor, DOLUS ONCESI mumlar TP/STOP'a degmis
+        sayiliyordu -> LONG'ta uydurma WIN. Bu metot mirasi temizler:
+        bagimsiz denetci ile celisen kayit yeniden acilir, duzeltilmis motor
+        dolustan itibaren yeniden karara baglar. Denetlenemeyen kayit
+        prefill_repaired=2 ile isaretlenir - sessizce dogru varsayilmaz.
+        """
+        rows = self._db.query(
+            "SELECT * FROM signals WHERE status='CLOSED' AND "
+            "prefill_repaired=0 AND outcome IN ('WIN','LOSS')")
         reopened = 0
         for r in rows:
-            pre = self._db.query(
-                "SELECT high,low FROM candles WHERE symbol=? AND interval=? "
-                "AND ts>=? AND ts<? ORDER BY ts ASC",
-                (r["pair"], self._ltf, r["entry_candle_ts"], r["fill_ts"]))
-            if not pre:
-                self._db.execute(
-                    "UPDATE signals SET prefill_repaired=2 WHERE id=?",
-                    (r["id"],))          # dogrulanamadi: sessiz kabul yok
+            if not r.get("entry_candle_ts"):
+                self._db.execute("UPDATE signals SET prefill_repaired=2 "
+                                 "WHERE id=?", (r["id"],))
                 continue
-            is_long = r["direction"] == Direction.LONG.value
-            touched = any(
-                (c["high"] >= r["tp1"] or c["low"] <= r["stop_loss"]) if is_long
-                else (c["low"] <= r["tp1"] or c["high"] >= r["stop_loss"])
-                for c in pre)
-            if not touched:
-                self._db.execute(
-                    "UPDATE signals SET prefill_repaired=1 WHERE id=?",
-                    (r["id"],))          # temiz: karar dolus sonrasi verilmis
+            candles = self._db.query(
+                "SELECT ts,open,high,low,close FROM candles WHERE symbol=? "
+                "AND interval=? AND ts>=? ORDER BY ts ASC",
+                (r["pair"], self._ltf, r["entry_candle_ts"]))
+            rep = verifier.replay(r, candles, self._fill_window,
+                                  self._max_track) if candles else {}
+            if rep.get("outcome") is None:
+                self._db.execute("UPDATE signals SET prefill_repaired=2 "
+                                 "WHERE id=?", (r["id"],))
+                continue
+            if verifier.compare(r, rep) is None:
+                self._db.execute("UPDATE signals SET prefill_repaired=1 "
+                                 "WHERE id=?", (r["id"],))
                 continue
             self._db.execute(
                 "UPDATE signals SET status='FILLED', outcome=NULL, "
@@ -186,10 +218,11 @@ class SignalTracker:
                 "funding_r_real=NULL, prefill_repaired=1 WHERE id=?",
                 (r["id"],))
             reopened += 1
-            log.warning(kv(event="prefill_outcome_reopened", signal_id=r["id"],
-                           pair=r["pair"], pre_bars=len(pre)))
+            log.warning(kv(event="bad_outcome_reopened", signal_id=r["id"],
+                           pair=r["pair"], stored=r["outcome"],
+                           verifier=rep["outcome"]))
         if reopened:
-            log.warning(kv(event="prefill_repair_done", reopened=reopened))
+            log.warning(kv(event="outcome_repair_done", reopened=reopened))
         return reopened
 
     def _backfill_cluster_ids(self) -> int:
@@ -836,6 +869,7 @@ class SignalTracker:
                 "real_sum": round(sum(b for _, b in funding_pairs), 3),
                 "note": "maliyet modeli v1 icin veri; v0 kilitli kalir"},
             "gate_log": {"counts": gate_counts, "recent": gate_recent},
+            "outcome_audit": self.verify_outcomes(),
         }
 
     def recent_signals(self, limit: int = 50) -> list[dict]:
