@@ -62,3 +62,32 @@ Düzeltme (aynı gün, veri kaybı yok):
 Düzeltme sonrası gerçek tablo: 33 küme (114 işlem), kilit sonrası 21 küme
 (67 işlem). Faz-1: 21/50. Küme-CI kilit sonrası [−0.41, +0.70] — sıfırı
 kesiyor, kapı KAPALI.
+
+## v3.6-kritik düzeltme (2026-08-02): dolum öncesi mumlar sonucu belirliyordu
+**Bulgu:** ELSAUSDT #390 panoda WIN +1.58R göründü. Botun kendi mum arşiviyle
+yeniden oynatınca ortaya çıktı: sinyal 02:12'de doğdu, fiyat 02:00–04:00
+arasında zaten TP1'in ÜSTÜNDEYDİ, giriş bölgesine ancak 04:15'teki çöküşte
+indi ve orada doldu. Yani kazanç yazılan hareket, girişten önce yaşanmıştı.
+
+**Kök neden:** `_evaluate_signal`, sinyal önceki turda dolduğunda `fill_price`'ı
+DB'den okur, dolum dallanmasını atlar ve sonuç döngüsü `entry_candle_ts`'ten
+başlar. Dolum öncesi mumlar TP/STOP'a değmiş sayılıyordu. Sabahki MFE/MAE
+düzeltmesi yalnız gezinme istatistiğini korumuştu; **karar satırları
+korumasız kalmıştı.**
+
+**Yön:** LONG'ta sistematik olarak UYDURMA WIN üretir (fiyat TP'ye koşup sonra
+bölgeye iner). SHORT'ta ayna durum. Kaçırılan hareket kazanç gibi kaydedilir.
+
+**Ölçülen kirlilik (arşiv kapsamındaki 7 gecikmeli dolum):** 3 kayıt kirli
+(#382, #359, #341 — hepsi WIN), + #390. Oran ~%43–50, tamamı WIN yönünde.
+
+**Düzeltme:** sonuç kontrolü `fill_ts` ile kapılandı; dolum öncesi mum karara
+giremez. Regresyon testi hatalı kodda "uydurma sonuç yazıldı: WIN" verir.
+**Onarım:** gecikmeli dolan kapanmış kayıtlar arşiv mumlarıyla denetlenir;
+kirli olan yeniden açılır ve düzeltilmiş motor dolumdan itibaren yeniden karara
+bağlar. Mumu arşivde olmayan kayıt `prefill_repaired=2` ile işaretlenir —
+sessizce doğru varsayılmaz.
+
+**Sonuç:** kilit öncesi/sonrası tüm başlık rakamları bu onarımdan sonra
+yeniden okunmalıdır. Faz-1 sayacı etkilenir (bazı kayıtlar geçici olarak
+açığa döner).

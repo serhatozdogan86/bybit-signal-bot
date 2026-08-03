@@ -326,3 +326,97 @@ def test_blocked_cohort_backup_carries_measurement_columns(tmp_path):
               "nf_done", "funding_done"):
         assert k in row, k
     assert row["mfe_r"] == 0.9 and row["funding_r_real"] == -0.004
+
+
+def test_pre_fill_candles_cannot_decide_outcome(tmp_path):
+    """UYDURMA WIN testi (v3.6-kritik): fiyat once TP'ye kosar, sonra
+    giris bolgesine iner. Dolus o inisde olur. Dolus ONCESI TP dokunusu
+    kazanc sayilmamali - o hareketi kacirmisiz demektir.
+
+    Gercek olay: ELSAUSDT #390 (08-03). Duzeltmeden once WIN +1.58R yazildi.
+    """
+    tracker, db = _make_tracker(tmp_path)
+    d = _signal()                    # LONG entry 100-101, stop 98, tp1 106
+    ltf = fx.make_series(np.full(70, 108.0))
+    ltf.candles[-1].ts = 1_000_000
+    tracker.maybe_track(d, ltf)
+    # 1. tur: fiyat TP1'in USTUNDE gezinir, bolgeye inmez -> dolus YOK
+    _feed(tracker, closes=[107.5, 107.0], lows=[107.0, 106.5],
+          highs=[108.5, 107.4], start_ts=1_000_000)   # high 108.5 > tp1 106
+    tracker.evaluate_open("TESTUSDT")
+    row = db.query_one("SELECT * FROM signals")
+    assert row["status"] == "PENDING" and row["outcome"] is None
+
+    # 2. tur: cakilir, bolgeye girer -> dolus 101 (stop 98'e degmedi)
+    _feed(tracker, closes=[107.5, 107.0, 100.5],
+          lows=[107.0, 106.5, 99.5], highs=[108.5, 107.4, 107.0],
+          start_ts=1_000_000)
+    tracker.evaluate_open("TESTUSDT")
+    row = db.query_one("SELECT * FROM signals")
+    assert row["status"] == "FILLED" and row["fill_ts"] == 2_800_000
+    # dolus mumunun tepesi 107 > tp1 ama bu DOLUS ONCESI degil, ayni mum.
+    # Muhafazakar davranis: ayni mumda hem tepe hem bolge -> yol bilinemez;
+    # burada stop'a deginmediginden WIN yazilabilir. Asil kontrol asagida:
+    assert row["outcome"] in (None, "WIN")
+
+    # 3. tur (ASIL TEST): dolus AYRI bir turda kaydedilmeli ki sonraki
+    # degerlendirmede fill_price DB'den gelsin ve dongu bastan tarasin -
+    # hatanin gercek kosulu budur.
+    db.execute("DELETE FROM signals")
+    ltf2 = fx.make_series(np.full(70, 108.0)); ltf2.candles[-1].ts = 5_000_000
+    tracker.maybe_track(_signal(), ltf2)
+    # tur A: TP1'in uzerinde gezinir, bolgeye inmez -> dolus yok
+    _feed(tracker, closes=[107.0, 107.0], lows=[106.0, 106.0],
+          highs=[110.0, 107.5], start_ts=5_000_000)   # 110 > tp1 106
+    tracker.evaluate_open("TESTUSDT")
+    assert db.query_one("SELECT * FROM signals")["status"] == "PENDING"
+    # tur B: bolgeye iner -> dolus DB'ye yazilir (bu turda filled_at_idx set)
+    _feed(tracker, closes=[107.0, 107.0, 100.8],
+          lows=[106.0, 106.0, 100.0], highs=[110.0, 107.5, 101.5],
+          start_ts=5_000_000)
+    tracker.evaluate_open("TESTUSDT")
+    row = db.query_one("SELECT * FROM signals")
+    assert row["status"] == "FILLED" and row["outcome"] is None
+    # tur C: yeni mum gelir, YENIDEN degerlendirilir. Artik fill_price
+    # DB'den okunur, filled_at_idx=None, dongu 0. mumdan baslar.
+    # HATALI kodda 0. mumun 110 tepesi TP sayilip WIN yazilirdi.
+    _feed(tracker, closes=[107.0, 107.0, 100.8, 100.6],
+          lows=[106.0, 106.0, 100.0, 100.2],
+          highs=[110.0, 107.5, 101.5, 100.9], start_ts=5_000_000)
+    tracker.evaluate_open("TESTUSDT")
+    row = db.query_one("SELECT * FROM signals")
+    assert row["outcome"] is None, f"uydurma sonuc yazildi: {row['outcome']}"
+    assert row["status"] == "FILLED"
+
+
+def test_repair_reopens_contaminated_outcomes(tmp_path):
+    """Onarim: dolus oncesi TP dokunusuyla kapatilmis kayit geri acilir;
+    temiz kayda dokunulmaz; mumu olmayan kayit '2' ile isaretlenir."""
+    tracker, db = _make_tracker(tmp_path)
+    base = "INSERT INTO signals(pair,direction,created_utc,entry_candle_ts," \
+           "entry_min,entry_max,stop_loss,tp1,tp2,rr,status,outcome," \
+           "fill_price,exit_price,r_multiple,closed_utc,fill_ts,blocked) " \
+           "VALUES(?,'LONG','2026-08-01T00:00:00Z',?,100,101,98,106,110,2.0," \
+           "'CLOSED','WIN',101,106,1.67,'2026-08-01T04:00:00Z',?,0)"
+    db.execute(base, ("KIRLIUSDT", 1_000_000, 2_800_000))   # gecikmeli dolus
+    db.execute(base, ("TEMIZUSDT", 1_000_000, 2_800_000))
+    db.execute(base, ("MUMSUZUSDT", 1_000_000, 2_800_000))
+    # KIRLI: dolus oncesi mumda TP'ye degmis (uydurma WIN)
+    for ts, hi in ((1_000_000, 107.0), (1_900_000, 103.0)):
+        db.execute("INSERT INTO candles(symbol,interval,ts,open,high,low,"
+                   "close,volume) VALUES('KIRLIUSDT','15',?,102,?,101.5,102,1)",
+                   (ts, hi))
+    # TEMIZ: dolus oncesi ne TP ne STOP
+    for ts in (1_000_000, 1_900_000):
+        db.execute("INSERT INTO candles(symbol,interval,ts,open,high,low,"
+                   "close,volume) VALUES('TEMIZUSDT','15',?,102,103,101.5,"
+                   "102,1)", (ts,))
+    assert tracker._repair_prefill_outcomes() == 1
+    kirli = db.query_one("SELECT * FROM signals WHERE pair='KIRLIUSDT'")
+    temiz = db.query_one("SELECT * FROM signals WHERE pair='TEMIZUSDT'")
+    mumsuz = db.query_one("SELECT * FROM signals WHERE pair='MUMSUZUSDT'")
+    assert kirli["outcome"] is None and kirli["status"] == "FILLED"
+    assert kirli["r_multiple"] is None and kirli["prefill_repaired"] == 1
+    assert temiz["outcome"] == "WIN" and temiz["prefill_repaired"] == 1
+    assert mumsuz["outcome"] == "WIN" and mumsuz["prefill_repaired"] == 2
+    assert tracker._repair_prefill_outcomes() == 0     # idempotent

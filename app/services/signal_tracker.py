@@ -123,7 +123,8 @@ class SignalTracker:
                     "mfe_r REAL", "mae_r REAL",
                     "nf_gap_r REAL", "nf_touch_bars INTEGER",
                     "nf_crossed INTEGER", "nf_done INTEGER DEFAULT 0",
-                    "funding_r_real REAL", "funding_done INTEGER DEFAULT 0"):
+                    "funding_r_real REAL", "funding_done INTEGER DEFAULT 0",
+                    "prefill_repaired INTEGER DEFAULT 0"):
             try:
                 self._db.execute(f"ALTER TABLE signals ADD COLUMN {ddl}")
             except Exception:
@@ -134,6 +135,62 @@ class SignalTracker:
             "id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "ts_utc TEXT, kind TEXT, detail TEXT)")
         self._backfill_cluster_ids()
+        self._repair_prefill_outcomes()
+
+    def _repair_prefill_outcomes(self) -> int:
+        """Dolus ONCESI mumlarla karara baglanmis sonuclari geri ac (v3.6).
+
+        HATA: sinyal onceki turda doldugunda fill_price DB'den geliyor,
+        dolus dallanmasi atlaniyor ve sonuc dongusu entry_candle_ts'ten
+        basliyordu. LONG'ta fiyat once TP'ye kosup sonra giris bolgesine
+        inerse, KACIRILAN hareket WIN olarak yaziliyordu (ornek: ELSAUSDT
+        #390, +1.58R uydurma).
+
+        Onarim: gecikmeli dolan kapanmis sinyallerde, dolus oncesi pencerede
+        TP veya STOP'a deginilmis mi diye arsiv mumlarina bakilir; deginmisse
+        kayit yeniden acilir (outcome/r/exit temizlenir) ve duzeltilmis motor
+        bir sonraki turda dolustan itibaren yeniden karara baglar.
+        Mumlari arsivde olmayan kayit DOKUNULMADAN birakilir ve isaretlenir
+        (prefill_repaired=2) - sessizce dogru varsayilmaz.
+        """
+        rows = self._db.query(
+            "SELECT id,pair,direction,entry_candle_ts,fill_ts,tp1,stop_loss "
+            "FROM signals WHERE status='CLOSED' AND prefill_repaired=0 "
+            "AND outcome IN ('WIN','LOSS') AND fill_ts IS NOT NULL "
+            "AND entry_candle_ts IS NOT NULL AND fill_ts > entry_candle_ts")
+        reopened = 0
+        for r in rows:
+            pre = self._db.query(
+                "SELECT high,low FROM candles WHERE symbol=? AND interval=? "
+                "AND ts>=? AND ts<? ORDER BY ts ASC",
+                (r["pair"], self._ltf, r["entry_candle_ts"], r["fill_ts"]))
+            if not pre:
+                self._db.execute(
+                    "UPDATE signals SET prefill_repaired=2 WHERE id=?",
+                    (r["id"],))          # dogrulanamadi: sessiz kabul yok
+                continue
+            is_long = r["direction"] == Direction.LONG.value
+            touched = any(
+                (c["high"] >= r["tp1"] or c["low"] <= r["stop_loss"]) if is_long
+                else (c["low"] <= r["tp1"] or c["high"] >= r["stop_loss"])
+                for c in pre)
+            if not touched:
+                self._db.execute(
+                    "UPDATE signals SET prefill_repaired=1 WHERE id=?",
+                    (r["id"],))          # temiz: karar dolus sonrasi verilmis
+                continue
+            self._db.execute(
+                "UPDATE signals SET status='FILLED', outcome=NULL, "
+                "exit_price=NULL, r_multiple=NULL, closed_utc=NULL, "
+                "mfe_r=NULL, mae_r=NULL, ambiguous=0, funding_done=0, "
+                "funding_r_real=NULL, prefill_repaired=1 WHERE id=?",
+                (r["id"],))
+            reopened += 1
+            log.warning(kv(event="prefill_outcome_reopened", signal_id=r["id"],
+                           pair=r["pair"], pre_bars=len(pre)))
+        if reopened:
+            log.warning(kv(event="prefill_repair_done", reopened=reopened))
+        return reopened
 
     def _backfill_cluster_ids(self) -> int:
         """cluster_id'si bos kayitlari geriye donuk etiketle (v3.6 duzeltme).
@@ -410,6 +467,14 @@ class SignalTracker:
                        else (c["high"] - fill_price)) / risk
                 mfe = max(mfe, fav)
                 mae = max(mae, adv)
+            # v3.6-KRITIK: SONUC kontrolu de yalniz dolustan itibaren.
+            # Sinyal onceki turda dolduysa fill_price DB'den gelir, dolus
+            # dallanmasi atlanir ve dongu entry_candle_ts'ten baslar. Bu
+            # filtre olmadan DOLUS ONCESI mumlar TP/STOP'a degmis sayilir:
+            # LONG'ta fiyat once TP'ye kosup sonra bolgeye inerse UYDURMA
+            # WIN yazilir - kacirilan hareket kazanc gibi kaydedilir.
+            if not at_or_after_fill:
+                continue
             hit_stop = (c["low"] <= sig["stop_loss"] if is_long
                         else c["high"] >= sig["stop_loss"])
             hit_tp = (c["high"] >= sig["tp1"] if is_long
