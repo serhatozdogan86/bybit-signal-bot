@@ -371,7 +371,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     .step .d{display:none}
   }
   /* ---------- MOBIL (<=760px): sekmeli tek kolon + menekse vurgu ---------- */
-  .col[data-tab="ayar"]{display:none}   /* yalniz mobil sekmede gorunur */
+  .col[data-tab="ayar"],.col[data-tab="adaylar"]{display:none}   /* yalniz mobil sekmede gorunur */
   .setrow{display:flex;align-items:center;justify-content:space-between;
      gap:12px;padding:11px 0;border-bottom:1px dashed var(--line)}
   .setrow:last-child{border-bottom:0}
@@ -419,8 +419,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     #setLang:empty::after{content:"başlıktaki TR/RU düğmesi";font-size:11.5px;
        color:var(--muted)}
     .hdr .icon{font-size:12px}
-    .col[data-tab="ayar"]{display:none}
-    .col[data-tab="ayar"].on{display:flex}
+    .col[data-tab="ayar"],.col[data-tab="adaylar"]{display:none}
+    .col[data-tab="ayar"].on,.col[data-tab="adaylar"].on{display:flex}
     .cols{grid-template-columns:1fr}
     /* sekme mantigi: yalniz aktif sutun gorunur */
     .col[data-tab]{display:none}
@@ -456,7 +456,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         padding-top:8px;border-top:1px dashed var(--line)}
     .sigwrap td.c-id{display:none}
     /* alt sekme cubugu */
-    .tabbar{display:grid;grid-template-columns:repeat(4,1fr);
+    .tabbar{display:grid;grid-template-columns:repeat(5,1fr);
         position:fixed;left:0;right:0;bottom:0;z-index:50;
         background:rgba(255,254,250,.96);backdrop-filter:blur(8px);
         border-top:1px solid var(--line);padding:6px 4px 8px}
@@ -565,6 +565,12 @@ DASHBOARD_HTML = r"""<!doctype html>
       </div>
     </div>
 
+    <div class="col" data-tab="adaylar">
+      <div class="card fill">
+        <div class="chead"><span class="tipwrap" tabindex="0" data-tip="Faz B gölge yarışı: 5 aday strateji, şampiyonla AYNI maliyet modeli ve AYNI sınavla (≥50 kapanmış küme + küme-CI alt sınırı > 0) kâğıt üzerinde ölçülür. Gerçek işlem yok. Girişler kapanış bazlı; v1 çıkışları sabit hedefli — trend adayları (S1/S2) için sonuçlar muhafazakâr alt sınırdır. Şampiyon Faz-1 sınavını geçemezse buradaki sıralama bir sonraki denemenin adayını belirler. Çoklu karşılaştırma düzeltmesi: kazanan, seçildikten SONRA toplanan veride de sınavı geçmek zorundadır. Yatırım tavsiyesi değildir.">Aday Stratejiler · Gölge Yarış <span class="i">ⓘ</span></span> <span class="tag">Faz B</span></div>
+        <div class="cbody scroll" id="chalBody"><div class="empty">aday verisi birikiyor…</div></div>
+      </div>
+    </div>
     <div class="col" data-tab="ayar">
       <div class="card">
         <div class="chead">Ayarlar <span class="tag">tercihler cihazında saklanır</span></div>
@@ -612,6 +618,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     <button class="tb active" data-go="ozet" role="tab"><span>▤</span>Özet</button>
     <button class="tb" data-go="sinyaller" role="tab"><span>≡</span>Sinyaller</button>
     <button class="tb" data-go="piyasa" role="tab"><span>◈</span>Piyasa</button>
+    <button class="tb" data-go="adaylar" role="tab"><span>⚑</span>Adaylar</button>
     <button class="tb" data-go="ayar" role="tab"><span>⚙</span>Ayar</button>
   </nav>
   <footer class="statusbar" id="statusbar">yükleniyor…</footer>
@@ -704,6 +711,12 @@ const RU={
 "Yön Bilançosu":"Баланс по направлениям","tıkla → yön filtresi":"клик → фильтр направления",
 /* v3.6 olcum karti */
 "Ölçüm · v3.6":"Измерение · v3.6","küme istatistiği":"кластерная статистика",
+"Adaylar":"Кандидаты","Aday Stratejiler · Gölge Yarış":"Стратегии-кандидаты · Теневая гонка",
+"Faz B":"Фаза B","aday verisi birikiyor…":"данные кандидатов накапливаются…",
+"henüz sonuçlanan aday işlemi yok — veri birikiyor":"завершённых сделок кандидатов пока нет — данные накапливаются",
+"strateji":"стратегия","açık":"открыто","sonuç":"итоги",
+"Faz B gölge yarışı: 5 aday strateji, şampiyonla AYNI maliyet modeli ve AYNI sınavla (≥50 kapanmış küme + küme-CI alt sınırı > 0) kâğıt üzerinde ölçülür. Gerçek işlem yok. Girişler kapanış bazlı; v1 çıkışları sabit hedefli — trend adayları (S1/S2) için sonuçlar muhafazakâr alt sınırdır. Şampiyon Faz-1 sınavını geçemezse buradaki sıralama bir sonraki denemenin adayını belirler. Çoklu karşılaştırma düzeltmesi: kazanan, seçildikten SONRA toplanan veride de sınavı geçmek zorundadır. Yatırım tavsiyesi değildir.":
+ "Теневая гонка Фазы B: 5 стратегий-кандидатов измеряются на бумаге с ТОЙ ЖЕ моделью издержек и ТЕМ ЖЕ экзаменом, что и чемпион (≥50 закрытых кластеров + нижняя граница кластерного CI > 0). Реальных сделок нет. Входы по закрытию; выходы v1 с фиксированной целью — для трендовых кандидатов (S1/S2) результаты являются консервативной нижней оценкой. Если чемпион не сдаст экзамен Фазы-1, этот рейтинг определит кандидата для следующей попытки. Поправка на множественные сравнения: победитель обязан сдать экзамен и на данных, собранных ПОСЛЕ выбора. Не инвестиционная рекомендация.",
 "Kümülatif R (Equity)":"Накопленный R (эквити)",
 "Sonuçlanan işlemlerin R toplamının zaman içindeki birikimi. Kalın mavi çizgi NET eğridir (komisyon, stop kayması ve fonlama düşülmüş); kesikli gri çizgi aynı işlemlerin brüt hâlidir. İki çizgi arasındaki makas, maliyetin zamanla biriken yüküdür — işlem sayısı arttıkça açılır. Noktalar tek tek işlemler: yeşil WIN, kırmızı LOSS. Başlıktaki PF (kâr faktörü), beklenti ve maksDD de net seriden hesaplanır; brüt yalnız kıyas için gösterilir.":
  "Накопление суммы R по завершённым сделкам во времени. Жирная синяя линия — ЧИСТАЯ кривая (за вычетом комиссии, проскальзывания на стопе и фондирования); пунктирная серая — те же сделки без издержек. Зазор между линиями и есть накапливающийся вес затрат: он расширяется по мере роста числа сделок. Точки — отдельные сделки: зелёная WIN, красная LOSS. PF (профит-фактор), ожидание и макс. просадка в заголовке тоже считаются по чистому ряду; валовая величина показана лишь для сравнения.",
@@ -1055,6 +1068,34 @@ function renderHeader(perf,status){
   const be=w.count?(100/(1+(w.sum_r/w.count))).toFixed(1):null;
   const pos=be&&Number(wr)>Number(be);
   el.innerHTML=`<b>${perf.decided_trades}</b> sinyal sonuçlandı · isabet <b>%${wr}</b>${be?" (başabaş ~%"+be+")":""} · toplam <b class="${tr>=0?"pos":"neg"}">${(tr>0?"+":"")+num(tr)}R</b> · ${pos?'<span class="pos">eşiğin üzerinde</span>':'<span class="neg">eşiğin altında</span>'} · n<30, hüküm için erken`;
+}
+
+/* ---------- Faz B: aday stratejiler sekmesi ---------- */
+const CHAL_ADI={S1_TSMOM:"S1 · Trend Takibi",S2_DONCHIAN:"S2 · Kırılım (Donchian)",
+  S3_MEANREV:"S3 · Ortalamaya Dönüş",S4_CARRY:"S4 · Fonlama Taşıması",
+  S6_SWEEP:"S6 · Süpürme Dönüşü"};
+function renderChallengers(ch){
+  const el=$("chalBody");if(!el)return;
+  if(!ch||!ch.strategies){el.innerHTML='<div class="empty">aday verisi birikiyor…</div>';return;}
+  const sgn=v=>v==null?"—":(v>0?"+":"")+num(v,2);
+  let h='<table class="sig"><thead><tr><th>strateji</th><th>açık</th>'+
+    '<th>sonuç</th><th>WR</th><th>net R</th><th>küme</th><th>CI</th></tr></thead><tbody>';
+  for(const k of Object.keys(CHAL_ADI)){
+    const s=ch.strategies[k];if(!s)continue;
+    const wr=s.win_rate==null?"—":(s.win_rate*100).toFixed(0)+"%";
+    const ci=s.ci?`[${sgn(s.ci[0])}, ${sgn(s.ci[1])}]`:"—";
+    const ciCls=s.ci&&s.ci[0]>0?"pos":(s.ci&&s.ci[1]<0?"neg":"");
+    h+=`<tr><td>${CHAL_ADI[k]}</td><td class="num">${s.open}</td>`+
+       `<td class="num">${s.decided}${s.expired?` <span class="muted">(+${s.expired}e)</span>`:""}</td>`+
+       `<td class="num">${wr}</td>`+
+       `<td class="num ${s.net_r>0?"pos":s.net_r<0?"neg":""}">${sgn(s.net_r)}</td>`+
+       `<td class="num">${s.clusters}/${ch.faz1_target||50}</td>`+
+       `<td class="num ${ciCls}">${ci}</td></tr>`;
+  }
+  h+="</tbody></table>";
+  const toplam=Object.values(ch.strategies).reduce((a,s)=>a+(s.decided||0),0);
+  if(!toplam)h+='<div class="empty" style="margin-top:8px">henüz sonuçlanan aday işlemi yok — veri birikiyor</div>';
+  el.innerHTML=h;
 }
 
 /* ---------- v3.6 olcum karti: kume-CI + Faz-1 kapisi ---------- */
@@ -1858,10 +1899,10 @@ function renderFooter(backup,healthy,ms,perf){
 /* ---------- loop ---------- */
 async function refresh(){
   const t0=performance.now();
-  const [perf,signals,status,uni,comments,market,news,px,backup]=await Promise.all([
+  const [perf,signals,status,uni,comments,market,news,px,backup,chal]=await Promise.all([
     j("/performance"),j("/signals?limit=500"),j("/status"),j("/universe"),
     j("/commentary?limit=4"),j("/market"),j("/news"),j("/prices"),
-    j("/backup/info")]);
+    j("/backup/info"),j("/challengers")]);
   const fetchMs=Math.round(performance.now()-t0);
   PREV_PRICES=PRICES;PRICES=(px&&px.prices)||{};
   LAST_STATUS=status;
@@ -1869,6 +1910,7 @@ async function refresh(){
   renderHeader(perf,status);
   renderKpis(perf,status,uni,SIGNALS);
   renderMeasure(perf);
+  renderChallengers(chal);
   renderCurve(SIGNALS);
   renderDuel(SIGNALS);
   renderChips();renderSignals();

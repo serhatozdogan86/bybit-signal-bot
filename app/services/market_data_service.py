@@ -56,6 +56,10 @@ class MarketDataService:
         """Orderbook snapshot (Phase 2 - ORDERBOOK_ENRICH icin)."""
         return self._client.get_orderbook(symbol, depth)
 
+    def get_all_tickers(self) -> list[dict] | None:
+        """Tum semboller tek istekte (funding dahil) - aday S4 icin."""
+        return self._client.get_all_tickers()
+
     def get_funding_history(self, symbol: str, start_ms: int | None = None,
                             end_ms: int | None = None) -> list[dict] | None:
         """Gercek funding oranlari (v3.6 maliyet-v1 veri toplama)."""

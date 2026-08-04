@@ -249,6 +249,17 @@ def create_app(store: StateStore, scheduler: Scheduler,
             json.dumps(tracker.verify_outcomes(), indent=2),
             mimetype="application/json")
 
+    @app.get("/challengers")
+    def challengers_view():
+        """Aday stratejilerin golge performansi (Faz B)."""
+        eng = getattr(scheduler, "challengers", None)
+        if eng is None:
+            return jsonify({"error": "challengers disabled"}), 404
+        data = eng.stats()
+        data["recent"] = eng.recent(60)
+        return app.response_class(json.dumps(data, indent=2),
+                                  mimetype="application/json")
+
     @app.get("/signals")
     def signals():
         if tracker is None:

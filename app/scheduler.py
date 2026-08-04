@@ -21,6 +21,7 @@ from app.integrations.telegram_notifier import TelegramNotifier
 from app.logging_setup import kv
 from app.models.decision import Decision, DecisionType
 from app.services.market_data_service import MarketDataService
+from app.services.challengers import ChallengerEngine
 from app.services.signal_tracker import SignalTracker, _cluster_id
 from app.services.state_store import StateStore
 from app.services.universe import UniverseProvider
@@ -60,6 +61,15 @@ class Scheduler:
         self._universe = universe    # None -> static SYMBOLS
         self._params = settings.strategy_params
         self._scan_lock = threading.Lock()   # es zamanli tarama koruma
+        self._funding_map: dict[str, float] = {}
+        # Aday motoru (Faz B): sampiyondan tamamen izole golge yarisci.
+        # Kurulum hatasi taramayi ASLA engellemez.
+        self.challengers = None
+        if tracker is not None:
+            try:
+                self.challengers = ChallengerEngine(tracker.db, settings.LTF)
+            except Exception:
+                log.exception(kv(event="challenger_init_error"))
 
     def symbols(self) -> list[str]:
         if self._universe is not None:
@@ -67,6 +77,24 @@ class Scheduler:
         return self._settings.symbols
 
     # ------------------------------------------------------------- tarama
+    def _refresh_funding_map(self) -> None:
+        """Tarama basina 1 toplu tickers cagrisi (S4 funding girdisi).
+        Hata -> eski harita kalir; bos harita S4'u sessizce susturur."""
+        if self.challengers is None:
+            return
+        try:
+            tickers = self._md.get_all_tickers() or []
+            fresh = {}
+            for t in tickers:
+                try:
+                    fresh[t.get("symbol")] = float(t.get("fundingRate"))
+                except (TypeError, ValueError):
+                    continue
+            if fresh:
+                self._funding_map = fresh
+        except Exception:
+            log.exception(kv(event="funding_map_error"))
+
     def scan_symbol(self, symbol: str) -> Decision:
         htf = self._md.get_series(symbol, self._settings.HTF)
         ltf = self._md.get_series(symbol, self._settings.LTF)
@@ -78,6 +106,13 @@ class Scheduler:
 
         if self._tracker is not None:
             self._shadow_track(decision, htf, ltf)
+        if self.challengers is not None:
+            try:
+                self.challengers.on_scan(symbol, htf, ltf,
+                                         self._funding_map.get(symbol))
+                self.challengers.evaluate_open(symbol)
+            except Exception:
+                log.exception(kv(event="challenger_scan_error", symbol=symbol))
 
         log.info(kv(event="scan", symbol=symbol, decision=decision.decision.value,
                     direction=decision.direction.value,
@@ -135,6 +170,7 @@ class Scheduler:
 
     def _scan_all_locked(self, send_telegram: bool) -> list[Decision]:
         self._market_bias = self._compute_market_bias()
+        self._refresh_funding_map()
         if self._commentary is not None:
             self._commentary.market_bias = self._market_bias
         results: list[Decision] = []
@@ -261,7 +297,10 @@ class Scheduler:
         degerlendirme calistirilir.
         """
         try:
-            pairs = [p for p in self._tracker.open_pairs() if p not in scanned]
+            pairs = set(self._tracker.open_pairs())
+            if self.challengers is not None:
+                pairs |= set(self.challengers.open_pairs())
+            pairs = [p for p in pairs if p not in scanned]
         except Exception:
             log.exception(kv(event="orphan_list_error"))
             return
@@ -271,6 +310,8 @@ class Scheduler:
                 if ltf is not None and len(ltf):
                     self._tracker.record_candles(ltf)
                 self._tracker.evaluate_open(pair)
+                if self.challengers is not None:
+                    self.challengers.evaluate_open(pair)
                 log.info(kv(event="orphan_eval", pair=pair))
             except Exception:
                 log.exception(kv(event="orphan_eval_error", pair=pair))

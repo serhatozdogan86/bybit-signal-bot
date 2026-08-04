@@ -303,6 +303,11 @@ class SignalTracker:
                         scanned=len(rows)))
         return len(updates)
 
+    @property
+    def db(self):
+        """Ayni SQLite baglantisi - aday motoru kendi tablosunu burada acar."""
+        return self._db
+
     def record_candles(self, series: KlineSeries) -> None:
         """Kapanmis mumlari arsivle. Son bar henuz olusuyor -> atlanir."""
         closed = series.candles[:-1]

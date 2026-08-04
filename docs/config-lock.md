@@ -112,3 +112,18 @@ doluş öncesi mum asla karara giremez; aynı mumda TP ve STOP varsa AMBIGUOUS.
 **İlk tam tarama sonucu (156 denetlenebilir kapanmış sinyal):** 5 uyuşmazlık,
 hepsi kayıt=WIN / denetçi=LOSS — #382, #359, #341, #57, #6. Brüt şişme
 yaklaşık +14.7R. Onarım sonrası başlık rakamları yeniden okunmalıdır.
+
+## Faz B başladı (2026-08-04): aday motoru — kilit İHLAL EDİLMEDİ
+Şampiyon motoru, eşikleri ve ölçüm penceresi aynen sürüyor; `app/strategies/`
+0 satır değişiklik. Eklenen her şey İZOLE gölge altyapısı:
+- `app/services/challengers.py`: 5 aday (S1 TSMOM, S2 Donchian, S3 ortalamaya
+  dönüş, S4 funding carry, S6 süpürme dönüşü), tek denetlenebilir
+  değerlendirici (sabit stop+hedef+zaman aşımı; iz-süren çıkışlar v2),
+  şampiyonla aynı maliyet sabitleri ve küme-CI standardı.
+- Ayrı tablo (`challenger_signals`); izolasyon testle zorlanır:
+  adaylar açıkken şampiyon `stats()` çıktısı bayt-bayt aynı.
+- Veri: taramada zaten çekilen seriler; tek istisna tarama başına 1 toplu
+  tickers çağrısı (S4 funding). Aday hatası taramayı düşüremez (fail-soft).
+- `/challengers` endpoint'i + panoda "Adaylar" sekmesi (mobil).
+- Bakış-öncesi yasağı adaylarda DOĞUŞTAN testli: giriş mumu ve öncesi karara
+  giremez (şampiyonda dört kez tekrarlanan sınıf burada kapalı doğdu).
