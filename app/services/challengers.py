@@ -31,7 +31,22 @@ from app.services.signal_tracker import FUNDING_8H, STOP_SLIP, TAKER_FEE
 log = logging.getLogger("challengers")
 
 STRATEGIES = ("S1_TSMOM", "S2_DONCHIAN", "S3_MEANREV", "S4_CARRY", "S6_SWEEP")
-MAX_OPEN_PER_STRATEGY = 15      # tablo buyumesine tavan (heat-lite)
+# Acik pozisyon tavani - STRATEJIYE GORE (v1.1 duzeltmesi).
+# NEDEN: tek tavan (15) yarisi adaletsiz kildi. Uzun tutan trend adaylari
+# (S1 medyan 45 bar, S4 37 bar) slotlari doldurup YENI SINYAL URETEMEZ hale
+# geldi; hizli devreden S3 (6 bar) ve S6 (2 bar) veriyi hizla biriktirdi.
+# 8 saat sonunda S3 8 kume toplarken S1 hala 1 kumedeydi. Boyle giderse
+# "en iyi aday" degil "en hizli devreden aday" hukum alirdi.
+# Tavan artik ortalama tutus suresiyle ORANTILI: yavas adaylar da makul
+# surede 50 kumeye ulasabilsin. Bu bir OLCUM ALTYAPISI duzeltmesidir;
+# hicbir stratejinin giris/cikis kurali degismedi.
+MAX_OPEN = {"S1_TSMOM": 40, "S2_DONCHIAN": 40, "S4_CARRY": 40,
+            "S3_MEANREV": 15, "S6_SWEEP": 15}
+MAX_OPEN_DEFAULT = 15
+# Ornekleme rejimi damgasi: tavan degisimi oncesi/sonrasi kohortlar
+# BIRLESTIRILEMEZ (farkli kisitla toplandilar). Istatistikler yalniz
+# gecerli rejimi sayar; eski kayitlar tabloda kalir ama hesaba girmez.
+SAMPLING_REGIME = 2
 FAZ1_TARGET = 50                # sampiyonla ayni sinav esigi
 
 
@@ -121,7 +136,12 @@ class ChallengerEngine:
             "timeout_bars INTEGER, status TEXT DEFAULT 'OPEN',"
             "outcome TEXT, exit_price REAL, exit_ts INTEGER,"
             "r_multiple REAL, hold_bars INTEGER, cluster_id TEXT,"
-            "ambiguous INTEGER DEFAULT 0)")
+            "ambiguous INTEGER DEFAULT 0, regime INTEGER DEFAULT 1)")
+        try:
+            self._db.execute("ALTER TABLE challenger_signals ADD COLUMN "
+                             "regime INTEGER DEFAULT 1")
+        except Exception:
+            pass  # kolon zaten var
 
     # ------------------------------------------------------- sinyal uretimi
     def on_scan(self, symbol: str, htf, ltf, funding: float | None) -> int:
@@ -138,11 +158,11 @@ class ChallengerEngine:
                 continue
             self._db.execute(
                 "INSERT INTO challenger_signals(strategy,pair,direction,"
-                "created_utc,entry_ts,entry,stop,tp,timeout_bars,cluster_id) "
-                "VALUES(?,?,?,?,?,?,?,?,?,?)",
+                "created_utc,entry_ts,entry,stop,tp,timeout_bars,cluster_id,"
+                "regime) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                 (strat, symbol, direction, _now_iso(), last.ts,
                  round(last.close, 8), round(stop, 8), round(tp, 8),
-                 timeout, cid))
+                 timeout, cid, SAMPLING_REGIME))
             made += 1
             log.info(kv(event="challenger_signal", strategy=strat,
                         pair=symbol, direction=direction))
@@ -159,7 +179,7 @@ class ChallengerEngine:
         r = self._db.query_one(
             "SELECT COUNT(*) n FROM challenger_signals WHERE strategy=? "
             "AND status='OPEN'", (strat,))
-        return (r["n"] or 0) >= MAX_OPEN_PER_STRATEGY
+        return (r["n"] or 0) >= MAX_OPEN.get(strat, MAX_OPEN_DEFAULT)
 
     def _generate(self, symbol, htf, ltf, funding):
         """(strateji, (yon, stop, tp, timeout_bar)) ciftleri."""
@@ -323,9 +343,19 @@ class ChallengerEngine:
         out = {"note": ("Golge adaylar - sampiyonla ayni maliyet modeli, "
                         "ayni kume-CI standardi, ayni 50-kume esigi. "
                         "v1 cikislari sabit hedefli (trend adaylari icin "
-                        "muhafazakar alt sinir). Yatirim tavsiyesi degildir."),
+                        "muhafazakar alt sinir). Rejim-2: acik pozisyon "
+                        "tavani stratejiye gore ayarlandi; rejim-1 kayitlari "
+                        "farkli kisitla toplandigi icin hesaba GIRMEZ. "
+                        "Yatirim tavsiyesi degildir."),
                "faz1_target": FAZ1_TARGET, "strategies": {}}
-        rows = self._db.query("SELECT * FROM challenger_signals")
+        allrows = self._db.query("SELECT * FROM challenger_signals")
+        rows = [r for r in allrows
+                if (r.get("regime") or 1) == SAMPLING_REGIME]
+        eski = [r for r in allrows
+                if (r.get("regime") or 1) != SAMPLING_REGIME]
+        out["sampling_regime"] = SAMPLING_REGIME
+        out["retired_rows"] = len(eski)
+        out["max_open"] = MAX_OPEN
         for strat in STRATEGIES:
             mine = [r for r in rows if r["strategy"] == strat]
             closed = [r for r in mine if r["status"] == "CLOSED"

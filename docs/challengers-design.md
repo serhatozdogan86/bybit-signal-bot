@@ -111,3 +111,23 @@ daha dürüst ölçülür. Karşılaştırmada bu asimetri açıkça not edilece
 ## Kilit uyumu
 Şampiyon motoruna, eşiklerine, ölçüm penceresine dokunulmaz. Adaylar ayrı
 kohort, ayrı tablo, sıfır etkileşim. Bu belge docs-only'dir.
+
+
+## Örnekleme rejimi 2 (2026-08-04): stratejiye göre açık pozisyon tavanı
+**Bulunan tasarım hatası:** tek tavan (15 açık pozisyon/strateji) yarışı
+adaletsiz kıldı. Ölçülen tutuş süreleri: S1 medyan 45 bar, S4 37 bar,
+S2 13 bar; buna karşılık S3 6 bar, S6 2 bar. Uzun tutan adaylar slotları
+doldurup **yeni sinyal üretemez** hale geldi — 8 saat sonunda S3 8 küme
+toplamışken S1 hâlâ 1 kümedeydi. Bu hızla hüküm "en iyi aday"a değil
+"en hızlı devreden aday"a çıkardı.
+
+**Düzeltme:** tavan tutuş süresiyle orantılı → S1/S2/S4: 40, S3/S6: 15.
+Hiçbir stratejinin giriş/çıkış kuralı değişmedi; bu bir **ölçüm altyapısı**
+düzeltmesidir.
+
+**Bedeli açıkça kayda geçiyor:** tavan öncesi kayıtlar farklı kısıtla
+toplandı, dolayısıyla yeni kohortla **birleştirilemez**. `regime` kolonu
+eklendi; istatistikler yalnız geçerli rejimi sayar, eski kayıtlar tabloda
+kalır (silinmez) ve sayısı `retired_rows` ile hem API'de hem panoda
+gösterilir. S1/S2/S4 sayaçları fiilen sıfırdan başlar. Sessiz sıfırlama
+yoktur — kullanıcı ne kaybettiğini görür.

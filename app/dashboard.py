@@ -711,7 +711,8 @@ const RU={
 "Yön Bilançosu":"Баланс по направлениям","tıkla → yön filtresi":"клик → фильтр направления",
 /* v3.6 olcum karti */
 "Ölçüm · v3.6":"Измерение · v3.6","küme istatistiği":"кластерная статистика",
-"Adaylar":"Кандидаты","tam":"полный","pencere dışı":"вне окна","Aday Stratejiler · Gölge Yarış":"Стратегии-кандидаты · Теневая гонка",
+"Adaylar":"Кандидаты","tam":"полный","pencere dışı":"вне окна",
+"örnekleme rejimi":"режим выборки","Aday Stratejiler · Gölge Yarış":"Стратегии-кандидаты · Теневая гонка",
 "Faz B":"Фаза B","aday verisi birikiyor…":"данные кандидатов накапливаются…",
 "henüz sonuçlanan aday işlemi yok — veri birikiyor":"завершённых сделок кандидатов пока нет — данные накапливаются",
 "strateji":"стратегия","açık":"открыто","sonuç":"итоги",
@@ -1095,6 +1096,9 @@ function renderChallengers(ch){
   h+="</tbody></table>";
   const toplam=Object.values(ch.strategies).reduce((a,s)=>a+(s.decided||0),0);
   if(!toplam)h+='<div class="empty" style="margin-top:8px">henüz sonuçlanan aday işlemi yok — veri birikiyor</div>';
+  if(ch.retired_rows)h+=`<div class="note" style="margin-top:8px">örnekleme rejimi ${ch.sampling_regime}: `+
+    `açık pozisyon tavanı stratejiye göre ayarlandı. Önceki ${ch.retired_rows} kayıt farklı kısıtla toplandığı için `+
+    `hesaba GİRMEZ (tabloda durur, silinmedi).</div>`;
   el.innerHTML=h;
 }
 

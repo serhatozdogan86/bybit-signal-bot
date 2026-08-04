@@ -147,9 +147,9 @@ def test_stats_shape_and_net_below_gross(tmp_path):
     eng, db = _eng(tmp_path)
     db.execute("INSERT INTO challenger_signals(strategy,pair,direction,"
                "created_utc,entry_ts,entry,stop,tp,timeout_bars,cluster_id,"
-               "status,outcome,r_multiple,hold_bars) VALUES('S1_TSMOM',"
-               "'AUSDT','LONG','2026-08-04T00:00:00Z',1000000,100,98,106,"
-               "192,'S1:L1','CLOSED','WIN',3.0,20)")
+               "status,outcome,r_multiple,hold_bars,regime) VALUES("
+               "'S1_TSMOM','AUSDT','LONG','2026-08-04T00:00:00Z',1000000,"
+               "100,98,106,192,'S1:L1','CLOSED','WIN',3.0,20,2)")
     s = eng.stats()["strategies"]["S1_TSMOM"]
     assert s["decided"] == 1 and s["win_rate"] == 1.0
     assert s["net_r"] < s["gross_r"]                # maliyet dusuldu
@@ -173,3 +173,46 @@ def test_challenger_stats_in_gist_backup_payload(tmp_path):
     gb2 = GistBackup(MagicMock(), tracker, symbols=["TESTUSDT"],
                      intervals=["15"])
     assert "0_challengers.json" in gb2.build_files()
+
+
+def test_per_strategy_open_caps(tmp_path):
+    """Tavan stratejiye gore: uzun tutan adaylar slot kitliligi yuzunden
+    veri toplayamaz hale gelmemeli (rejim-2 duzeltmesi)."""
+    from app.services.challengers import MAX_OPEN, MAX_OPEN_DEFAULT
+    eng, db = _eng(tmp_path)
+    assert MAX_OPEN["S1_TSMOM"] > MAX_OPEN["S3_MEANREV"]
+    for i in range(MAX_OPEN["S3_MEANREV"]):
+        db.execute("INSERT INTO challenger_signals(strategy,pair,direction,"
+                   "created_utc,entry_ts,entry,stop,tp,timeout_bars,"
+                   "cluster_id,regime) VALUES('S3_MEANREV',?,'LONG','x',1,"
+                   "100,98,104,96,?,2)", (f"P{i}USDT", f"S3:L{i}"))
+    assert eng._crowded("S3_MEANREV") is True
+    assert eng._crowded("S1_TSMOM") is False      # ayri tavan, ayri sayac
+    assert MAX_OPEN.get("BILINMEYEN", MAX_OPEN_DEFAULT) == MAX_OPEN_DEFAULT
+
+
+def test_old_regime_rows_excluded_from_stats(tmp_path):
+    """Ornekleme rejimi degisince eski kohort BIRLESTIRILMEZ: farkli
+    kisitla toplandi. Tabloda kalir, hesaba girmez, sayisi raporlanir."""
+    from app.services.challengers import SAMPLING_REGIME
+    eng, db = _eng(tmp_path)
+    ins = ("INSERT INTO challenger_signals(strategy,pair,direction,"
+           "created_utc,entry_ts,entry,stop,tp,timeout_bars,cluster_id,"
+           "status,outcome,r_multiple,hold_bars,regime) VALUES('S1_TSMOM',"
+           "?,'LONG','x',1,100,98,106,192,'S1:L1','CLOSED','WIN',3.0,20,?)")
+    db.execute(ins, ("ESKIUSDT", 1))              # tavan oncesi
+    db.execute(ins, ("YENIUSDT", SAMPLING_REGIME))
+    s = eng.stats()
+    assert s["sampling_regime"] == SAMPLING_REGIME
+    assert s["retired_rows"] == 1
+    assert s["strategies"]["S1_TSMOM"]["decided"] == 1   # yalniz yeni kohort
+
+
+def test_new_signals_stamped_with_current_regime(tmp_path):
+    from app.services.challengers import SAMPLING_REGIME
+    eng, db = _eng(tmp_path)
+    htf = fx.make_series(np.full(60, 100.0), interval="240")
+    closes = np.concatenate([np.full(98, 100.0), [100.0, 106.0]])
+    eng.on_scan("AUSDT", htf, fx.make_series(closes), None)
+    r = db.query_one("SELECT regime FROM challenger_signals")
+    assert r["regime"] == SAMPLING_REGIME
