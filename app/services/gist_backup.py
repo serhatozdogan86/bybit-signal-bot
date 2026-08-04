@@ -70,6 +70,12 @@ class GistBackup:
         self._last_sync_utc: str | None = None
 
     # ------------------------------------------------------------- durum
+    def set_challengers(self, engine) -> None:
+        """Aday motoru sonradan baglanir (scheduler kurar). Yedege
+        0_challengers.json olarak girer - izleme boslugu kapanir: aday
+        performansi da gist uzerinden bagimsizca denetlenebilir."""
+        self._challengers = engine
+
     def info(self) -> dict:
         return {
             "gist_id": self._gist_id,
@@ -89,6 +95,8 @@ class GistBackup:
             "0_signals.json": json.dumps(self._tracker.recent_signals(500), indent=2),
             "0_blocked.json": json.dumps(self._tracker.blocked_signals(300), indent=2),
             "0_decisions.json": json.dumps(self._tracker.recent_decisions(2000), indent=2),
+            "0_challengers.json": json.dumps(
+                self._challenger_payload(), indent=2),
             "0_commentary.json": json.dumps(
                 self._commentary.recent(6) if self._commentary else [],
                 indent=2),
@@ -108,6 +116,18 @@ class GistBackup:
                 files[f"candles_{symbol}_{interval}.csv"] = _candles_csv(
                     rows[-self._candle_max_rows:])
         return files
+
+    def _challenger_payload(self) -> dict:
+        eng = getattr(self, "_challengers", None)
+        if eng is None:
+            return {"note": "aday motoru bagli degil"}
+        try:
+            data = eng.stats()
+            data["recent"] = eng.recent(200)
+            return data
+        except Exception:
+            log.exception(kv(event="challenger_backup_error"))
+            return {"note": "aday yedegi hata verdi; sonraki senkronda tekrar"}
 
     def sync(self) -> bool:
         files = self.build_files()

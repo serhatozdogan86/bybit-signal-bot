@@ -68,6 +68,8 @@ class Scheduler:
         if tracker is not None:
             try:
                 self.challengers = ChallengerEngine(tracker.db, settings.LTF)
+                if gist_backup is not None:
+                    gist_backup.set_challengers(self.challengers)
             except Exception:
                 log.exception(kv(event="challenger_init_error"))
 

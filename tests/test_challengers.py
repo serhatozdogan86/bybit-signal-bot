@@ -153,3 +153,21 @@ def test_stats_shape_and_net_below_gross(tmp_path):
     s = eng.stats()["strategies"]["S1_TSMOM"]
     assert s["decided"] == 1 and s["win_rate"] == 1.0
     assert s["net_r"] < s["gross_r"]                # maliyet dusuldu
+
+
+def test_challenger_stats_in_gist_backup_payload(tmp_path):
+    """IZLEME BOSLUGU KAPALI KALSIN: aday verisi yedege girmezse uzaktan
+    denetlenemez (bugun yasandi). build_files 0_challengers.json icermeli."""
+    from unittest.mock import MagicMock
+    from app.services.gist_backup import GistBackup
+    tracker, db = _make_tracker(tmp_path)
+    eng = ChallengerEngine(db, "15")
+    gb = GistBackup(MagicMock(), tracker)
+    gb.set_challengers(eng)
+    files = gb.build_files()
+    assert "0_challengers.json" in files
+    payload = json.loads(files["0_challengers.json"])
+    assert "strategies" in payload and "S6_SWEEP" in payload["strategies"]
+    # motor baglanmadan da yedek COKMEmeli
+    gb2 = GistBackup(MagicMock(), tracker)
+    assert "0_challengers.json" in gb2.build_files()
