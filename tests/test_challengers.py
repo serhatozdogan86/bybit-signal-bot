@@ -162,12 +162,14 @@ def test_challenger_stats_in_gist_backup_payload(tmp_path):
     from app.services.gist_backup import GistBackup
     tracker, db = _make_tracker(tmp_path)
     eng = ChallengerEngine(db, "15")
-    gb = GistBackup(MagicMock(), tracker)
+    gb = GistBackup(MagicMock(), tracker, symbols=["TESTUSDT"],
+                    intervals=["15"])
     gb.set_challengers(eng)
     files = gb.build_files()
     assert "0_challengers.json" in files
     payload = json.loads(files["0_challengers.json"])
     assert "strategies" in payload and "S6_SWEEP" in payload["strategies"]
     # motor baglanmadan da yedek COKMEmeli
-    gb2 = GistBackup(MagicMock(), tracker)
+    gb2 = GistBackup(MagicMock(), tracker, symbols=["TESTUSDT"],
+                     intervals=["15"])
     assert "0_challengers.json" in gb2.build_files()
