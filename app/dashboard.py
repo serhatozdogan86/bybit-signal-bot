@@ -711,7 +711,7 @@ const RU={
 "Yön Bilançosu":"Баланс по направлениям","tıkla → yön filtresi":"клик → фильтр направления",
 /* v3.6 olcum karti */
 "Ölçüm · v3.6":"Измерение · v3.6","küme istatistiği":"кластерная статистика",
-"Adaylar":"Кандидаты","Aday Stratejiler · Gölge Yarış":"Стратегии-кандидаты · Теневая гонка",
+"Adaylar":"Кандидаты","tam":"полный","pencere dışı":"вне окна","Aday Stratejiler · Gölge Yarış":"Стратегии-кандидаты · Теневая гонка",
 "Faz B":"Фаза B","aday verisi birikiyor…":"данные кандидатов накапливаются…",
 "henüz sonuçlanan aday işlemi yok — veri birikiyor":"завершённых сделок кандидатов пока нет — данные накапливаются",
 "strateji":"стратегия","açık":"открыто","sonuç":"итоги",
@@ -1678,7 +1678,20 @@ let EV_ZOOM=24;
 async function loadEvidence(id,win){
   const box=$("evidBox"); if(!box) return;
   const ru=(LANG==="ru");
+  /* Otomatik pencere: kapanmis sinyalde cikis mumu pencereye SIGMALI.
+     Sabit +-12 mum, saatlerce tutulan islemde cikisi ekran disinda birakip
+     "stop'a gelmemis" yanilsamasi yaratiyordu. */
   if(win) EV_ZOOM=win;
+  else{
+    const sg=SIGNALS.find(x=>x.id===id);
+    let need=24;
+    if(sg&&sg.closed_utc&&sg.entry_candle_ts){
+      const bars=Math.ceil((Date.parse(sg.closed_utc.replace(" ","T"))
+                            -sg.entry_candle_ts)/900000);
+      if(bars>0) need=Math.min(80,Math.max(12,bars+3));
+    }
+    EV_ZOOM=need;
+  }
   try{
     const d=await j(`/signal/${id}/chart?before=${EV_ZOOM}&after=${EV_ZOOM}`);
     if(!d||d.error){box.innerHTML=`<div class="empty">${ru?"данные графика недоступны":"grafik verisi yok"}</div>`;return;}
@@ -1689,7 +1702,8 @@ async function loadEvidence(id,win){
     if(e.confluence) rows.push(`<b>${ru?"конфлюэнс":"confluence"}</b> ${e.confluence}`);
     if(e.invalidation) rows.push(`<b>${ru?"инвалидация":"invalidasyon"}</b> ${e.invalidation}`);
     if(e.regime||e.htf_bias) rows.push(`<b>${ru?"режим / 4H":"rejim / 4H"}</b> ${[e.regime,e.htf_bias].filter(Boolean).join(" · ")}`);
-    const zb=[[12,ru?"вблизи":"yakın"],[24,ru?"обычно":"normal"],[48,ru?"шире":"geniş"]]
+    const zb=[[12,ru?"вблизи":"yakın"],[24,ru?"обычно":"normal"],[48,ru?"шире":"geniş"],
+              [80,ru?"полный":"tam"]]
       .map(([v,l])=>`<button class="${EV_ZOOM===v?"on":""}" onclick="loadEvidence(${id},${v})">${l}</button>`).join("");
     box.innerHTML=`<div class="zoombar"><span class="zl">${ru?"окно графика":"grafik penceresi"}: ±${EV_ZOOM} ${ru?"свечей 15m":"mum (15m)"}</span>${zb}</div>`+
       drawEvidence(d)+
@@ -1753,8 +1767,19 @@ function drawEvidence(d){
         stroke="#2563EB" stroke-width="1" stroke-dasharray="3 4" opacity="0.7"/>
       <text x="${X(trig)+BW/2+3}" y="${TOP+9}" fill="#2563EB">${ru?"сигнал":"sinyal"}</text>`;}
   // dolus / cikis noktalari
+  /* Pencere disindaki olayi kenara YAPISTIRMAK yanilticidir: fiyat o
+     seviyeye hic gelmemis gibi gorunur ("stop cizgisine gelmemis ki").
+     Disaridaysa nokta cizilmez; kac mum sonra oldugu yaziyla soylenir. */
   const mark=(ts,px,col,lbl)=>{
     if(px==null) return "";
+    const last=cs[cs.length-1], first=cs[0];
+    if(ts>last.ts||ts<first.ts){
+      const uzak=Math.round((ts-(ts>last.ts?last.ts:first.ts))/900000);
+      const sag=ts>last.ts;
+      const x=sag?X(cs.length-1)+BW/2:X(0)+BW/2;
+      return `<text x="${x}" y="${Y(px)-6}" fill="${col}" text-anchor="${sag?"end":"start"}"
+        >${lbl} ${sag?"→":"←"} ${ru?"вне окна":"pencere dışı"} ${Math.abs(uzak)} ${ru?"св.":"mum"}</text>`;
+    }
     let idx=cs.findIndex(c=>c.ts>=ts); if(idx<0) idx=cs.length-1;
     return `<circle cx="${X(idx)+BW/2}" cy="${Y(px)}" r="4" fill="${col}" stroke="#FFFEFA" stroke-width="1.5"/>
       <text x="${X(idx)+BW/2+7}" y="${Y(px)-6}" fill="${col}">${lbl}</text>`;};

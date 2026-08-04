@@ -70,3 +70,19 @@ bitirip haksız EXPIRED üretiyordu. Aynı kök, üçüncü tezahür:
 MFE/MAE → sonuç kararı → süre sayımı.
 Ders: bir bulaşma bulunduğunda o değişkenin geçtiği TÜM satırlar taranmalı,
 sadece hatanın göründüğü satır değil.
+
+## Kural 9 (2026-08-04): görselleştirme de bir iddiadır
+JTOUSDT #489 ve SLXUSDT #475 panoda "stop çizgisine gelmemiş ama LOSS"
+görünüyordu. Muhasebe DOĞRUYDU (bağımsız denetçi: uyuşmazlık yok; stop
+sırasıyla doluştan 27 ve 16 mum sonra gerçekleşti). Hata grafikteydi:
+`mark()` fonksiyonu, pencere dışındaki çıkışı `idx=cs.length-1` ile sağ
+kenara YAPIŞTIRIYOR ve fiyat o seviyeye hiç gelmemiş gibi gösteriyordu.
+Sabit ±12 mumluk "yakın" pencere, saatlerce tutulan işlemin çıkışını
+ekran dışında bırakıyordu.
+
+Kural: **grafikte çizilen her işaret, veride karşılığı olan bir noktaya
+denk gelmelidir.** Veri pencere dışındaysa işaret çizilmez — durum yazıyla
+söylenir. Kenara kırpma (clamping) sessiz bir yalandır.
+Düzeltme: pencere dışı çıkış için "→ pencere dışı N mum" etiketi; kapanmış
+sinyalde pencere otomatik olarak çıkışı kapsayacak şekilde büyür (tavan 80);
+"tam" zoom seçeneği eklendi. İki değişmezlik testi kod düzenini sabitler.

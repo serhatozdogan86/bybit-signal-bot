@@ -185,3 +185,33 @@ def test_legacy_filled_rows_without_fill_ts_cannot_become_zombies(tmp_path):
     row = db.query_one("SELECT status,outcome,fill_ts FROM signals")
     assert row["outcome"] == "LOSS" and row["fill_ts"] == 1000000, (
         f"yuruyus-ici turetme calismadi: {dict(row)}")
+
+
+def test_chart_never_clamps_offscreen_exit_to_edge():
+    """HATA SINIFI: pencere disindaki olayi kenara yapistirmak, fiyat o
+    seviyeye HIC gelmemis gibi gosterir (JTOUSDT #489, SLXUSDT #475:
+    'stop cizgisine gelmemis ki'). Cikis pencerede degilse nokta
+    CIZILMEZ; kac mum uzakta oldugu yaziyla soylenir."""
+    import re as _re
+    from app.dashboard import DASHBOARD_HTML
+    js = max(_re.findall(r"<script>(.*?)</script>", DASHBOARD_HTML, _re.S),
+             key=len)
+    mark = js[js.index("const mark=("):]
+    mark = mark[:mark.index("/* Dolus ani")]
+    assert "pencere dışı" in mark or "вне окна" in mark, (
+        "mark() pencere disi durumunu bildirmiyor")
+    # kenara yapistirma yalniz PENCERE ICI dalinda kalmali
+    disari = mark.index("ts>last.ts||ts<first.ts")
+    clamp = mark.index("idx=cs.length-1")
+    assert disari < clamp, "kenara yapistirma pencere-disi kontrolunden once"
+
+
+def test_chart_window_autosizes_to_include_exit():
+    """Sabit dar pencere, saatlerce tutulan islemin cikisini ekran disinda
+    birakiyordu. Kapanmis sinyalde pencere cikisi KAPSAMALI."""
+    import re as _re
+    from app.dashboard import DASHBOARD_HTML
+    js = max(_re.findall(r"<script>(.*?)</script>", DASHBOARD_HTML, _re.S),
+             key=len)
+    assert "closed_utc&&sg.entry_candle_ts" in js, "otomatik pencere yok"
+    assert "Math.min(80,Math.max(12,bars+3))" in js, "kapsama hesabi yok"
