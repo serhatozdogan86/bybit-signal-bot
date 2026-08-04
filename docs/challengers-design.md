@@ -24,7 +24,25 @@ esnek olduğu için ölçülemez; mekanik tanım bulunursa v2'de confluence olar
 denenir. Kural: takdire dayalı hiçbir öğe ölçüme giremez (yanlışlanamaz
 strateji, strateji değildir).
 
-## Aday stratejiler (5 tam + 1 ikinci dalga)
+**Wyckoff hakkında dürüstlük (S7):** Yöntemin üç yasası (arz-talep,
+sebep-sonuç, çaba/sonuç) düşünme çerçevesi olarak sağlamdır; şematik
+etiketleme (Faz A–E, "birikim mi dağıtım mı") ise GERİYE DÖNÜK yapılır —
+ders kitabı örnekleri seçilmiş örneklerdir, gerçek zamanda hangi fazda
+olunduğunu söyleyen mekanik kural yoktur. Bu yüzden S7, tüm şema
+etiketlemesini dışarıda bırakıp yalnız Spring+Test ikilisine indirgendi.
+Ayrıca bağlam farkı kayda geçsin: Wyckoff 1930'ların hisse mikroyapısı
+için tasarlandı (seans kapanışları, tek borsa, temiz hacim); kripto perp'te
+hacim 7/24, parçalı ve kısmen şişkindir — hacim eşikleri bu yüzden mutlak
+değil SMA20'ye göreli tanımlandı.
+
+**Kayda geçen çakışma:** Şampiyon motoru zaten kısmi bir Wyckoff
+uygulamasıdır (süpürme≈Spring, hacimli kırılım≈SOS, retest≈LPS, hacim
+teyidi≈çaba/sonuç). Kilit sonrası beklentisi ≈0 olması Wyckoff'u çürütmez
+ama "aynı fikri Wyckoff diline çevirince düzelir" beklentisini de baştan
+geçersiz kılar. S7'nin varlık nedeni yeni bir dil değil, TERS HACİM
+FİLTRESİDİR.
+
+## Aday stratejiler (5 canlı + 2 beklemede)
 
 | # | Aile | Kural özeti (v1) | Neden |
 |---|------|------------------|-------|
@@ -34,6 +52,7 @@ strateji, strateji değildir).
 | S4 | **Funding carry** | 8s funding penceresinde yıllıklandırılmış \|oran\| > %30 olan parite: pozitif → SHORT, negatif → LONG. Stop 2×ATR(4H). Çıkış: funding normalleşince veya 48 saat. | Kripto fonlarının fiilen işlettiği taşıma stratejisi. Gerçek funding verisini v3.6'da toplamaya başladık — doğrudan sinerji. |
 | S5 | **Kesitsel momentum** (2. dalga) | Evrende 24s göreli güç sıralaması; en güçlü %10 LONG / en zayıf %10 SHORT, 8 saatte bir yeniden denge. | Farklı bahis türü (mutlak değil göreli yön). R-muhasebesine oturmaz; kendi Sharpe'ıyla raporlanmalı → implementasyonu ayrı dalga. |
 | S6 | **Likidite süpürme dönüşü (SMC'nin ölçülebilir çekirdeği)** | Fiyat son 96×15m swing ekstremumunu aşar AMA mum o seviyenin gerisinde kapanır (yukarı süpürme → SHORT adayı, ayna LONG). Teyit: aynı/sonraki mum süpürme öncesi aralığa geri kapanır + hacim ≥1.5×SMA20. Giriş teyit kapanışında. Stop: ekstremum ±0.5×ATR. TP 2R sabit, zaman aşımı 96 bar. | Şampiyon kırılım DEVAMINI oynar; S6 süpürme DÖNÜŞÜNÜ oynar — stop avını satın alan taraf. Portföyde gerçek çeşitlendirme. |
+| S7 | **Wyckoff Spring + Test (BEKLEMEDE — kod yok)** | Faz 1 (spring): 15m mum son 96 barın swing dibini kırar (`low < swing_low`) VE hacim ≥1.5×SMA20 VE kapanış swing dibinin üstüne döner. Faz 2 (test): sonraki 1–6 bar içinde bir mum swing dibine yaklaşır (`low ≤ swing_low + 0.25×ATR14`) AMA spring dibinin ÜSTÜNDE kalır (`low > spring_low`) VE hacim ≤0.7×SMA20. Giriş: test mumunun kapanışı. Stop: `spring_low − 0.25×ATR`. TP 2R, zaman aşımı 96 bar. Ayna kurgu SHORT (upthrust + test). Geçersizlik: 6 bar içinde test gelmezse veya `low ≤ spring_low` olursa kurulum iptal. | Wyckoff'un tek mekanikleştirilebilir çekirdeği. **S6'dan yapısal farkı:** S6 teyit için YÜKSEK hacim arar; Wyckoff teyitte DÜŞÜK hacim ister ("satıcı kalmadı" = kuruyan arz). Aynı olayın zıt filtresi → gerçek hipotez ayrımı. |
 
 Hepsi **kapanış-bazlı giriş** kullanır: limit-bölge doluşu yok →
 NOT_FILLED belirsizliği yok → hem gölge takip hem geçmiş test şampiyondan
@@ -78,6 +97,13 @@ daha dürüst ölçülür. Karşılaştırmada bu asimetri açıkça not edilece
 - **Faz B tetikleyicisi:** otomatik denetim art arda 2 temiz tur + #57/#6
   kapanışı. Sonra S1–S4 + S6 implementasyonu (izolasyon şartlarıyla) + VM'de
   backtest verisi çekimi.
+- **S7 tetikleyicisi (bilinçli erteleme):** S7 şu an KODLANMAZ. Gerekçe:
+  (1) S3 ve S6 tam eleme aşamasında; sınav ortasında yeni değişken sokmak
+  o ölçümü kirletir. (2) S6'nın "yüksek hacimli teyit" filtresi hakkında
+  birkaç gün içinde veri gelecek — S6 elenirse ters filtre hipotezi
+  güçlenir ve S7 daha isabetli tasarlanır. S6 kendi 50 kümesini
+  doldurduğunda S7 kodlanır ve YENİ aday olarak yarışa girer; mevcut
+  verinin üstüne asla yazılmaz.
 - **Karşılaştırma raporu:** şampiyonun Faz-1 hükmü çıktığında (≈50 küme)
   adayların ara sıralaması hazır olur. Adaylar için kesin hüküm kendi 50
   kümelerini doldurunca verilir — 8 günde kimseye madalya yok.
