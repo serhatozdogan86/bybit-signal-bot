@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import os
 import logging
+import re
 from datetime import datetime, timezone
 
 from app.logging_setup import kv
@@ -124,7 +125,11 @@ class SignalTracker:
                     "nf_gap_r REAL", "nf_touch_bars INTEGER",
                     "nf_crossed INTEGER", "nf_done INTEGER DEFAULT 0",
                     "funding_r_real REAL", "funding_done INTEGER DEFAULT 0",
-                    "prefill_repaired INTEGER DEFAULT 0"):
+                    "prefill_repaired INTEGER DEFAULT 0",
+                    # v3.7 olcum: otopside geriye donuk rejim analizi icin.
+                    # contract_json yedek muafiyetindedir (restore'da yok
+                    # olur); rejim bilgisi KOLON olarak yasamali (kural 2).
+                    "regime TEXT", "market_bias TEXT"):
             try:
                 self._db.execute(f"ALTER TABLE signals ADD COLUMN {ddl}")
             except Exception:
@@ -136,6 +141,7 @@ class SignalTracker:
             "ts_utc TEXT, kind TEXT, detail TEXT)")
         self._backfill_cluster_ids()
         self._backfill_fill_ts()
+        self._backfill_regime_bias()
         self._repair_bad_outcomes()
 
     def verify_outcomes(self, limit: int = 400) -> dict:
@@ -303,6 +309,43 @@ class SignalTracker:
                         scanned=len(rows)))
         return len(updates)
 
+    def _backfill_regime_bias(self) -> int:
+        """regime/market_bias kolonu bos kayitlari KAYITLI veriden doldur (v3.7).
+
+        Kaynak onceligi: contract_json (regime v1.1'den beri, market_bias
+        v1.2'den beri orada); eski kapi-bloklu kayitlarda market_bias
+        contract'ta yok ama reject_reason metninde gecer ("market gate:
+        BTC bear") - o da kayitli veridir, uydurma degil. Hicbir kaynakta
+        yoksa NULL kalir (kural 1: eksik veri eksik kalir).
+
+        Idempotent: yalniz bos kolonlara dokunur, her acilista guvenle kosar.
+        """
+        rows = self._db.query(
+            "SELECT id,contract_json FROM signals WHERE contract_json IS NOT "
+            "NULL AND contract_json!='' AND (regime IS NULL "
+            "OR market_bias IS NULL)")
+        updates: list[tuple] = []
+        for r in rows:
+            try:
+                c = json.loads(r["contract_json"])
+            except (json.JSONDecodeError, TypeError):
+                continue
+            regime = c.get("regime")
+            bias = c.get("market_bias")
+            if not bias:
+                m = re.search(r"market gate: BTC (\w+)",
+                              c.get("reject_reason") or "")
+                bias = m.group(1) if m else None
+            if regime or bias:
+                updates.append((regime, bias, r["id"]))
+        if updates:
+            self._db.executemany(
+                "UPDATE signals SET regime=COALESCE(regime,?), "
+                "market_bias=COALESCE(market_bias,?) WHERE id=?", updates)
+            log.info(kv(event="regime_backfill", filled=len(updates),
+                        scanned=len(rows)))
+        return len(updates)
+
     @property
     def db(self):
         """Ayni SQLite baglantisi - aday motoru kendi tablosunu burada acar."""
@@ -339,13 +382,14 @@ class SignalTracker:
         self._db.execute(
             "INSERT INTO signals(pair,direction,created_utc,entry_candle_ts,"
             "entry_min,entry_max,stop_loss,tp1,tp2,rr,contract_json,"
-            "confidence,setup_type,cluster_id,engine_sha) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "confidence,setup_type,cluster_id,engine_sha,regime,market_bias) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (d.pair, d.direction.value, d.timestamp_utc, ltf.candles[-1].ts,
              d.entry_zone.min, d.entry_zone.max, d.stop_loss,
              d.targets.tp1, d.targets.tp2, d.rr, json.dumps(d.contract_dict()),
              d.confidence.value, d.setup_type.value,
-             _cluster_id(d, ltf), _ENGINE_SHA))
+             _cluster_id(d, ltf), _ENGINE_SHA,
+             d.regime.value, d.market_bias))
         log.info(kv(event="shadow_track", pair=d.pair, direction=d.direction.value))
         return True
 
@@ -379,13 +423,15 @@ class SignalTracker:
         self._db.execute(
             "INSERT INTO signals(pair,direction,created_utc,entry_candle_ts,"
             "entry_min,entry_max,stop_loss,tp1,tp2,rr,contract_json,"
-            "confidence,setup_type,blocked,cluster_id,engine_sha,block_reason) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,2,?,?,?)",
+            "confidence,setup_type,blocked,cluster_id,engine_sha,block_reason,"
+            "regime,market_bias) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,2,?,?,?,?,?)",
             (d.pair, d.direction.value, d.timestamp_utc, ltf.candles[-1].ts,
              d.entry_zone.min, d.entry_zone.max, d.stop_loss,
              d.targets.tp1, d.targets.tp2, d.rr, json.dumps(d.contract_dict()),
              d.confidence.value, d.setup_type.value,
-             _cluster_id(d, ltf), _ENGINE_SHA, reason))
+             _cluster_id(d, ltf), _ENGINE_SHA, reason,
+             d.regime.value, d.market_bias))
         log.info(kv(event="portfolio_heat_block", pair=d.pair, reason=reason))
         return True
 
@@ -406,13 +452,15 @@ class SignalTracker:
         self._db.execute(
             "INSERT INTO signals(pair,direction,created_utc,entry_candle_ts,"
             "entry_min,entry_max,stop_loss,tp1,tp2,rr,contract_json,"
-            "confidence,setup_type,blocked,cluster_id,engine_sha,block_reason) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,'counter-regime')",
+            "confidence,setup_type,blocked,cluster_id,engine_sha,block_reason,"
+            "regime,market_bias) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,'counter-regime',?,?)",
             (d.pair, d.direction.value, d.timestamp_utc, ltf.candles[-1].ts,
              d.entry_zone.min, d.entry_zone.max, d.stop_loss,
              d.targets.tp1, d.targets.tp2, d.rr, json.dumps(d.contract_dict()),
              d.confidence.value, d.setup_type.value,
-             _cluster_id(d, ltf), _ENGINE_SHA))
+             _cluster_id(d, ltf), _ENGINE_SHA,
+             d.regime.value, d.market_bias))
         log.info(kv(event="shadow_track_blocked", pair=d.pair,
                     direction=d.direction.value))
         return True
@@ -926,16 +974,22 @@ class SignalTracker:
             "SELECT COALESCE(cluster_id,'?') cluster, COUNT(*) n "
             "FROM signals WHERE blocked=2 GROUP BY cluster_id "
             "ORDER BY n DESC LIMIT 15")
-        # kapi-bloklu kohortun rejim dagilimi (contract_json'dan)
-        gate_regime: dict[str, int] = {}
-        for g in self._db.query(
-                "SELECT contract_json FROM signals WHERE blocked=1"):
-            try:
-                regime = (json.loads(g["contract_json"] or "{}")
-                          .get("regime") or "unknown")
-            except (json.JSONDecodeError, TypeError):
-                regime = "unknown"
-            gate_regime[regime] = gate_regime.get(regime, 0) + 1
+        # kapi-bloklu kohortun rejim dagilimi (v3.7: KOLONDAN okunur -
+        # contract_json yedek muafiyetindedir, restore sonrasi bos gelir;
+        # kolon yedekten sag cikar, bu yol her zaman calisir)
+        gate_regime = {(r["regime"] or "unknown"): r["n"]
+                       for r in self._db.query(
+                           "SELECT regime, COUNT(*) n FROM signals "
+                           "WHERE blocked=1 GROUP BY regime")}
+        # v3.7: gercek kohortun piyasa-rejimi kirilimi (otopsi ekseni:
+        # "hangi rejimde dogan sinyaller kaybettirdi?"). Etiketsiz kayitlar
+        # '?' altinda raporlanir - sessiz haric tutma yok (kural 1).
+        bias_dist = self._db.query(
+            "SELECT COALESCE(market_bias,'?') market_bias, outcome, "
+            "COUNT(*) n, ROUND(SUM(r_multiple),2) gross_r FROM signals "
+            "WHERE status='CLOSED' AND blocked=0 "
+            "AND outcome IN ('WIN','LOSS') GROUP BY market_bias, outcome "
+            "ORDER BY market_bias, outcome")
         # parite yogunlasmasi
         pair_rows = self._db.query(
             "SELECT pair, COUNT(*) n, ROUND(SUM(r_multiple),2) gross_r "
@@ -965,6 +1019,7 @@ class SignalTracker:
                                 "concentration": conc},
             "heat_blocked_cluster_dist": heat_dist,
             "gate_blocked_regime_dist": gate_regime,
+            "market_bias_dist": bias_dist,
             "pair_concentration": {"top": pair_rows[:10],
                                    "concentration": pair_conc},
             "holding_hours": {
@@ -1006,7 +1061,8 @@ class SignalTracker:
             # v3.6: olcum kolonlari yedege girmezse her restore'da SESSIZCE
             # kaybolur - hypo/nf/mfe/funding verisi yeniden uretilemez.
             "fill_ts,ambiguous,hypo_r,hypo_done,mfe_r,mae_r,nf_gap_r,"
-            "nf_touch_bars,nf_crossed,nf_done,funding_r_real,funding_done "
+            "nf_touch_bars,nf_crossed,nf_done,funding_r_real,funding_done,"
+            "regime,market_bias "
             "FROM signals WHERE blocked=0 ORDER BY id DESC LIMIT ?",
             (limit,))
         for r in rows:
@@ -1068,7 +1124,8 @@ class SignalTracker:
             # v3.6: bloklu kohort da degerlendiriliyor -> olcum kolonlari
             # yedege girmezse restore'da kaybolur (gercek kohortla ayni kural)
             "fill_ts,ambiguous,hypo_r,hypo_done,mfe_r,mae_r,nf_gap_r,"
-            "nf_touch_bars,nf_crossed,nf_done,funding_r_real,funding_done "
+            "nf_touch_bars,nf_crossed,nf_done,funding_r_real,funding_done,"
+            "regime,market_bias "
             "FROM signals WHERE blocked>=1 ORDER BY id DESC LIMIT ?", (limit,))
 
     def recent_decisions(self, limit: int = 2000) -> list[dict]:
@@ -1121,9 +1178,10 @@ class SignalTracker:
                 "fill_price,exit_price,r_multiple,closed_utc,confidence,"
                 "setup_type,blocked,cluster_id,engine_sha,block_reason,"
                 "hypo_r,hypo_done,fill_ts,ambiguous,mfe_r,mae_r,nf_gap_r,"
-                "nf_touch_bars,nf_crossed,nf_done,funding_r_real,funding_done) "
+                "nf_touch_bars,nf_crossed,nf_done,funding_r_real,funding_done,"
+                "regime,market_bias) "
                 "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,"
-                "?,?,?,?,?,?,?,?,?,?)",
+                "?,?,?,?,?,?,?,?,?,?,?,?)",
                 (r.get("pair"), r.get("direction"), r.get("created_utc"),
                  r.get("entry_candle_ts"), r.get("entry_min"), r.get("entry_max"),
                  r.get("stop_loss"), r.get("tp1"), r.get("tp2"), r.get("rr"),
@@ -1138,7 +1196,8 @@ class SignalTracker:
                  r.get("mfe_r"), r.get("mae_r"), r.get("nf_gap_r"),
                  r.get("nf_touch_bars"), r.get("nf_crossed"),
                  r.get("nf_done", 0), r.get("funding_r_real"),
-                 r.get("funding_done", 0)))
+                 r.get("funding_done", 0),
+                 r.get("regime"), r.get("market_bias")))
             imported += 1
         if imported:
             # gist yedekteki eski kayitlarda cluster_id bos olabilir;

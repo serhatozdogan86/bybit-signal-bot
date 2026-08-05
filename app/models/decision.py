@@ -1,7 +1,9 @@
 """
-Output contract - schema v1.1.
+Output contract - schema v1.2.
 Alan isimleri SABITTIR; entegrasyonlar bu sozlesmeye gore parse eder.
 decision enum: SIGNAL | NO_TRADE | DATA_MISSING
+v1.2 (2026-08-05): market_bias eklendi - karar aninda gecerli BTC piyasa
+rejimi (bull/bear/neutral/halt). Geriye uyumlu: alan eklemesi, degisiklik yok.
 """
 from __future__ import annotations
 
@@ -10,7 +12,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-SCHEMA_VERSION = "1.1"
+SCHEMA_VERSION = "1.2"
 DISCLAIMER = "Decision support only. Not financial advice."
 
 
@@ -93,6 +95,10 @@ class Decision(BaseModel):
     reject_reason: str | None = None
     watch_condition: str | None = None
     data_missing: list[str] = Field(default_factory=list)
+    # v1.2: karar aninda gecerli BTC piyasa rejimi. Decision.regime sembolun
+    # kendi rejimidir ve her SIGNAL tanim geregi trending'dir; otopside
+    # "hangi piyasa rejiminde dogdu" analizi bu alana dayanir.
+    market_bias: str = "neutral"
     disclaimer: str = DISCLAIMER
 
     def contract_dict(self) -> dict:

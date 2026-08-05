@@ -204,3 +204,23 @@ Kilit-v2 penceresi başlamadan yapıldı — yeni pencere temiz defterle açıl�
 
 Regresyon testleri: `test_fill_candle_stop_counts`,
 `test_fill_candle_both_is_ambiguous_loss`, `test_compare_ambiguous_loss_equivalence`.
+
+## v3.7 ölçüm eki (2026-08-05): rejim bilgisi sinyal kayıtlarında yaşar
+Otopside geriye dönük rejim analizi yapılamadı çünkü sinyal anındaki piyasa
+rejimi (market_bias: bull/bear/neutral/halt) HİÇBİR yere yazılmıyordu —
+Decision.regime sembol rejimidir ve her SIGNAL tanım gereği trending doğar,
+ayrıştırmaz. Ölçüm eki (motor davranışı değişmez):
+- Sözleşme v1.1 → v1.2: `market_bias` alanı eklendi (yalnız alan eklemesi,
+  geriye uyumlu). Karar arşivi (decisions) bunu otomatik taşır.
+- `signals` tablosuna `regime` + `market_bias` KOLONLARI eklendi; üç yazım
+  yolu da (gerçek / kapı-bloklu / ısı-bloklu kohort) doldurur. Kolon olarak
+  eklendi çünkü contract_json yedek muafiyetindedir — restore'da kaybolur
+  (kural 2: her kolon yedekten sağ çıkar; kolonlar yedek payload'ına ve
+  import'a eklendi, değişmezlik testi otomatik zorlar).
+- Geriye dönük doldurma `_backfill_regime_bias`: eski kayıtların rejimi
+  KAYITLI veriden okunur (contract_json; eski kapı-bloklularda reject_reason
+  metnindeki "market gate: BTC …"). Kaynağı olmayan NULL kalır ve
+  `market_bias_dist`'te '?' olarak raporlanır (kural 1: uydurma yok).
+- `/measurement`: `gate_blocked_regime_dist` artık kolondan okur (restore
+  sonrası da çalışır); gerçek kohort için `market_bias_dist` eklendi.
+Kural 7 uygulandı: 5 test önce KIRMIZI gösterildi, düzeltme sonrası yeşil.
