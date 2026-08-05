@@ -127,3 +127,55 @@ yaklaşık +14.7R. Onarım sonrası başlık rakamları yeniden okunmalıdır.
 - `/challengers` endpoint'i + panoda "Adaylar" sekmesi (mobil).
 - Bakış-öncesi yasağı adaylarda DOĞUŞTAN testli: giriş mumu ve öncesi karara
   giremez (şampiyonda dört kez tekrarlanan sınıf burada kapalı doğdu).
+
+
+# ============================================================
+# KİLİT AÇILDI — 2026-08-05, YANLIŞLAMA KRİTERİ #2 TETİKLENDİ
+# ============================================================
+Kriter (kilit günü yazılmıştı): "gerçek kohortta maliyet-modelli
+maksDD > 20R → kenar var olsa bile taşınamaz."
+**Ölçüm: kilit sonrası kohortta maksDD 35.58R.** Eşik iki katına yakın
+aşıldı. Kural gereği ölçüm penceresi burada KAPANIR.
+
+## Hüküm
+Şampiyon (breakout_retest) Faz-1'i GEÇEMEDİ. 41/50 kümede durduruldu;
+kalan 9 küme sonucu değiştirmezdi — düşüş kriteri kenardan bağımsızdır.
+Kilit sonrası: 102 işlem, %28 WR, net **−7.72R** (zirve +23.1R → dip −7.7R).
+Diğer iki kriter tetiklenmedi (kenar ölümü: CI üst sınırı +0.37 hâlâ pozitif;
+açlık yok).
+
+## Otopsi — kayıp nerede yoğunlaştı
+| Eksen | Bulgu |
+|---|---|
+| Güven etiketi | MEDIUM: 40 işlem, %18 WR, **−20.8R**. HIGH: 24 işlem, %29, +0.3R |
+| Kurulum | breakout_retest −24.4R; sweep_reclaim (5 işlem) +1.7R |
+| Stop mesafesi | dar (<%0.75): −11.5R · orta: −3.0R · geniş (>%1.5): **+6.8R** |
+| Plan RR | RR 2–3: **−14.2R** · RR 3–4: +4.1R · RR≥4: +2.4R |
+| Zaman | 08-02 tek başına −16.2R (20 işlem, %10 WR) |
+| Küme | En kötü 3 küme −16.3R; çıkarılsa net +8.6R |
+
+**Kök neden (tek cümle):** motor kaybetmedi, RİSK YOĞUNLAŞMASI kaybettirdi.
+41 kümenin 3'ü toplam düşüşün yarısını üretti; 08-02'de 8 farklı kümede
+20 pozisyon aynı anda açıldı ve gün −16.2R kapandı. Küme-içi ısı limiti
+(2) vardı ama **kümeler arası** korelasyon limiti yoktu.
+
+## "Ne olsaydı" — geriye dönük, TEK değişken, aşırı iyimser
+| Senaryo | n | net | maksDD |
+|---|---|---|---|
+| Gerçek | 102 | −7.72R | 35.58R |
+| RR≥3 **ve** stop≥%0.75 | 41 | **+9.20R** | 14.30R |
+| Yalnız geniş stop (>%1.5) | 40 | +6.75R | 16.14R |
+| Günlük −4R freni | 74 | +3.24R | 16.97R |
+| HIGH + stop≥%0.75 | 17 | +0.72R | 8.82R |
+| Yalnız HIGH güven | 24 | +0.29R | 13.09R |
+
+**Bu tablo bir vaat değildir.** Hepsi geriye dönük seçim; sonucu bilerek
+filtre aramak en zayıf kanıt türüdür. Değeri sıralamada, rakamlarda değil.
+Ortak yön nettir ve üç bağımsız eksende aynı şeyi söylüyor: **dar stop +
+düşük RR + MEDIUM güven** kombinasyonu zararın taşıyıcısı.
+
+## Bundan sonra
+Yeni motor tasarımı ayrı bir belgeye yazılır ve ÖN-KAYITLI olarak yeni bir
+ölçüm penceresinde sınanır. Yukarıdaki hiçbir eşik, bu veriden türetildiği
+için doğrudan kural yapılamaz — hipotez olarak kaydedilip GELECEK veride
+test edilir. Aday yarışı (S1–S6) etkilenmez, kendi sınavına devam eder.
