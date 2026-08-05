@@ -13,8 +13,12 @@ küme-CI alt sınırı > 0) geçen bir motor bulmak. Dil: Türkçe, sade.
 - v2 şampiyon henüz TASARLANMADI; tasarlanırsa ÖN-KAYITLA yeni aday olur.
 
 ## DEĞİŞTİRİLEMEZ KURALLAR
-1. `app/strategies/` DONMUŞTUR. Tek satır değişiklik yasak; her commit
-   mesajında "strategies/ 0 satır" kanıtı beklenir.
+1. `app/strategies/` DONMUŞTUR. Davranışı etkileyen tek satır bile yasak.
+   KAYITLI İSTİSNA (2026-08-05, f61333e): karar davranışını DEĞİŞTİRMEYEN
+   salt-metadata enstrümantasyonu, (a) davranış-kimliği kanıtı (aynı girdi
+   → market_bias hariç bayt-bayt aynı karar, üç senaryoda doğrulandı) ve
+   (b) inceleme kaydı ile kabul edilebilir. Örnek: `d.market_bias = ...`.
+   Eşik/filtre/hesap değişikliği bu istisnaya GİRMEZ.
 2. PUSH KAPISI: `python -m pytest tests/ -q` yeşil değilse push YOK.
    Komut zincirine kapı koy (`&&` veya rc kontrolü) — 853927e'nin dersi.
 3. Yeni hata bulunca: önce SINIFINI kapatan değişmezlik testi
