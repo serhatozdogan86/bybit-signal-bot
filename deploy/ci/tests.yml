@@ -1,0 +1,40 @@
+name: tests
+
+# Her push ve PR'da yapisal guvenceler kosar. Amac: hata siniflarini
+# kapatan degismezlik testleri (docs/error-prevention.md) benim ya da
+# birinin unutmasina BAGLI OLMASIN. Kirmizi test = kirmizi commit.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: bagimliliklar
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      - name: yapisal guvenceler (hata siniflari)
+        run: python -m pytest tests/test_invariants.py -v
+      - name: tum testler
+        run: python -m pytest tests/ -q
+      - name: pano JS sozdizimi
+        run: |
+          python - <<'PY'
+          import re, pathlib
+          html = pathlib.Path("app/dashboard.py").read_text()
+          js = max(re.findall(r"<script>(.*?)</script>", html, re.S), key=len)
+          pathlib.Path("/tmp/dash.js").write_text(js)
+          PY
+          node --check /tmp/dash.js
+      - name: derleme
+        run: python -m compileall -q app

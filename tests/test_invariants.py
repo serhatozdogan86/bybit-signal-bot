@@ -215,3 +215,32 @@ def test_chart_window_autosizes_to_include_exit():
              key=len)
     assert "closed_utc&&sg.entry_candle_ts" in js, "otomatik pencere yok"
     assert "Math.min(80,Math.max(12,bars+3))" in js, "kapsama hesabi yok"
+
+
+def test_alarm_registry_has_no_search_logic():
+    """HATA SINIFI: veride kalip ARAYAN otomatik dongu, 150 sinyal ve
+    onlarca bolme varken tesadufen 'anlamli' bir sey mutlaka bulur -
+    p-hacking'in sanayilesmesi. Alarm kaydi yalniz ONCEDEN ILAN EDILMIS
+    kosullari kontrol etmeli."""
+    import inspect
+
+    from app.services import alarms
+    src = inspect.getsource(alarms)
+    yasak = ("itertools", "combinations", "permutations", "corr",
+             "p_value", "scan_thresholds", "grid")
+    bulunan = [k for k in yasak if k in src]
+    assert not bulunan, f"alarm kaydinda arama/tarama izi: {bulunan}"
+    # her alarm kodunun bir gerekce referansi olmali (ref veya aciklama)
+    assert "ONCEDEN" in src.upper() and "ARAMAZ" in src.upper()
+
+
+def test_audit_summary_reaches_backup_payload(tmp_path):
+    """HATA SINIFI: denetim calisir ama sonucu disariya ULASMAZ - agac
+    ormanda devrilir. Ozet stats()'a, dolayisiyla gist yedegine girmeli."""
+    from app.services.database import Database
+    from app.services.signal_tracker import SignalTracker
+    db = Database(str(tmp_path / "a.db"))
+    tr = SignalTracker(db, "15")
+    st = tr.stats()
+    assert "outcome_audit" in st["measurement"], "denetim ozeti stats'ta yok"
+    assert "max_drawdown_r" in st["measurement"], "maksDD yanlislama icin yok"

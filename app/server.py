@@ -249,6 +249,15 @@ def create_app(store: StateStore, scheduler: Scheduler,
             json.dumps(tracker.verify_outcomes(), indent=2),
             mimetype="application/json")
 
+    @app.get("/alarms")
+    def alarms_view():
+        """Onceden ilan edilmis alarm kosullari (kalip aramaz)."""
+        rep = getattr(scheduler, "_alarm_report", None)
+        if rep is None and hasattr(scheduler, "_evaluate_alarms"):
+            rep = scheduler._evaluate_alarms()
+        return app.response_class(json.dumps(rep or {}, indent=2),
+                                  mimetype="application/json")
+
     @app.get("/challengers")
     def challengers_view():
         """Aday stratejilerin golge performansi (Faz B)."""

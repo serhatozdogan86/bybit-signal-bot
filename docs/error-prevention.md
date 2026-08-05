@@ -86,3 +86,29 @@ söylenir. Kenara kırpma (clamping) sessiz bir yalandır.
 Düzeltme: pencere dışı çıkış için "→ pencere dışı N mum" etiketi; kapanmış
 sinyalde pencere otomatik olarak çıkışı kapsayacak şekilde büyür (tavan 80);
 "tam" zoom seçeneği eklendi. İki değişmezlik testi kod düzenini sabitler.
+
+## Denetim döngüsü (2026-08-05): üç katman
+Soru: "sürekli denetleyip hata/fikir arayabilir miyiz?" — Cevap ikiye ayrıldı.
+
+**Denetim: evet, kod olarak.** Üç katman kuruldu:
+1. **Alarm kaydı** (`app/services/alarms.py`) — her taramada, önceden ilan
+   edilmiş koşullar: denetim uyuşmazlığı, kümesiz kayıt, tarama durması,
+   yedek bayatlaması, kenar ölümü (CI üst sınırı<0), maksDD>20R, Faz-1
+   kapısı, aday tavanı, aday elenmesi. `/alarms` ile okunur; KRİTİK olanlar
+   ERROR log'a düşer.
+2. **CI** (`.github/workflows/tests.yml`) — her push'ta değişmezlik testleri
+   + tüm suite + JS sözdizimi + derleme. Kapının açık kalması artık kimsenin
+   hatırlamasına bağlı değil.
+3. **Haftalık insan incelemesi** — alarm günlüğü + örnekleme denetimi +
+   yeni fikirlerin ÖN-KAYDI.
+
+**Fikir arama: hayır — en azından otomatik hâliyle.** Veride kalıp arayan
+bir döngü, ~150 sinyal ve onlarca olası bölme varken tesadüfen "anlamlı" bir
+şey MUTLAKA bulur; bu p-hacking'i sanayileştirmektir. Kural: hipotez ÖNCE
+yazılır (H-1 gibi), GELECEK veride test edilir, çoklu karşılaştırma sayılır.
+`test_alarm_registry_has_no_search_logic` bu sınırı kodda zorlar.
+
+**Ek kapatılan boşluk:** denetim çalışıyordu ama sonucu yedeğe girmiyordu —
+"ağaç ormanda devriliyordu". Artık `stats().measurement.outcome_audit` ile
+gist'e yazılıyor; uzaktan denetlenebilir. maksDD de eklendi (yanlışlama
+kriteri sayısal olarak izlenebilsin diye).

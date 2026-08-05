@@ -21,6 +21,7 @@ from app.integrations.telegram_notifier import TelegramNotifier
 from app.logging_setup import kv
 from app.models.decision import Decision, DecisionType
 from app.services.market_data_service import MarketDataService
+from app.services import alarms
 from app.services.challengers import ChallengerEngine
 from app.services.signal_tracker import SignalTracker, _cluster_id
 from app.services.state_store import StateStore
@@ -79,6 +80,32 @@ class Scheduler:
         return self._settings.symbols
 
     # ------------------------------------------------------------- tarama
+    def _evaluate_alarms(self) -> dict:
+        """Onceden ilan edilmis kosullari kontrol et; KRITIK olanlari
+        gunluge dusur. Kalip ARAMAZ - bkz. app/services/alarms.py."""
+        try:
+            meta = self._store.get_meta() or {}
+            rep = alarms.evaluate(
+                self._tracker.stats(),
+                {"outcome_audit": getattr(self._tracker, "_audit_cache", None)
+                 or {}},
+                self.challengers.stats() if self.challengers else None,
+                last_scan_utc=meta.get("last_scan_utc"),
+                last_backup_utc=(self._gist.info() or {}).get("last_sync_utc")
+                if self._gist is not None else None)
+            self._alarm_report = rep
+            for a in rep["alarms"]:
+                if a["level"] == alarms.CRITICAL:
+                    log.error(kv(event="ALARM", code=a["code"],
+                                 msg=a["message"]))
+                elif a["level"] == alarms.WARNING:
+                    log.warning(kv(event="alarm", code=a["code"],
+                                   msg=a["message"]))
+            return rep
+        except Exception:
+            log.exception(kv(event="alarm_eval_error"))
+            return {"alarms": [], "critical": 0, "warning": 0}
+
     def _refresh_funding_map(self) -> None:
         """Tarama basina 1 toplu tickers cagrisi (S4 funding girdisi).
         Hata -> eski harita kalir; bos harita S4'u sessizce susturur."""
@@ -202,13 +229,14 @@ class Scheduler:
                 # Amac: muhasebe hatasini insanin fark etmesini BEKLEMEMEK.
                 self._audit_tick = getattr(self, "_audit_tick", 0) + 1
                 if self._audit_tick % 24 == 1:
-                    rep = self._tracker.verify_outcomes()
+                    rep = self._tracker.refresh_audit()
                     log.info(kv(event="outcome_audit", checked=rep["checked"],
                                 mismatches=rep["mismatches"]))
                     if rep["mismatches"]:
                         self._tracker.log_gate_event(
                             "audit_mismatch",
                             f"{rep['mismatches']} kayit mum arsiviyle celisiyor")
+                self._evaluate_alarms()
             except Exception:
                 log.exception(kv(event="outcome_audit_error"))
         self._store.record_scan(

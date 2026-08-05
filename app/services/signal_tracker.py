@@ -772,6 +772,10 @@ class SignalTracker:
             },
             "not_filled_hypo_slip": measurement.hypo_slip_summary(ghost_rows),
             "unclustered_excluded": unclustered,
+            "max_drawdown_r": self.max_drawdown_r(),
+            # v3.6: denetim OZETI stats'a girer ki yedekten uzaktan
+            # gorulebilsin. Tam rapor /verify ve /measurement'ta.
+            "outcome_audit": self._audit_summary(),
         }
         return {
             "note": "Shadow accounting: estimated fills, no slippage. Not real trading results.",
@@ -796,6 +800,44 @@ class SignalTracker:
         }
 
     # ---------------------------------------- v3.6: teshis dagilimlari
+    def _audit_summary(self) -> dict:
+        """Son denetimin ozeti (onbellekli). Alarm kaydi ve yedek bunu okur;
+        agac ormanda devrilmesin diye sonuc DISARIYA ulasmali."""
+        try:
+            cached = getattr(self, "_audit_cache", None)
+            if cached is None:
+                cached = self.verify_outcomes()
+                self._audit_cache = cached
+            return {"checked": cached.get("checked"),
+                    "mismatches": cached.get("mismatches"),
+                    "unauditable": cached.get("unauditable"),
+                    "ids": [d.get("id") for d in cached.get("details", [])][:10]}
+        except Exception:
+            log.exception(kv(event="audit_summary_error"))
+            return {"error": "denetim ozeti uretilemedi"}
+
+    def refresh_audit(self) -> dict:
+        """Periyodik denetim: onbellegi tazeler (scheduler ~6 saatte cagirir)."""
+        self._audit_cache = self.verify_outcomes()
+        return self._audit_cache
+
+    def max_drawdown_r(self) -> float:
+        """Net R serisinde en buyuk tepe-dip mesafesi (yanlislama kriteri)."""
+        rows = self._db.query(
+            "SELECT direction,outcome,entry_min,entry_max,stop_loss,"
+            "fill_price,r_multiple,closed_utc FROM signals WHERE "
+            "status='CLOSED' AND blocked=0 AND outcome IN ('WIN','LOSS') "
+            "ORDER BY closed_utc ASC")
+        peak = cum = dd = 0.0
+        for r in rows:
+            c = cost_r(r)
+            if c is None or r.get("r_multiple") is None:
+                continue
+            cum += r["r_multiple"] - c
+            peak = max(peak, cum)
+            dd = max(dd, peak - cum)
+        return round(dd, 2)
+
     def diagnostics(self) -> dict:
         """Konsey P0-3 teshisleri. Yalniz OKUMA; hicbir esik degistirmez.
 
