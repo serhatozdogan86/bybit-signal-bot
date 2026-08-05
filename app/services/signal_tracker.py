@@ -772,7 +772,8 @@ class SignalTracker:
             },
             "not_filled_hypo_slip": measurement.hypo_slip_summary(ghost_rows),
             "unclustered_excluded": unclustered,
-            "max_drawdown_r": self.max_drawdown_r(),
+            "max_drawdown_r": self.max_drawdown_r(),          # gercek kohort
+            "max_drawdown_r_all": self.max_drawdown_r(False),
             # v3.6: denetim OZETI stats'a girer ki yedekten uzaktan
             # gorulebilsin. Tam rapor /verify ve /measurement'ta.
             "outcome_audit": self._audit_summary(),
@@ -821,13 +822,23 @@ class SignalTracker:
         self._audit_cache = self.verify_outcomes()
         return self._audit_cache
 
-    def max_drawdown_r(self) -> float:
-        """Net R serisinde en buyuk tepe-dip mesafesi (yanlislama kriteri)."""
-        rows = self._db.query(
-            "SELECT direction,outcome,entry_min,entry_max,stop_loss,"
-            "fill_price,r_multiple,closed_utc FROM signals WHERE "
-            "status='CLOSED' AND blocked=0 AND outcome IN ('WIN','LOSS') "
-            "ORDER BY closed_utc ASC")
+    def max_drawdown_r(self, since_lock: bool = True) -> float:
+        """Net R serisinde en buyuk tepe-dip mesafesi.
+
+        KAPSAM ONEMLI: yanlislama kriteri #2 (config-lock.md) "GERCEK
+        KOHORTTA maliyet-modelli maksDD > 20R" der - yani kilit sonrasi
+        kohort. Tum zamanlari olcmek ilan edilen tanimdan SAPMAKTIR; iki
+        pencere farkli cevap verebilir (olculdu: tumu 36.7R, kilit oncesi
+        11.8R, kilit sonrasi 35.6R). Varsayilan ilan edilen tanimdir.
+        """
+        sql = ("SELECT direction,outcome,entry_min,entry_max,stop_loss,"
+               "fill_price,r_multiple,closed_utc FROM signals WHERE "
+               "status='CLOSED' AND blocked=0 AND outcome IN ('WIN','LOSS')")
+        params: tuple = ()
+        if since_lock:
+            sql += " AND created_utc >= ?"
+            params = (measurement.LOCK_UTC,)
+        rows = self._db.query(sql + " ORDER BY closed_utc ASC", params)
         peak = cum = dd = 0.0
         for r in rows:
             c = cost_r(r)

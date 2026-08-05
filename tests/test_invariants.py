@@ -244,3 +244,32 @@ def test_audit_summary_reaches_backup_payload(tmp_path):
     st = tr.stats()
     assert "outcome_audit" in st["measurement"], "denetim ozeti stats'ta yok"
     assert "max_drawdown_r" in st["measurement"], "maksDD yanlislama icin yok"
+
+
+def test_maxdd_metric_matches_declared_scope(tmp_path):
+    """HATA SINIFI: ilan edilen kriteri OLCERKEN kapsami kaydirmak.
+    config-lock.md #2: 'GERCEK KOHORTTA maksDD > 20R' -> kilit sonrasi.
+    Tum zamanlari olcup kriteri o rakamla degerlendirmek sapmadir."""
+    from app.services import measurement
+    from app.services.database import Database
+    from app.services.signal_tracker import SignalTracker
+    db = Database(str(tmp_path / "d.db"))
+    tr = SignalTracker(db, "15")
+    ins = ("INSERT INTO signals(pair,direction,created_utc,closed_utc,"
+           "entry_min,entry_max,stop_loss,tp1,tp2,rr,status,outcome,"
+           "fill_price,r_multiple,blocked) VALUES('AUSDT','LONG',?,?,100,"
+           "101,98,106,110,2.0,'CLOSED',?,101,?,0)")
+    # kilit ONCESI buyuk dususu var: +20R sonra -15R
+    db.execute(ins, ("2026-07-01T00:00:00Z", "2026-07-01T01:00:00Z", "WIN", 20.0))
+    db.execute(ins, ("2026-07-02T00:00:00Z", "2026-07-02T01:00:00Z", "LOSS", -15.0))
+    # kilit SONRASI kucuk: +2R sonra -3R  -> kohort DD ~3, tum zaman DD ~16
+    db.execute(ins, (measurement.LOCK_UTC, "2026-07-30T01:00:00Z", "WIN", 2.0))
+    db.execute(ins, ("2026-07-31T00:00:00Z", "2026-07-31T01:00:00Z", "LOSS", -3.0))
+    kohort = tr.max_drawdown_r()          # varsayilan = ilan edilen kapsam
+    tumu = tr.max_drawdown_r(False)
+    assert kohort < tumu, "varsayilan kapsam gercek kohort olmali"
+    assert 2.5 < kohort < 4.5, f"gercek kohort DD beklenmedik: {kohort}"
+    assert tumu > 14.0, f"tum-zaman DD beklenmedik: {tumu}"
+    st = tr.stats()["measurement"]
+    assert st["max_drawdown_r"] == kohort
+    assert st["max_drawdown_r_all"] == tumu
