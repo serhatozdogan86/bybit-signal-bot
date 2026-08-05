@@ -28,7 +28,7 @@ Telegram'a **SIGNAL** gönderir, aksi halde **NO_TRADE** veya **DATA_MISSING** �
         │                                     (Phase 2: WSClient aynı arayüzü implemente eder)
         ▼
 [SignalEngine]  regime → structure → execution → volume → confluence → risk → decision
-        │  Decision (pydantic, schema v1.1)
+        │  Decision (pydantic, schema v1.2)
         ▼
 [StateStore (abstract)]  cooldown / dedup / son sonuçlar   ← MVP: InMemory, sonra Redis/SQLite
         │
@@ -62,7 +62,7 @@ app/
 ├── logging_setup.py           # structured logging (key=value)
 ├── config/settings.py         # env → typed Settings + StrategyParams
 ├── models/candle.py           # Candle, KlineSeries
-├── models/decision.py         # Decision output contract (schema v1.1)
+├── models/decision.py         # Decision output contract (schema v1.2)
 ├── integrations/bybit_client.py       # REST + retry/backoff
 ├── integrations/telegram_notifier.py  # sendMessage + timeout/retry/429
 ├── services/market_data_service.py    # veri kaynağı soyutlaması (WS'e hazır)
@@ -124,7 +124,7 @@ Redis/SQLite sınıfı yazıp `app/main.py`'de tek satır değiştirmek yeterlid
 2. Telegram'a **"Signal engine online"** açılış mesajı düştü (token + chat_id doğru demektir).
 3. `GET /healthz` → `{"status": "ok", ...}` dönüyor.
 4. `POST /scan/dry` → tüm semboller için tam contract JSON dönüyor; `decision` alanları
-   `SIGNAL / NO_TRADE / DATA_MISSING`'den biri ve `schema_version` = `1.1`.
+   `SIGNAL / NO_TRADE / DATA_MISSING`'den biri ve `schema_version` = `1.2`.
 5. `/scan/dry` çıktısında hiçbir sembol `DATA_MISSING` değil (Bybit bağlantısı sağlıklı).
 6. `GET /status` → `meta.scan_count` birkaç dakika arayla artıyor (döngü canlı).
 7. `POST /scan` bir kez çağrıldığında sonuç Telegram'a düşüyor (SEND_NO_TRADE=false ise
@@ -174,7 +174,7 @@ Redis/SQLite sınıfı yazıp `app/main.py`'de tek satır değiştirmek yeterlid
 | `POST /scan` | Manuel tarama, Telegram'a gönderir, özet döner. Tarama sürerken **409** |
 | `POST /scan/dry` | Manuel tarama, Telegram'a **göndermez**, tam JSON döner |
 
-## Output contract (schema v1.1)
+## Output contract (schema v1.2)
 
 `decision`: `SIGNAL | NO_TRADE | DATA_MISSING`. Alan isimleri sabittir; tam şema
 `app/models/decision.py` içindedir ve `tests/test_signal_engine.py::test_contract_dict_field_names_are_stable`

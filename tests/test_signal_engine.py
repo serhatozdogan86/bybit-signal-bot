@@ -95,10 +95,28 @@ def test_contract_dict_field_names_are_stable():
         "entry_zone", "stop_loss", "targets", "rr", "invalidation",
         "volume_confirmation", "liquidity_note", "indicator_confluence",
         "failed_filters", "reject_reason", "watch_condition", "data_missing",
-        "disclaimer",
+        "market_bias", "disclaimer",
     }
     assert set(c.keys()) == expected
-    assert c["schema_version"] == "1.1"
+    assert c["schema_version"] == "1.2"
+
+
+def test_market_bias_recorded_in_contract():
+    """v1.2: sinyal aninda gecerli BTC piyasa rejimi sozlesmeye yazilir.
+
+    Otopside 'hangi rejimde dogdu' analizi bu alana dayanir; onceden hicbir
+    yere kaydedilmiyordu (Decision.regime sembol rejimidir ve her SIGNAL
+    tanim geregi trending'dir - ayristirmaz).
+    """
+    htf, ltf = _long_scenario()
+    d = signal_engine.evaluate("BIASUSDT", htf, ltf, PARAMS, market_bias="bull")
+    assert d.decision is DecisionType.SIGNAL
+    assert d.market_bias == "bull"
+    assert d.contract_dict()["market_bias"] == "bull"
+    # NO_TRADE/DATA_MISSING kararlarinda da tasinir (karar arsivi icin)
+    d2 = signal_engine.evaluate("BIASUSDT", None, None, PARAMS,
+                                market_bias="bear")
+    assert d2.contract_dict()["market_bias"] == "bear"
 
 
 # ------------------------------------------------------------- v3.0

@@ -353,11 +353,11 @@ def test_pre_fill_candles_cannot_decide_outcome(tmp_path):
           start_ts=1_000_000)
     tracker.evaluate_open("TESTUSDT")
     row = db.query_one("SELECT * FROM signals")
-    assert row["status"] == "FILLED" and row["fill_ts"] == 2_800_000
-    # dolus mumunun tepesi 107 > tp1 ama bu DOLUS ONCESI degil, ayni mum.
-    # Muhafazakar davranis: ayni mumda hem tepe hem bolge -> yol bilinemez;
-    # burada stop'a deginmediginden WIN yazilabilir. Asil kontrol asagida:
-    assert row["outcome"] in (None, "WIN")
+    assert row["fill_ts"] == 2_800_000
+    # v3.7: dolus mumu sonuc kontrolune girer (denetciyle AYNI kural).
+    # Bu mumda stop'a deginmedi, tepe 107 > tp1 -> WIN ayni mumda yazilir.
+    # DOLUS ONCESI 108.5'lik tepe hala sayilmaz - asil kontrol 3. turda.
+    assert row["status"] == "CLOSED" and row["outcome"] == "WIN"
 
     # 3. tur (ASIL TEST): dolus AYRI bir turda kaydedilmeli ki sonraki
     # degerlendirmede fill_price DB'den gelsin ve dongu bastan tarasin -
@@ -462,3 +462,19 @@ def test_verifier_replay_rules():
     # bolgeye hic dokunulmadi -> NOT_FILLED
     out3 = verifier.replay(sig, [c(i, 105, 103) for i in range(24)], 24, 192)
     assert out3["outcome"] == "NOT_FILLED"
+
+
+def test_compare_ambiguous_loss_equivalence():
+    """v3.7: kayit=LOSS(ambiguous=1) ile denetci=AMBIGUOUS ayni karardir.
+
+    Kilitli kural ayni-mum vakasini defterde LOSS yazar; denetcinin farkli
+    adlandirmasi uyusmazlik degildir. ambiguous=0 ise fark GERCEK uyusmazlik
+    olarak kalir (esdegerlik yalniz isaretli kayitlar icin).
+    """
+    from app.services import verifier
+    sig = {"id": 1, "pair": "XUSDT", "direction": "LONG", "outcome": "LOSS",
+           "ambiguous": 1, "r_multiple": -1.0, "fill_ts": 5}
+    rep = {"outcome": "AMBIGUOUS", "fill_ts": 5, "r": -1.0}
+    assert verifier.compare(sig, rep) is None
+    diff = verifier.compare(dict(sig, ambiguous=0), rep)
+    assert diff is not None and "AMBIGUOUS" in diff["problems"][0]

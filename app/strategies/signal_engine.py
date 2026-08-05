@@ -36,6 +36,7 @@ def evaluate(pair: str, htf_series: KlineSeries | None, ltf_series: KlineSeries 
              params: StrategyParams, now: datetime | None = None,
              market_bias: str = "neutral") -> Decision:
     d = Decision.base(pair, params.htf, params.ltf, now)
+    d.market_bias = market_bias   # v1.2: karar aninin piyasa rejimi arsive girer
 
     # 1. DATA
     missing = [name for name, s in (("htf_klines", htf_series), ("ltf_klines", ltf_series))

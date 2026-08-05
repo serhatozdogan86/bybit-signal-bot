@@ -108,6 +108,51 @@ def test_short_win_and_dedupe(tmp_path):
     assert abs(sig["r_multiple"] - (99.0 - 94.0) / (102.0 - 99.0)) < 0.01
 
 
+def test_fill_candle_stop_counts(tmp_path):
+    """v3.7: dolus mumundaki stop temasi karara girer (ilan edilen kural).
+
+    Hatali kod dolus mumunu `continue` ile atlar; sonraki ralli TP'ye
+    ulasinca UYDURMA WIN yazardi. Dogru davranis: ayni mumda dolus + stop
+    temasi -> LOSS, sonraki mumlar sonucu degistiremez.
+    """
+    tracker, _ = _make_tracker(tmp_path)
+    d = _signal()
+    ltf = fx.make_series(np.full(70, 101.5))
+    ltf.candles[-1].ts = 1_000_000
+    tracker.maybe_track(d, ltf)
+    # bar0: low 97.5 hem entry_max 101'e hem stop 98'e deger (TP 106 degil)
+    # bar1: ralli 107 -> eski kod burada WIN 1.67 uretirdi
+    _feed(tracker, closes=[100.0, 106.5],
+          lows=[97.5, 104.0], highs=[101.5, 107.0])
+    tracker.evaluate_open("TESTUSDT")
+    sig = tracker.recent_signals(1)[0]
+    assert sig["outcome"] == "LOSS" and sig["r_multiple"] == -1.0
+    # bagimsiz denetci ile ayni cevap: uyusmazlik yok
+    assert tracker.verify_outcomes()["mismatches"] == 0
+
+
+def test_fill_candle_both_is_ambiguous_loss(tmp_path):
+    """v3.7: dolus mumunda hem TP hem STOP -> kilitli kural: LOSS (ambiguous=1).
+
+    Denetci ayni olayi AMBIGUOUS diye adlandirir; compare() bunu esdeger
+    sayar - kalici sahte alarm uretilmez.
+    """
+    tracker, _ = _make_tracker(tmp_path)
+    d = _signal()
+    ltf = fx.make_series(np.full(70, 101.5))
+    ltf.candles[-1].ts = 1_000_000
+    tracker.maybe_track(d, ltf)
+    # bar0: low 97.5 (entry + stop) VE high 106.5 (tp1) ayni mumda
+    _feed(tracker, closes=[100.0, 100.0],
+          lows=[97.5, 99.0], highs=[106.5, 101.0])
+    tracker.evaluate_open("TESTUSDT")
+    sig = tracker.recent_signals(1)[0]
+    assert sig["outcome"] == "LOSS" and sig["r_multiple"] == -1.0
+    assert sig["ambiguous"] == 1
+    # kayit=LOSS(ambiguous=1) vs denetci=AMBIGUOUS -> esdeger, alarm yok
+    assert tracker.verify_outcomes()["mismatches"] == 0
+
+
 def test_dataset_accumulation(tmp_path):
     tracker, db = _make_tracker(tmp_path)
     d = _signal()
@@ -199,6 +244,92 @@ def test_blocked_cohort_isolated(tmp_path):
     d2 = signal_engine.evaluate("BLKUSDT", htf, ltf, StrategyParams())
     assert tracker.maybe_track(d2, ltf) is True
     assert tracker.stats()["open_signals"] == 1
+
+
+def test_signal_record_carries_regime_and_market_bias(tmp_path):
+    """v3.7-olcum: sinyal kaydi sembol rejimini VE piyasa rejimini kolon
+    olarak tasir. contract_json yedek muafiyetindedir (restore'da kaybolur);
+    otopside geriye donuk rejim analizi kolonlara dayanmali."""
+    from app.services.database import Database as _DB
+    from app.strategies import signal_engine
+    import json as _json
+
+    db = _DB(str(tmp_path / "rgm.db"))
+    tracker = SignalTracker(db, ltf_interval="15")
+    htf = fx.make_series(fx.bullish_htf_closes(), interval="240", seed=3)
+    ltf = fx.make_series(fx.bullish_ltf_closes(), interval="15",
+                         volumes=fx.breakout_volumes(), seed=4)
+    d = signal_engine.evaluate("RGMUSDT", htf, ltf, StrategyParams(),
+                               market_bias="bull")
+    assert d.decision.value == "SIGNAL"
+    tracker.maybe_track(d, ltf)
+    row = tracker.recent_signals(1)[0]
+    assert row["regime"] == "trending"
+    assert row["market_bias"] == "bull"
+    contract = _json.loads(
+        db.query_one("SELECT contract_json FROM signals")["contract_json"])
+    assert contract["regime"] == "trending"
+    assert contract["market_bias"] == "bull"
+    # kapi-bloklu kohort da ayni bilgiyi tasimali
+    d2 = signal_engine.evaluate("RGMUSDT", htf, ltf, StrategyParams(),
+                                market_bias="bear")   # LONG bear'de bloklanir
+    tracker.track_blocked(d2, ltf)
+    blk = tracker.blocked_signals(1)[0]
+    assert blk["regime"] == "trending" and blk["market_bias"] == "bear"
+
+
+def test_regime_survives_backup_restore(tmp_path):
+    """v3.7-olcum (kural 2): regime/market_bias yedek payload'ina girer ve
+    restore'dan sag cikar - contract_json gibi sessizce kaybolamaz."""
+    from app.services.database import Database as _DB
+    from app.strategies import signal_engine
+
+    db = _DB(str(tmp_path / "rst.db"))
+    tracker = SignalTracker(db, ltf_interval="15")
+    htf = fx.make_series(fx.bullish_htf_closes(), interval="240", seed=3)
+    ltf = fx.make_series(fx.bullish_ltf_closes(), interval="15",
+                         volumes=fx.breakout_volumes(), seed=4)
+    d = signal_engine.evaluate("RSTUSDT", htf, ltf, StrategyParams(),
+                               market_bias="bull")
+    tracker.maybe_track(d, ltf)
+    payload = tracker.recent_signals(10)          # yedege giden sekil
+    db.execute("DELETE FROM signals")             # redeploy simulasyonu
+    assert tracker.import_signals(payload) == 1
+    row = tracker.recent_signals(1)[0]
+    assert row["regime"] == "trending"
+    assert row["market_bias"] == "bull"
+
+
+def test_regime_backfill_from_stored_records(tmp_path):
+    """v3.7-olcum: eski kayitlarin rejimi KAYITLI veriden geri doldurulur
+    (contract_json; kapi-bloklularda reject_reason metni). Hicbir kaynagi
+    olmayan kayit NULL kalir - uydurma yok (kural 1)."""
+    import json as _json
+    tracker, db = _make_tracker(tmp_path)
+    db.execute(
+        "INSERT INTO signals(pair,direction,created_utc,contract_json) "
+        "VALUES('AUSDT','LONG','2026-08-01T00:00:00Z',?)",
+        (_json.dumps({"regime": "trending", "market_bias": "bear"}),))
+    # eski kapi-bloklu kayit: contract'ta market_bias alani YOK (v1.1),
+    # ama reject_reason metninde kayitli
+    db.execute(
+        "INSERT INTO signals(pair,direction,created_utc,blocked,"
+        "contract_json) VALUES('BUSDT','LONG','2026-08-01T00:00:00Z',1,?)",
+        (_json.dumps({"regime": "trending",
+                      "reject_reason": "counter-regime long blocked "
+                                       "(market gate: BTC bear)"}),))
+    # kaynaksiz kayit: EKSIK KALMALI
+    db.execute("INSERT INTO signals(pair,direction,created_utc) "
+               "VALUES('CUSDT','LONG','2026-08-01T00:00:00Z')")
+    assert tracker._backfill_regime_bias() >= 2
+    rows = {r["pair"]: r for r in
+            db.query("SELECT pair,regime,market_bias FROM signals")}
+    assert rows["AUSDT"]["regime"] == "trending"
+    assert rows["AUSDT"]["market_bias"] == "bear"
+    assert rows["BUSDT"]["regime"] == "trending"
+    assert rows["BUSDT"]["market_bias"] == "bear"
+    assert rows["CUSDT"]["regime"] is None
+    assert rows["CUSDT"]["market_bias"] is None
 
 
 def test_cost_r_and_cluster(tmp_path):
