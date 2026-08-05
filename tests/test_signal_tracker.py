@@ -108,6 +108,51 @@ def test_short_win_and_dedupe(tmp_path):
     assert abs(sig["r_multiple"] - (99.0 - 94.0) / (102.0 - 99.0)) < 0.01
 
 
+def test_fill_candle_stop_counts(tmp_path):
+    """v3.7: dolus mumundaki stop temasi karara girer (ilan edilen kural).
+
+    Hatali kod dolus mumunu `continue` ile atlar; sonraki ralli TP'ye
+    ulasinca UYDURMA WIN yazardi. Dogru davranis: ayni mumda dolus + stop
+    temasi -> LOSS, sonraki mumlar sonucu degistiremez.
+    """
+    tracker, _ = _make_tracker(tmp_path)
+    d = _signal()
+    ltf = fx.make_series(np.full(70, 101.5))
+    ltf.candles[-1].ts = 1_000_000
+    tracker.maybe_track(d, ltf)
+    # bar0: low 97.5 hem entry_max 101'e hem stop 98'e deger (TP 106 degil)
+    # bar1: ralli 107 -> eski kod burada WIN 1.67 uretirdi
+    _feed(tracker, closes=[100.0, 106.5],
+          lows=[97.5, 104.0], highs=[101.5, 107.0])
+    tracker.evaluate_open("TESTUSDT")
+    sig = tracker.recent_signals(1)[0]
+    assert sig["outcome"] == "LOSS" and sig["r_multiple"] == -1.0
+    # bagimsiz denetci ile ayni cevap: uyusmazlik yok
+    assert tracker.verify_outcomes()["mismatches"] == 0
+
+
+def test_fill_candle_both_is_ambiguous_loss(tmp_path):
+    """v3.7: dolus mumunda hem TP hem STOP -> kilitli kural: LOSS (ambiguous=1).
+
+    Denetci ayni olayi AMBIGUOUS diye adlandirir; compare() bunu esdeger
+    sayar - kalici sahte alarm uretilmez.
+    """
+    tracker, _ = _make_tracker(tmp_path)
+    d = _signal()
+    ltf = fx.make_series(np.full(70, 101.5))
+    ltf.candles[-1].ts = 1_000_000
+    tracker.maybe_track(d, ltf)
+    # bar0: low 97.5 (entry + stop) VE high 106.5 (tp1) ayni mumda
+    _feed(tracker, closes=[100.0, 100.0],
+          lows=[97.5, 99.0], highs=[106.5, 101.0])
+    tracker.evaluate_open("TESTUSDT")
+    sig = tracker.recent_signals(1)[0]
+    assert sig["outcome"] == "LOSS" and sig["r_multiple"] == -1.0
+    assert sig["ambiguous"] == 1
+    # kayit=LOSS(ambiguous=1) vs denetci=AMBIGUOUS -> esdeger, alarm yok
+    assert tracker.verify_outcomes()["mismatches"] == 0
+
+
 def test_dataset_accumulation(tmp_path):
     tracker, db = _make_tracker(tmp_path)
     d = _signal()

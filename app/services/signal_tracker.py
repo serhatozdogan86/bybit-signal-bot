@@ -517,17 +517,22 @@ class SignalTracker:
             if fill_price is None:
                 touched = (c["low"] <= sig["entry_max"] if is_long
                            else c["high"] >= sig["entry_min"])
-                if touched:
-                    fill_price = sig["entry_max"] if is_long else sig["entry_min"]
-                    filled_at_idx = i
-                    self._db.execute(
-                        "UPDATE signals SET status='FILLED', fill_price=?, "
-                        "fill_ts=? WHERE id=?",
-                        (fill_price, c["ts"], sig["id"]))
-                elif i + 1 >= self._fill_window:
-                    self._close(sig["id"], "NOT_FILLED", None, 0.0)
-                    return
-                continue
+                if not touched:
+                    if i + 1 >= self._fill_window:
+                        self._close(sig["id"], "NOT_FILLED", None, 0.0)
+                        return
+                    continue
+                fill_price = sig["entry_max"] if is_long else sig["entry_min"]
+                filled_at_idx = i
+                self._db.execute(
+                    "UPDATE signals SET status='FILLED', fill_price=?, "
+                    "fill_ts=? WHERE id=?",
+                    (fill_price, c["ts"], sig["id"]))
+                sig["fill_ts"] = c["ts"]
+                # v3.7 (2026-08-05): dolus mumu da SONUC kontrolune girer -
+                # continue YOK. Ilan edilen kural (verifier): "dolus mumundan
+                # ITIBAREN once stop mu TP mi". Mumu atlamak dolus mumundaki
+                # stop temasini kacirir; sonraki ralli uydurma WIN yazar.
 
             # --- 2) sonuc kontrolu ---
             risk = (fill_price - sig["stop_loss"]) if is_long else (sig["stop_loss"] - fill_price)

@@ -70,14 +70,23 @@ def replay(sig: dict, candles: list[dict], fill_window: int,
 
 
 def compare(sig: dict, replayed: dict) -> dict | None:
-    """Kayit ile yeniden oynatma uyusuyor mu? Uyusmazlik varsa rapor doner."""
+    """Kayit ile yeniden oynatma uyusuyor mu? Uyusmazlik varsa rapor doner.
+
+    v3.7 (2026-08-05): kilitli golge kurali (config-lock.md) ayni mumda
+    TP+STOP'u defterde LOSS (ambiguous=1) olarak yazar; denetci ayni olayi
+    AMBIGUOUS diye adlandirir. Ikisi AYNI karardir (r=-1) - farkli isim
+    uyusmazlik sayilmaz, yoksa her ambiguous vaka kalici sahte alarm uretir.
+    """
     if replayed.get("outcome") is None:
         return None                       # denetlenemez (veri yetersiz)
     stored = sig.get("outcome")
     if stored is None:
         return None                       # kayit henuz acik
     problems = []
-    if stored != replayed["outcome"]:
+    equivalent = (stored == replayed["outcome"]
+                  or (stored == "LOSS" and bool(sig.get("ambiguous"))
+                      and replayed["outcome"] == "AMBIGUOUS"))
+    if not equivalent:
         problems.append(f"sonuc: kayit={stored} denetci={replayed['outcome']}")
     if (sig.get("fill_ts") and replayed.get("fill_ts")
             and sig["fill_ts"] != replayed["fill_ts"]):

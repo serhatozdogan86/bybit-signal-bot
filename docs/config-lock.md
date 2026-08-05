@@ -179,3 +179,28 @@ Yeni motor tasarımı ayrı bir belgeye yazılır ve ÖN-KAYITLI olarak yeni bir
 ölçüm penceresinde sınanır. Yukarıdaki hiçbir eşik, bu veriden türetildiği
 için doğrudan kural yapılamaz — hipotez olarak kaydedilip GELECEK veride
 test edilir. Aday yarışı (S1–S6) etkilenmez, kendi sınavına devam eder.
+
+## v3.7 ölçüm düzeltmesi (2026-08-05, kilit açıldıktan SONRA): doluş mumu + AMBIGUOUS eşdeğerliği
+Kritik bug fix istisnası kapsamında iki muhasebe düzeltmesi; motor
+(`app/strategies/`), eşikler, maliyet modeli ve ısı limitlerine sıfır dokunuş.
+Kilit-v2 penceresi başlamadan yapıldı — yeni pencere temiz defterle açılır.
+
+1. **Doluş mumu sonuç kontrolüne girer** (`_evaluate_signal`): canlı takipçi,
+   doluşun gerçekleştiği mumu `continue` ile atlıyor, stop/TP kontrolüne bir
+   SONRAKİ mumdan başlıyordu. İlan edilen kural (verifier, v3.6: "doluş
+   mumundan İTİBAREN önce STOP mu TP mi") doluş mumunu kapsar. Atlama,
+   doluş mumundaki stop temasını kaçırır; fiyat sonra TP'ye koşarsa uydurma
+   WIN yazılırdı — "doluş öncesi bulaşma" sınıfının son üyesi. Yön İYİMSER
+   olduğundan düzeltme yanlışlama #2 hükmünü etkilemez, olsa olsa güçlendirir.
+   Etkilenen kapanmış kayıtlar mevcut onarım mekanizmasıyla
+   (`_repair_bad_outcomes`) açılışta yeniden karara bağlanır; başlık
+   rakamları onarım sonrası yeniden okunmalıdır.
+2. **LOSS(ambiguous=1) ≡ AMBIGUOUS** (`verifier.compare`): kilitli kural
+   aynı-mum TP+STOP'u defterde LOSS (ambiguous=1) yazar; denetçi aynı olayı
+   AMBIGUOUS diye adlandırır. İki isim aynı karardır (r=−1). Eşdeğerlik
+   tanınmadığından her ambiguous vaka kalıcı sahte "uyuşmazlık" üretiyor ve
+   onarım döngüsünce gereksiz yeniden açılıyordu. Düzeltme denetim aracına
+   yapıldı; motor tarafı kilitli kurala zaten uyuyordu.
+
+Regresyon testleri: `test_fill_candle_stop_counts`,
+`test_fill_candle_both_is_ambiguous_loss`, `test_compare_ambiguous_loss_equivalence`.
