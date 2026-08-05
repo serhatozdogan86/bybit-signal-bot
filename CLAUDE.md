@@ -1,0 +1,46 @@
+# CLAUDE.md — Bu depoda çalışan her Claude oturumu önce bunu okur
+
+## Proje
+Bybit perpetual gölge sinyal botu. GERÇEK PARA YOK — tüm işlemler kâğıt
+üzerinde ölçüm. Amaç: istatistiksel kanıt eşiğini (≥50 kapanmış küme +
+küme-CI alt sınırı > 0) geçen bir motor bulmak. Dil: Türkçe, sade.
+
+## DURUM (2026-08-05)
+- Şampiyon (breakout_retest) Faz-1'i GEÇEMEDİ: yanlışlama #2 tetiklendi
+  (kilit sonrası maksDD 35.6R > 20R). Otopsi: docs/config-lock.md sonu.
+- 5 aday gölge yarışta (app/services/challengers.py), rejim-2 örneklemesi.
+  S7 (Wyckoff) ve S5 beklemede — tetikleyicileri docs/challengers-design.md.
+- v2 şampiyon henüz TASARLANMADI; tasarlanırsa ÖN-KAYITLA yeni aday olur.
+
+## DEĞİŞTİRİLEMEZ KURALLAR
+1. `app/strategies/` DONMUŞTUR. Tek satır değişiklik yasak; her commit
+   mesajında "strategies/ 0 satır" kanıtı beklenir.
+2. PUSH KAPISI: `python -m pytest tests/ -q` yeşil değilse push YOK.
+   Komut zincirine kapı koy (`&&` veya rc kontrolü) — 853927e'nin dersi.
+3. Yeni hata bulunca: önce SINIFINI kapatan değişmezlik testi
+   (tests/test_invariants.py), test hatalı kodda KIRMIZI vermeli, sonra
+   düzeltme. docs/error-prevention.md'deki 9 kural bağlayıcıdır.
+4. Ölçüm eşikleri / maliyet sabitleri / karar kuralları veriden türetilip
+   doğrudan kural yapılamaz — önce docs/ideas.md'ye ÖN-KAYIT (H-1 örneği),
+   GELECEK veride test.
+5. Veride otomatik kalıp arama YOK (p-hacking). Alarm koşulları önceden
+   ilan edilir: app/services/alarms.py (testi bunu zorlar).
+6. app/services/verifier.py tracker'dan BAĞIMSIZ kalır — import etmez.
+7. Aday motoru şampiyon tablolarına yazamaz; bayt-bayt izolasyon testlidir.
+
+## OPERASYON
+- Canlı: Oracle VM 132.145.247.85:8080; main'e push → ~2 dk'da autodeploy.
+  VM'deki autodeploy çalışma ağacında ELLE ÇALIŞMA — ayrı clone kullan.
+- Canlı SQLite'a yazan sorgu YASAK; denetim için önce dosyayı kopyala.
+- Uzaktan durum: gist 7841e94325309e69812439897a0c186c
+  (codeload.github.com/gist/<id>/tar.gz/HEAD; 0_performance.json,
+  0_signals.json, 0_challengers.json, candles_*.csv).
+- Rotalar: /verify /alarms /measurement /challengers (DASHBOARD_TOKEN'lı).
+- Bybit API bazı ortamlardan coğrafi engelli; VM'den erişilir.
+
+## ŞERİTLER (iki Claude çakışmasın)
+- **Denetim şeridi** (Claude Code dahil herkes): oku, doğrula, yeniden
+  oynat, rapor et. Serbest.
+- **Değişiklik şeridi**: TEK yazar. Değişiklik yapacaksan önce açık PR /
+  bekleyen iş var mı bak (git log + son commit mesajları), kurallar
+  yukarıda. Uyuşmazlık bulursan kod değiştirmeden önce rapor et.
