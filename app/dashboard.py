@@ -237,6 +237,7 @@ DASHBOARD_HTML = r"""<!doctype html>
   .b-PENDING,.b-FILLED{background:var(--amber-bg);color:var(--amber-ink)}
   .b-NOT_FILLED,.b-EXPIRED{background:var(--grey-bg);color:#5B5344}
   .b-AMBIGUOUS{background:var(--blue-bg);color:var(--blue-ink)}
+  .b-OPEN{background:var(--amber-bg);color:var(--amber-ink)}
   .age{font-size:10px;color:var(--muted)}
   .conf{display:inline-block;margin-left:5px;width:15px;text-align:center;
         border-radius:4px;font-size:9.5px;font-weight:700;font-family:var(--mono)}
@@ -329,6 +330,16 @@ DASHBOARD_HTML = r"""<!doctype html>
      border-radius:12px;padding:12px 14px}
   #modal .sheet{max-width:1000px}
   @media(max-width:760px){#modal .sheet{max-width:96vw}}
+  /* aday detay penceresi (Faz B) */
+  #chalBody table.sig tbody tr{cursor:pointer}
+  .sheet h4.chsec{font-size:13px;font-weight:600;margin:14px 0 6px;
+                  color:var(--blue)}
+  .sheet .chp{font-size:12.5px;line-height:1.55;margin:0}
+  .sheet table.mini{width:100%;font-size:11.5px}
+  .sheet table.mini th{text-align:left;color:var(--muted);font-weight:600;
+                       padding:2px 6px 2px 0}
+  .sheet table.mini td{padding:2px 6px 2px 0;white-space:nowrap}
+  .sheet table.mini td:last-child{color:var(--muted)}
   .zoombar{display:flex;gap:6px;align-items:center;margin-bottom:8px}
   .zoombar button{background:var(--card);border:1px solid var(--line);
      color:var(--head);border-radius:7px;padding:4px 11px;cursor:pointer;
@@ -567,7 +578,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     <div class="col" data-tab="adaylar">
       <div class="card fill">
-        <div class="chead"><span class="tipwrap" tabindex="0" data-tip="Faz B gölge yarışı: 5 aday strateji, şampiyonla AYNI maliyet modeli ve AYNI sınavla (≥50 kapanmış küme + küme-CI alt sınırı > 0) kâğıt üzerinde ölçülür. Gerçek işlem yok. Girişler kapanış bazlı; v1 çıkışları sabit hedefli — trend adayları (S1/S2) için sonuçlar muhafazakâr alt sınırdır. Şampiyon Faz-1 sınavını geçemezse buradaki sıralama bir sonraki denemenin adayını belirler. Çoklu karşılaştırma düzeltmesi: kazanan, seçildikten SONRA toplanan veride de sınavı geçmek zorundadır. Yatırım tavsiyesi değildir.">Aday Stratejiler · Gölge Yarış <span class="i">ⓘ</span></span> <span class="tag">Faz B</span></div>
+        <div class="chead"><span class="tipwrap" tabindex="0" data-tip="Faz B gölge yarışı: 5 aday strateji, şampiyonla AYNI maliyet modeli ve AYNI sınavla (≥50 kapanmış küme + küme-CI alt sınırı > 0) kâğıt üzerinde ölçülür. Gerçek işlem yok. Girişler kapanış bazlı; v1 çıkışları sabit hedefli — trend adayları (S1/S2) için sonuçlar muhafazakâr alt sınırdır. Şampiyon Faz-1 sınavını geçemezse buradaki sıralama bir sonraki denemenin adayını belirler. Çoklu karşılaştırma düzeltmesi: kazanan, seçildikten SONRA toplanan veride de sınavı geçmek zorundadır. Yatırım tavsiyesi değildir.">Aday Stratejiler · Gölge Yarış <span class="i">ⓘ</span></span> <span class="tag">Faz B</span> <span class="tag">satıra tıkla → detay</span></div>
         <div class="cbody scroll" id="chalBody"><div class="empty">aday verisi birikiyor…</div></div>
       </div>
     </div>
@@ -814,6 +825,55 @@ const RU={
 "gölge muhasebe · geçmiş performans garanti değildir · yatırım tavsiyesi değildir":
  "теневой учёт · прошлые результаты не гарантия · не инвестиционная рекомендация",
 "başlıktaki TR/RU düğmesi":"кнопка TR/RU в шапке",
+/* --- aday detay penceresi (Faz B) --- */
+"İstatistikler":"Статистика","Nasıl çalışır?":"Как это работает?",
+"Parametreler":"Параметры","Dürüstlük notları":"Заметки честности",
+"Son 15 işlem":"Последние 15 сделок","Sonuçlanan":"Завершено",
+"Kazanma oranı":"Доля выигрышей","Brüt R":"Валовой R","Net R":"Чистый R",
+"Süresi dolan":"Истёкшие (тайм-аут)","Açık / tavan":"Открыто / лимит",
+"Küme":"Кластеры","Güven aralığı":"Доверительный интервал",
+"Belirsiz":"Неоднозначные","Tutuş medyanı":"Медиана удержания",
+"Giriş kuralı":"Правило входа","Hedef":"Цель","Zaman aşımı":"Тайм-аут",
+"Tavan":"Лимит открытых","Filtreler":"Фильтры",
+"parite":"пара","yön":"напр.","zaman":"время","net R":"чистый R",
+"Fiyat uzun vadeli ortalamasının üstündeyse ve son günlerde de yükselmişse, yokuşun devam edeceğine oynar; düşüşte aynısının tersini yapar. Güçlü hareketlerin bir süre daha sürme eğilimi olduğu fikrine dayanır. Yön dönene kadar bekler, erken inmez.":
+"Если цена выше долгосрочной средней и в последние дни росла, ставит на продолжение подъёма; при падении делает обратное. Опирается на то, что сильные движения обычно длятся ещё какое-то время. Ждёт разворота и не выходит раньше времени.",
+"4H kapanış EMA200 üstünde (LONG) / altında (SHORT) VE son 12×4H momentum aynı yönde":
+"Закрытие 4H выше EMA200 (LONG) / ниже (SHORT) И моментум за 12×4H в ту же сторону",
+"rejim/hacim filtresi yok; funding kullanılmaz":
+"фильтров режима/объёма нет; funding не используется",
+"v1 çıkışları sabit hedeflidir — trend stratejileri için bu, muhafazakâr bir alt sınırdır; iz süren çıkışlar v2'de.":
+"Выходы v1 с фиксированной целью — для трендовых стратегий это консервативная нижняя граница; трейлинг-выходы в v2.",
+"v1 çıkışları sabit hedeflidir; iz süren çıkışlar v2'ye ertelendi.":
+"Выходы v1 с фиксированной целью; трейлинг-выходы отложены до v2.",
+"Örnekleme rejimi 2: açık pozisyon tavanı stratejiye göre ayarlandı; önceki rejimin kayıtları hesaba girmez.":
+"Режим выборки 2: лимит открытых позиций зависит от стратегии; записи прежнего режима в расчёт не входят.",
+"Gölge ölçümdür, gerçek emir yoktur; yatırım tavsiyesi değildir.":
+"Теневое измерение, реальных ордеров нет; не является инвестиционной рекомендацией.",
+"Fiyat, son birkaç günün en yükseğini yukarı kırarsa alır; en düşüğünü aşağı kırarsa satar. Yeni zirvenin veya yeni dibin çoğu zaman devamı geldiği fikrine dayanır. Kırılım yoksa hiçbir şey yapmaz.":
+"Если цена пробивает вверх максимум последних дней — покупает; если пробивает вниз минимум — продаёт. Опирается на то, что за новым максимумом или минимумом часто следует продолжение. Без пробоя ничего не делает.",
+"Kapanış 20×4H Donchian kanalının dışına çıkınca — kenar tetik: önceki kapanış içeride":
+"Закрытие выходит за канал Дончиана 20×4H — триггер по краю: предыдущее закрытие внутри",
+"Piyasa yatayken fiyat ortalamasından aşırı uzaklaşırsa, gerilen lastik gibi geri çekileceğine oynar: aşırı düşene alıcı, aşırı yükselene satıcı olur. Yalnızca trend yokken çalışır; trend varken bu oyun tehlikelidir, o yüzden kapısı kapalıdır.":
+"Когда рынок во флэте и цена слишком далеко ушла от средней, ставит на возврат, как натянутая резинка: покупает перепроданное, продаёт перекупленное. Работает только без тренда; в тренде эта игра опасна, поэтому ворота закрыты.",
+"4H ADX < 20 (yatay rejim) VE fiyat 20 bar ortalamasından 2σ uzakta":
+"4H ADX < 20 (флэт) И цена в 2σ от средней за 20 баров",
+"20 bar ortalamasına dönüş":"возврат к средней за 20 баров",
+"rejim kapısı: 4H ADX < 20; hacim/funding filtresi yok":
+"ворота режима: 4H ADX < 20; фильтров объёма/funding нет",
+"Vadeli piyasada bir tarafa aşırı kalabalık binmişse — fonlama ücreti çok yükselmişse — kalabalığın tersine geçer. Herkesin aynı fikirde olduğu an, çoğu zaman dönüşün yakın olduğu andır. Ücret normalken hiçbir şey yapmaz.":
+"Если на фьючерсах толпа слишком сильно встала в одну сторону — ставка финансирования сильно выросла — идёт против толпы. Момент, когда все согласны, часто близок к развороту. При обычной ставке ничего не делает.",
+"Yıllıklandırılmış |funding| > %30 — kalabalığın tersi yönde":
+"Годовая |funding| > 30% — против толпы",
+"funding kapısı: yıllık |funding| > %30; rejim/hacim filtresi yok":
+"ворота funding: годовая |funding| > 30%; фильтров режима/объёма нет",
+"Fiyat bilinen bir tepeyi ya da dibi iğneyle aşıp hemen geri dönerse, bunun stopları toplamak için yapılmış bir hamle olduğunu varsayar ve dönüş yönüne girer. Teyit için o mumda işlem hacminin de sıçramış olmasını ister.":
+"Если цена иглой прокалывает известную вершину или дно и сразу возвращается, считает это охотой за стопами и входит в сторону разворота. Для подтверждения требует всплеска объёма на той же свече.",
+"Fitil son 96 barın ekstremumunu aşar ama kapanış gerisinde kalır VE hacim ≥ 1.5 × SMA20":
+"Фитиль превышает экстремум последних 96 баров, но закрытие остаётся позади, И объём ≥ 1.5 × SMA20",
+"süpürme fitilinin 0.5 × ATR(15dk) ötesi":"за фитилём свипа + 0.5 × ATR(15м)",
+"hacim kapısı: tetik mumu ≥ 1.5 × SMA20; rejim/funding filtresi yok":
+"ворота объёма: триггерная свеча ≥ 1.5 × SMA20; фильтров режима/funding нет",
 "Şimdi yenile":"Обновить сейчас","≥ 1.5× ort.":"≥ 1.5× сред.",
 "Tüm sonuçlar":"Все результаты","gölge muhasebedir":"— теневой учёт",
 ": varsayımsal giriş, kayma/komisyon yok, gerçek emir yok. Geçmiş performans garanti değildir; yatırım tavsiyesi değildir. Haber başlıkları dış kaynaktan aynen aktarılır.":
@@ -885,6 +945,9 @@ const RU_PAT=[
  [/hepsi \((\d+)\)/, (m,n)=>`все (${n})`],
  [/güven (HIGH|MEDIUM|LOW)/, (m,g)=>`уверенность ${g}`],
  [/(\d+) küme \/ (\d+)/, (m,a,b)=>`${a} кластеров / ${b}`],
+ [/^(\d+) bar \((\d+) saat\)$/, (m,a,b)=>`${a} бар (${b} ч)`],
+ [/^(\d+) açık pozisyon$/, (m,n)=>`${n} открытых позиций`],
+ [/^([\d.]+) sa$/, (m,n)=>`${n} ч`],
  [/riskin %([\d.]+)'i/, (m,n)=>`${n}% от риска`],
  [/~([\d]+)x/, (m,n)=>`~${n}x`]
 ];
@@ -1075,9 +1138,11 @@ function renderHeader(perf,status){
 const CHAL_ADI={S1_TSMOM:"S1 · Trend Takibi",S2_DONCHIAN:"S2 · Kırılım (Donchian)",
   S3_MEANREV:"S3 · Ortalamaya Dönüş",S4_CARRY:"S4 · Fonlama Taşıması",
   S6_SWEEP:"S6 · Süpürme Dönüşü"};
+let CHAL=null;   // /challengers son yaniti - detay penceresi buradan okur
 function renderChallengers(ch){
   const el=$("chalBody");if(!el)return;
   if(!ch||!ch.strategies){el.innerHTML='<div class="empty">aday verisi birikiyor…</div>';return;}
+  CHAL=ch;
   const sgn=v=>v==null?"—":(v>0?"+":"")+num(v,2);
   let h='<table class="sig"><thead><tr><th>strateji</th><th>açık</th>'+
     '<th>sonuç</th><th>WR</th><th>net R</th><th>küme</th><th>CI</th></tr></thead><tbody>';
@@ -1086,7 +1151,7 @@ function renderChallengers(ch){
     const wr=s.win_rate==null?"—":(s.win_rate*100).toFixed(0)+"%";
     const ci=s.ci?`[${sgn(s.ci[0])}, ${sgn(s.ci[1])}]`:"—";
     const ciCls=s.ci&&s.ci[0]>0?"pos":(s.ci&&s.ci[1]<0?"neg":"");
-    h+=`<tr><td>${CHAL_ADI[k]}</td><td class="num">${s.open}</td>`+
+    h+=`<tr data-k="${k}"><td>${CHAL_ADI[k]}</td><td class="num">${s.open}</td>`+
        `<td class="num">${s.decided}${s.expired?` <span class="muted">(+${s.expired}e)</span>`:""}</td>`+
        `<td class="num">${wr}</td>`+
        `<td class="num ${s.net_r>0?"pos":s.net_r<0?"neg":""}">${sgn(s.net_r)}</td>`+
@@ -1100,6 +1165,60 @@ function renderChallengers(ch){
     `açık pozisyon tavanı stratejiye göre ayarlandı. Önceki ${ch.retired_rows} kayıt farklı kısıtla toplandığı için `+
     `hesaba GİRMEZ (tabloda durur, silinmedi).</div>`;
   el.innerHTML=h;
+  el.querySelectorAll("tbody tr[data-k]").forEach(row=>
+    row.addEventListener("click",()=>chalDetail(row.dataset.k)));
+}
+/* Aday detay penceresi. Aciklama+parametreler /challengers yanitindaki
+   strategy_info'dan gelir (tek kaynak challengers.py; burada elle metin YOK) */
+function chalDetail(k){
+  if(!CHAL||!CHAL.strategies||!CHAL.strategies[k])return;
+  const s=CHAL.strategies[k];
+  const info=(CHAL.strategy_info||{})[k]||{};
+  const cap=(CHAL.max_open||{})[k];
+  const sgn=v=>v==null?"—":(v>0?"+":"")+num(v,2);
+  const g=(kk,v,cls)=>`<span class="k">${kk}</span><span class="v num ${cls||""}">${v}</span>`;
+  const wr=s.win_rate==null?"—":(s.win_rate*100).toFixed(0)+"%";
+  const ci=s.ci?`[${sgn(s.ci[0])}, ${sgn(s.ci[1])}]`:"—";
+  const hold=s.hold_bars_median==null?"—":num(s.hold_bars_median*0.25,1)+" sa";
+  let html=`<h4 class="chsec">İstatistikler</h4><div class="kvgrid">`+
+    g("Sonuçlanan",s.decided)+
+    g("Kazanma oranı",wr)+
+    g("Brüt R",sgn(s.gross_r),s.gross_r>0?"pos":s.gross_r<0?"neg":"")+
+    g("Net R",sgn(s.net_r),s.net_r>0?"pos":s.net_r<0?"neg":"")+
+    g("Süresi dolan",s.expired||0)+
+    g("Açık / tavan",`${s.open} / ${cap==null?"—":cap}`)+
+    g("Küme",`${s.clusters}/${CHAL.faz1_target||50}`)+
+    g("Güven aralığı",ci,s.ci&&s.ci[0]>0?"pos":s.ci&&s.ci[1]<0?"neg":"")+
+    g("Belirsiz",s.ambiguous||0)+
+    g("Tutuş medyanı",hold)+`</div>`;
+  const rows=(CHAL.recent||[]).filter(r=>r.strategy===k).slice(0,15);
+  if(rows.length){
+    html+=`<h4 class="chsec">Son 15 işlem</h4><div style="overflow-x:auto">`+
+      `<table class="mini"><thead><tr><th>parite</th><th>yön</th><th>sonuç</th>`+
+      `<th>net R</th><th>zaman</th></tr></thead><tbody>`;
+    for(const r of rows){
+      const o=r.outcome||r.status;
+      html+=`<tr><td><b>${r.pair}</b></td>`+
+        `<td><span class="badge b-${r.direction}">${r.direction}</span></td>`+
+        `<td><span class="badge b-${o}">${o}</span></td>`+
+        `<td class="num ${r.net_r>0?"pos":r.net_r<0?"neg":""}">${r.net_r==null?"—":sgn(r.net_r)}</td>`+
+        `<td class="num">${fmtTs(r.created_utc)}</td></tr>`;
+    }
+    html+=`</tbody></table></div>`;
+  }
+  if(info.how)html+=`<h4 class="chsec">Nasıl çalışır?</h4><p class="chp">${info.how}</p>`;
+  const P=info.params||{};
+  const PL=[["giris","Giriş kuralı"],["stop","Stop"],["hedef","Hedef"],
+    ["zaman_asimi","Zaman aşımı"],["tavan","Tavan"],["filtreler","Filtreler"]];
+  if(info.params){
+    html+=`<h4 class="chsec">Parametreler</h4><dl>`+
+      PL.map(([kk,l])=>P[kk]?`<dt>${l}</dt><dd>${P[kk]}</dd>`:"").join("")+`</dl>`;
+  }
+  if(info.honesty&&info.honesty.length){
+    html+=`<h4 class="chsec">Dürüstlük notları</h4>`+
+      info.honesty.map(n=>`<div class="note">${n}</div>`).join("");
+  }
+  openModal(CHAL_ADI[k]||info.name||k,html);
 }
 
 /* ---------- v3.6 olcum karti: kume-CI + Faz-1 kapisi ---------- */

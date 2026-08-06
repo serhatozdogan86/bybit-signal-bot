@@ -49,6 +49,147 @@ MAX_OPEN_DEFAULT = 15
 SAMPLING_REGIME = 2
 FAZ1_TARGET = 50                # sampiyonla ayni sinav esigi
 
+# ---- strateji parametre sabitleri: TEK KAYNAK (v1.2, suruklenme yasagi) ----
+# Hem _generate() hem STRATEGY_INFO (pano detay penceresi) BU sabitleri okur;
+# kod degisince aciklama otomatik guncellenir, elle es tutulan metin yoktur.
+# DEGERLER AYNEN KORUNDU - bu bir yeniden adlandirmadir, esik degisikligi degil.
+TSMOM_EMA_N = 200        # S1: 4H EMA uzunlugu
+TSMOM_MOM_BARS = 12      # S1: momentum penceresi (4H bar)
+DONCHIAN_N = 20          # S2: kanal penceresi (4H bar)
+TREND_STOP_ATR = 2.0     # S1/S2: stop mesafesi (ATR-4H kati)
+TREND_TP_ATR = 6.0       # S1/S2: hedef mesafesi (ATR-4H kati)
+TREND_TIMEOUT = 192      # S1/S2/S4: zaman asimi (15dk bar) = 48 saat
+S3_ADX_MAX = 20.0        # S3: yatay-rejim kapisi (4H ADX ust siniri)
+S3_SMA_N = 20            # S3: ortalama penceresi (15dk bar)
+S3_SIGMA = 2.0           # S3: sapma esigi (standart sapma kati)
+S3_STOP_ATR = 1.5        # S3: stop mesafesi (ATR-15dk kati)
+FAST_TIMEOUT = 96        # S3/S6: zaman asimi (15dk bar) = 24 saat
+S4_ANN_FUNDING = 0.30    # S4: yillik |funding| esigi
+S4_RISK_ATR = 2.0        # S4: risk birimi (ATR-4H kati)
+S4_TP_RISK = 2.0         # S4: hedef (risk kati)
+S6_SWING_N = 96          # S6: swing penceresi (15dk bar)
+S6_VOL_MULT = 1.5        # S6: hacim esigi (SMA20 kati)
+S6_WICK_ATR = 0.5        # S6: stop tamponu (fitil otesi, ATR-15dk kati)
+S6_TP_RISK = 2.0         # S6: hedef (risk kati)
+
+
+def _saat(bars: int) -> str:
+    return f"{bars} bar ({bars * 15 // 60} saat)"
+
+
+def _honesty(strat: str) -> list[str]:
+    """Durustluk notlari - sabitlerden turetilir, elle es tutulmaz."""
+    if strat in ("S1_TSMOM", "S2_DONCHIAN"):
+        notes = ["v1 çıkışları sabit hedeflidir — trend stratejileri için bu, "
+                 "muhafazakâr bir alt sınırdır; iz süren çıkışlar v2'de."]
+    else:
+        notes = ["v1 çıkışları sabit hedeflidir; iz süren çıkışlar "
+                 "v2'ye ertelendi."]
+    notes.append(f"Örnekleme rejimi {SAMPLING_REGIME}: açık pozisyon tavanı "
+                 "stratejiye göre ayarlandı; önceki rejimin kayıtları hesaba "
+                 "girmez.")
+    notes.append("Gölge ölçümdür, gerçek emir yoktur; "
+                 "yatırım tavsiyesi değildir.")
+    return notes
+
+
+# Pano detay penceresinin TEK bilgi kaynagi. UI bu sozlugu /challengers
+# uzerinden okur; metinler arayuze elle YAZILMAZ. Sayilar yukaridaki gercek
+# sabitlerden gelir (test_strategy_info_* bunu zorlar).
+STRATEGY_INFO: dict[str, dict] = {
+    "S1_TSMOM": {
+        "name": "Trend Takibi (TSMOM)",
+        "how": ("Fiyat uzun vadeli ortalamasının üstündeyse ve son günlerde "
+                "de yükselmişse, yokuşun devam edeceğine oynar; düşüşte "
+                "aynısının tersini yapar. Güçlü hareketlerin bir süre daha "
+                "sürme eğilimi olduğu fikrine dayanır. Yön dönene kadar "
+                "bekler, erken inmez."),
+        "params": {
+            "giris": (f"4H kapanış EMA{TSMOM_EMA_N} üstünde (LONG) / altında "
+                      f"(SHORT) VE son {TSMOM_MOM_BARS}×4H momentum aynı "
+                      "yönde"),
+            "stop": f"{TREND_STOP_ATR:g} × ATR(4H)",
+            "hedef": (f"{TREND_TP_ATR:g} × ATR(4H) — plan RR "
+                      f"{TREND_TP_ATR / TREND_STOP_ATR:g}"),
+            "zaman_asimi": _saat(TREND_TIMEOUT),
+            "tavan": f"{MAX_OPEN['S1_TSMOM']} açık pozisyon",
+            "filtreler": "rejim/hacim filtresi yok; funding kullanılmaz",
+        },
+    },
+    "S2_DONCHIAN": {
+        "name": "Kırılım (Donchian)",
+        "how": ("Fiyat, son birkaç günün en yükseğini yukarı kırarsa alır; "
+                "en düşüğünü aşağı kırarsa satar. Yeni zirvenin veya yeni "
+                "dibin çoğu zaman devamı geldiği fikrine dayanır. Kırılım "
+                "yoksa hiçbir şey yapmaz."),
+        "params": {
+            "giris": (f"Kapanış {DONCHIAN_N}×4H Donchian kanalının dışına "
+                      "çıkınca — kenar tetik: önceki kapanış içeride"),
+            "stop": f"{TREND_STOP_ATR:g} × ATR(4H)",
+            "hedef": (f"{TREND_TP_ATR:g} × ATR(4H) — plan RR "
+                      f"{TREND_TP_ATR / TREND_STOP_ATR:g}"),
+            "zaman_asimi": _saat(TREND_TIMEOUT),
+            "tavan": f"{MAX_OPEN['S2_DONCHIAN']} açık pozisyon",
+            "filtreler": "rejim/hacim filtresi yok; funding kullanılmaz",
+        },
+    },
+    "S3_MEANREV": {
+        "name": "Ortalamaya Dönüş",
+        "how": ("Piyasa yatayken fiyat ortalamasından aşırı uzaklaşırsa, "
+                "gerilen lastik gibi geri çekileceğine oynar: aşırı düşene "
+                "alıcı, aşırı yükselene satıcı olur. Yalnızca trend yokken "
+                "çalışır; trend varken bu oyun tehlikelidir, o yüzden kapısı "
+                "kapalıdır."),
+        "params": {
+            "giris": (f"4H ADX < {S3_ADX_MAX:g} (yatay rejim) VE fiyat "
+                      f"{S3_SMA_N} bar ortalamasından {S3_SIGMA:g}σ uzakta"),
+            "stop": f"{S3_STOP_ATR:g} × ATR(15dk)",
+            "hedef": f"{S3_SMA_N} bar ortalamasına dönüş",
+            "zaman_asimi": _saat(FAST_TIMEOUT),
+            "tavan": f"{MAX_OPEN['S3_MEANREV']} açık pozisyon",
+            "filtreler": (f"rejim kapısı: 4H ADX < {S3_ADX_MAX:g}; "
+                          "hacim/funding filtresi yok"),
+        },
+    },
+    "S4_CARRY": {
+        "name": "Fonlama Taşıması",
+        "how": ("Vadeli piyasada bir tarafa aşırı kalabalık binmişse — "
+                "fonlama ücreti çok yükselmişse — kalabalığın tersine geçer. "
+                "Herkesin aynı fikirde olduğu an, çoğu zaman dönüşün yakın "
+                "olduğu andır. Ücret normalken hiçbir şey yapmaz."),
+        "params": {
+            "giris": (f"Yıllıklandırılmış |funding| > %{S4_ANN_FUNDING * 100:g} "
+                      "— kalabalığın tersi yönde"),
+            "stop": f"{S4_RISK_ATR:g} × ATR(4H)",
+            "hedef": f"risk × {S4_TP_RISK:g} — plan RR {S4_TP_RISK:g}",
+            "zaman_asimi": _saat(TREND_TIMEOUT),
+            "tavan": f"{MAX_OPEN['S4_CARRY']} açık pozisyon",
+            "filtreler": (f"funding kapısı: yıllık |funding| > "
+                          f"%{S4_ANN_FUNDING * 100:g}; rejim/hacim filtresi yok"),
+        },
+    },
+    "S6_SWEEP": {
+        "name": "Süpürme Dönüşü",
+        "how": ("Fiyat bilinen bir tepeyi ya da dibi iğneyle aşıp hemen geri "
+                "dönerse, bunun stopları toplamak için yapılmış bir hamle "
+                "olduğunu varsayar ve dönüş yönüne girer. Teyit için o mumda "
+                "işlem hacminin de sıçramış olmasını ister."),
+        "params": {
+            "giris": (f"Fitil son {S6_SWING_N} barın ekstremumunu aşar ama "
+                      f"kapanış gerisinde kalır VE hacim ≥ {S6_VOL_MULT:g} × "
+                      "SMA20"),
+            "stop": f"süpürme fitilinin {S6_WICK_ATR:g} × ATR(15dk) ötesi",
+            "hedef": f"risk × {S6_TP_RISK:g} — plan RR {S6_TP_RISK:g}",
+            "zaman_asimi": _saat(FAST_TIMEOUT),
+            "tavan": f"{MAX_OPEN['S6_SWEEP']} açık pozisyon",
+            "filtreler": (f"hacim kapısı: tetik mumu ≥ {S6_VOL_MULT:g} × "
+                          "SMA20; rejim/funding filtresi yok"),
+        },
+    },
+}
+for _k in STRATEGY_INFO:
+    STRATEGY_INFO[_k]["honesty"] = _honesty(_k)
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -195,80 +336,88 @@ class ChallengerEngine:
             h_high = h_low = h_close = []
             atr_h = None
 
-        # S1 TSMOM: 4H kapanis EMA200 ustunde VE 12x4H momentum ayni yonde
+        # S1 TSMOM: 4H kapanis EMA ustunde VE momentum ayni yonde
+        # (sabitler yukarida; UI aciklamasi da AYNI sabitlerden turetilir)
         if atr_h and len(h_close) >= 120:
-            ema = _ema(h_close, 200)
-            if ema is not None and len(h_close) >= 13:
-                mom = h_close[-1] - h_close[-13]
+            ema = _ema(h_close, TSMOM_EMA_N)
+            if ema is not None and len(h_close) >= TSMOM_MOM_BARS + 1:
+                mom = h_close[-1] - h_close[-(TSMOM_MOM_BARS + 1)]
                 if h_close[-1] > ema and mom > 0:
                     out.append(("S1_TSMOM",
-                                ("LONG", entry - 2 * atr_h,
-                                 entry + 6 * atr_h, 192)))
+                                ("LONG", entry - TREND_STOP_ATR * atr_h,
+                                 entry + TREND_TP_ATR * atr_h, TREND_TIMEOUT)))
                 elif h_close[-1] < ema and mom < 0:
                     out.append(("S1_TSMOM",
-                                ("SHORT", entry + 2 * atr_h,
-                                 entry - 6 * atr_h, 192)))
+                                ("SHORT", entry + TREND_STOP_ATR * atr_h,
+                                 entry - TREND_TP_ATR * atr_h, TREND_TIMEOUT)))
 
-        # S2 DONCHIAN: 20x4H kanal kirilimi (kenar tetik: onceki bar icerde)
-        if atr_h and len(h_high) >= 21 and len(l_close) >= 2:
-            dh, dl = max(h_high[-20:]), min(h_low[-20:])
+        # S2 DONCHIAN: kanal kirilimi (kenar tetik: onceki bar icerde)
+        if atr_h and len(h_high) >= DONCHIAN_N + 1 and len(l_close) >= 2:
+            dh, dl = max(h_high[-DONCHIAN_N:]), min(h_low[-DONCHIAN_N:])
             if l_close[-2] <= dh < l_close[-1]:
                 out.append(("S2_DONCHIAN",
-                            ("LONG", entry - 2 * atr_h,
-                             entry + 6 * atr_h, 192)))
+                            ("LONG", entry - TREND_STOP_ATR * atr_h,
+                             entry + TREND_TP_ATR * atr_h, TREND_TIMEOUT)))
             elif l_close[-2] >= dl > l_close[-1]:
                 out.append(("S2_DONCHIAN",
-                            ("SHORT", entry + 2 * atr_h,
-                             entry - 6 * atr_h, 192)))
+                            ("SHORT", entry + TREND_STOP_ATR * atr_h,
+                             entry - TREND_TP_ATR * atr_h, TREND_TIMEOUT)))
 
-        # S3 MEANREV: yalniz yatay rejimde (4H ADX<20) 2σ sapmayi sat/al
-        if atr_l and len(l_close) >= 21:
+        # S3 MEANREV: yalniz yatay rejimde sigma-sapmayi sat/al
+        if atr_l and len(l_close) >= S3_SMA_N + 1:
             adx = _adx(h_high, h_low, h_close) if h_ok else None
-            if adx is not None and adx < 20:
-                sma = sum(l_close[-20:]) / 20
-                var = sum((x - sma) ** 2 for x in l_close[-20:]) / 20
+            if adx is not None and adx < S3_ADX_MAX:
+                sma = sum(l_close[-S3_SMA_N:]) / S3_SMA_N
+                var = sum((x - sma) ** 2
+                          for x in l_close[-S3_SMA_N:]) / S3_SMA_N
                 sd = var ** 0.5
                 if sd > 0:
-                    if entry < sma - 2 * sd:
+                    if entry < sma - S3_SIGMA * sd:
                         out.append(("S3_MEANREV",
-                                    ("LONG", entry - 1.5 * atr_l, sma, 96)))
-                    elif entry > sma + 2 * sd:
+                                    ("LONG", entry - S3_STOP_ATR * atr_l,
+                                     sma, FAST_TIMEOUT)))
+                    elif entry > sma + S3_SIGMA * sd:
                         out.append(("S3_MEANREV",
-                                    ("SHORT", entry + 1.5 * atr_l, sma, 96)))
+                                    ("SHORT", entry + S3_STOP_ATR * atr_l,
+                                     sma, FAST_TIMEOUT)))
 
-        # S4 CARRY: yilliklandirilmis |funding| > %30 -> kalabaligin tersi
+        # S4 CARRY: yilliklandirilmis |funding| esigi -> kalabaligin tersi
         if atr_h and funding is not None:
             ann = funding * 3 * 365
-            if ann > 0.30:
-                risk = 2 * atr_h
+            if ann > S4_ANN_FUNDING:
+                risk = S4_RISK_ATR * atr_h
                 out.append(("S4_CARRY",
-                            ("SHORT", entry + risk, entry - 2 * risk, 192)))
-            elif ann < -0.30:
-                risk = 2 * atr_h
+                            ("SHORT", entry + risk,
+                             entry - S4_TP_RISK * risk, TREND_TIMEOUT)))
+            elif ann < -S4_ANN_FUNDING:
+                risk = S4_RISK_ATR * atr_h
                 out.append(("S4_CARRY",
-                            ("LONG", entry - risk, entry + 2 * risk, 192)))
+                            ("LONG", entry - risk,
+                             entry + S4_TP_RISK * risk, TREND_TIMEOUT)))
 
         # S6 SWEEP: swing ekstremumu asilir ama kapanis gerisinde + hacim
-        if atr_l and len(l_close) >= 100:
-            sw_h = max(l_high[-98:-2])
-            sw_l = min(l_low[-98:-2])
+        if atr_l and len(l_close) >= S6_SWING_N + 4:
+            sw_h = max(l_high[-(S6_SWING_N + 2):-2])
+            sw_l = min(l_low[-(S6_SWING_N + 2):-2])
             vol_sma = sum(l_vol[-21:-1]) / 20
             c = ltf.candles[-1]
-            vol_ok = vol_sma > 0 and c.volume >= 1.5 * vol_sma
+            vol_ok = vol_sma > 0 and c.volume >= S6_VOL_MULT * vol_sma
             if c.high > sw_h and c.close < sw_h and vol_ok:
                 # stop, ESKI swing degil supurme FITILININ otesinde durur:
                 # fitilin siradan retesti pozisyonu dusurmemeli
-                stop = c.high + 0.5 * atr_l
+                stop = c.high + S6_WICK_ATR * atr_l
                 risk = stop - entry
                 if risk > 0:
                     out.append(("S6_SWEEP",
-                                ("SHORT", stop, entry - 2 * risk, 96)))
+                                ("SHORT", stop,
+                                 entry - S6_TP_RISK * risk, FAST_TIMEOUT)))
             elif c.low < sw_l and c.close > sw_l and vol_ok:
-                stop = c.low - 0.5 * atr_l
+                stop = c.low - S6_WICK_ATR * atr_l
                 risk = entry - stop
                 if risk > 0:
                     out.append(("S6_SWEEP",
-                                ("LONG", stop, entry + 2 * risk, 96)))
+                                ("LONG", stop,
+                                 entry + S6_TP_RISK * risk, FAST_TIMEOUT)))
         return out
 
     # ------------------------------------------------------- degerlendirme
@@ -382,10 +531,24 @@ class ChallengerEngine:
                 "ci": ([boot["ci_low"], boot["ci_high"]]
                        if boot and boot.get("ci_low") is not None else None),
                 "e_net": boot["e_net"] if boot else None,
+                # v1.2 detay penceresi: belirsiz sayisi + tutus medyani
+                "ambiguous": sum(1 for r in closed if r.get("ambiguous")),
+                "hold_bars_median": measurement.median_or_none(
+                    [float(r["hold_bars"]) for r in closed
+                     if r.get("hold_bars") is not None]),
             }
         return out
 
+    def strategy_info(self) -> dict:
+        """Detay penceresinin tek bilgi kaynagi (aciklama + parametreler)."""
+        return STRATEGY_INFO
+
     def recent(self, limit: int = 120) -> list[dict]:
-        return self._db.query(
+        rows = self._db.query(
             "SELECT * FROM challenger_signals ORDER BY id DESC LIMIT ?",
             (limit,))
+        # v1.2: net R sunucuda hesaplanir (tek kaynak _net_r; JS kopyasi yok)
+        for r in rows:
+            n = self._net_r(r) if r.get("r_multiple") is not None else None
+            r["net_r"] = round(n, 2) if n is not None else None
+        return rows
