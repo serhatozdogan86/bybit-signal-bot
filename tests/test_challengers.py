@@ -216,3 +216,114 @@ def test_new_signals_stamped_with_current_regime(tmp_path):
     eng.on_scan("AUSDT", htf, fx.make_series(closes), None)
     r = db.query_one("SELECT regime FROM challenger_signals")
     assert r["regime"] == SAMPLING_REGIME
+
+
+# ---------------- v1.2: detay penceresi tek-kaynak sozlugu ----------------
+def test_strategy_info_covers_all_active_strategies():
+    """SURUKLENME YASAGI: her aktif stratejinin (S1-S6, beklemedekiler
+    haric) STRATEGY_INFO'da tam kaydi olmali. UI metni elle yazmaz."""
+    from app.services import challengers as ch
+    for strat in ch.STRATEGIES:
+        info = ch.STRATEGY_INFO.get(strat)
+        assert info, f"{strat} icin STRATEGY_INFO kaydi yok"
+        assert len(info["name"]) >= 3
+        assert len(info["how"]) >= 80, f"{strat}.how cok kisa (2-4 cumle olmali)"
+        for key in ("giris", "stop", "hedef", "zaman_asimi", "tavan",
+                    "filtreler"):
+            assert info["params"].get(key), f"{strat}.params.{key} bos"
+        assert info["honesty"], f"{strat}.honesty bos"
+        assert any("yatırım tavsiyesi değildir" in n for n in info["honesty"])
+        assert any(str(ch.SAMPLING_REGIME) in n for n in info["honesty"])
+
+
+def test_strategy_info_numbers_derived_from_constants():
+    """Sayisal parametreler GERCEK sabitlerden turetilmeli - sabit degisince
+    aciklama otomatik degisir, eski kalamaz."""
+    from app.services import challengers as ch
+    for strat in ch.STRATEGIES:
+        cap = ch.MAX_OPEN.get(strat, ch.MAX_OPEN_DEFAULT)
+        assert str(cap) in ch.STRATEGY_INFO[strat]["params"]["tavan"]
+    p1 = ch.STRATEGY_INFO["S1_TSMOM"]["params"]
+    assert f"{ch.TREND_STOP_ATR:g}" in p1["stop"]
+    assert f"{ch.TREND_TP_ATR:g}" in p1["hedef"]
+    assert str(ch.TREND_TIMEOUT) in p1["zaman_asimi"]
+    assert f"EMA{ch.TSMOM_EMA_N}" in p1["giris"]
+    p3 = ch.STRATEGY_INFO["S3_MEANREV"]["params"]
+    assert str(ch.FAST_TIMEOUT) in p3["zaman_asimi"]
+    assert f"{ch.S3_ADX_MAX:g}" in p3["giris"]
+    p4 = ch.STRATEGY_INFO["S4_CARRY"]["params"]
+    assert f"%{ch.S4_ANN_FUNDING * 100:g}" in p4["giris"]
+    p6 = ch.STRATEGY_INFO["S6_SWEEP"]["params"]
+    assert str(ch.S6_SWING_N) in p6["giris"]
+    assert f"{ch.S6_VOL_MULT:g}" in p6["giris"]
+
+
+def test_challengers_endpoint_returns_strategy_info(tmp_path):
+    """/challengers arayuzun okudugu tek kapidir - strategy_info donmeli."""
+    from unittest.mock import MagicMock
+    from app.server import create_app
+    from app.services.database import Database
+    from app.services.sqlite_state_store import SQLiteStateStore
+    db = Database(str(tmp_path / "ep.db"))
+    eng = ChallengerEngine(db, "15")
+    sch = MagicMock()
+    sch.challengers = eng
+    app = create_app(SQLiteStateStore(db), sch, None)
+    data = app.test_client().get("/challengers").get_json()
+    assert "strategy_info" in data and "recent" in data
+    for strat in data["strategies"]:
+        info = data["strategy_info"].get(strat)
+        assert info and info["how"] and info["params"] and info["honesty"]
+
+
+def test_stats_carry_ambiguous_and_hold_median(tmp_path):
+    """Detay penceresi 1. bolum girdileri: belirsiz sayisi + tutus medyani."""
+    eng, db = _eng(tmp_path)
+    ins = ("INSERT INTO challenger_signals(strategy,pair,direction,"
+           "created_utc,entry_ts,entry,stop,tp,timeout_bars,cluster_id,"
+           "status,outcome,r_multiple,hold_bars,ambiguous,regime) VALUES("
+           "'S1_TSMOM',?,'LONG','x',1,100,98,106,192,?,'CLOSED',?,?,?,?,2)")
+    db.execute(ins, ("AUSDT", "S1:L1", "WIN", 3.0, 20, 0))
+    db.execute(ins, ("BUSDT", "S1:L2", "LOSS", -1.0, 10, 1))
+    s = eng.stats()["strategies"]["S1_TSMOM"]
+    assert s["ambiguous"] == 1
+    assert s["hold_bars_median"] == 15.0            # medyan(20, 10)
+
+
+def test_recent_rows_carry_net_r(tmp_path):
+    """Son-15 tablosunun net R'si SUNUCUDA hesaplanir (tek kaynak _net_r;
+    JS'te maliyet modeli kopyasi tutulmaz)."""
+    eng, db = _eng(tmp_path)
+    db.execute("INSERT INTO challenger_signals(strategy,pair,direction,"
+               "created_utc,entry_ts,entry,stop,tp,timeout_bars,cluster_id,"
+               "status,outcome,r_multiple,hold_bars,regime) VALUES("
+               "'S2_DONCHIAN','AUSDT','LONG','x',1,100,98,106,192,'S2:L1',"
+               "'CLOSED','WIN',3.0,20,2)")
+    db.execute("INSERT INTO challenger_signals(strategy,pair,direction,"
+               "created_utc,entry_ts,entry,stop,tp,timeout_bars,cluster_id) "
+               "VALUES('S2_DONCHIAN','BUSDT','LONG','x',1,100,98,106,192,"
+               "'S2:L2')")
+    rows = {r["pair"]: r for r in eng.recent(10)}
+    assert rows["AUSDT"]["net_r"] is not None
+    assert rows["AUSDT"]["net_r"] < 3.0             # maliyet dusuldu
+    assert rows["BUSDT"]["net_r"] is None           # acik kayit: hesap yok
+
+
+def test_strategy_info_texts_have_ru_entries():
+    """Kural: yeni UI metinlerinin TAMAMI RU sozlugune girer. Turkce
+    karakter iceren her STRATEGY_INFO metni panoda birebir anahtar olmali.
+    (tavan/zaman_asimi kalip cevirisiyle donusur - RU_PAT; burada haric.)"""
+    import re
+    from app.dashboard import DASHBOARD_HTML
+    from app.services import challengers as ch
+    missing = []
+    for strat in ch.STRATEGIES:
+        info = ch.STRATEGY_INFO[strat]
+        p = info["params"]
+        for txt in (info["how"], p["giris"], p["stop"], p["hedef"],
+                    p["filtreler"], *info["honesty"]):
+            if not re.search(r"[çğıöşüÇĞİÖŞÜâîû]", txt):
+                continue                    # dil-notru metin: ceviri gerekmez
+            if f'"{txt}"' not in DASHBOARD_HTML:
+                missing.append(f"{strat}: {txt[:50]}…")
+    assert not missing, f"RU sozlugunde eksik metin: {missing}"

@@ -265,7 +265,11 @@ def create_app(store: StateStore, scheduler: Scheduler,
         if eng is None:
             return jsonify({"error": "challengers disabled"}), 404
         data = eng.stats()
-        data["recent"] = eng.recent(60)
+        # 200: detay penceresi strateji basina son 15 islemi gosterebilsin
+        data["recent"] = eng.recent(200)
+        # v1.2: aciklama+parametreler TEK kaynaktan (STRATEGY_INFO) gelir;
+        # arayuz bunlari elle yazmaz - suruklenme yasagi
+        data["strategy_info"] = eng.strategy_info()
         return app.response_class(json.dumps(data, indent=2),
                                   mimetype="application/json")
 
