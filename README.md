@@ -248,6 +248,11 @@ SQLite dosyası free planda **ephemeral disktedir** (redeploy'da silinir). Bot b
 2. **Self-restore:** Her açılışta DB boşsa (redeploy olmuş demektir) bot gist'i
    bulur ve mum arşivi + sinyal kayıtlarını geri yükler — takip kaldığı yerden
    devam eder. **İnsan müdahalesi gerekmez.**
+   > Not (v3.7): `decisions` karar arşivi gist revizyonlarında saklanır ama
+   > DB'ye geri **yüklenmez** — tabloda tekilleştirme anahtarı yok ve gist'te
+   > yalnız son 2000 karar tutuluyor; kısmi arşivi tam arşiv gibi göstermek
+   > "eksik veri eksik kalır" kuralını ihlal ederdi. Mum arşivi ve sinyal
+   > kayıtları (bloklu kohort dahil) tam geri döner.
 
 Kurulum (tek seferlik, 2 dk):
 1. github.com → sağ üst profil → **Settings** → **Developer settings** →

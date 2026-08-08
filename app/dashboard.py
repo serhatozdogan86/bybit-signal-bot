@@ -944,6 +944,7 @@ const RU_PAT=[
  [/^Açık (\d+)$/, (m,n)=>`Открытые ${n}`],
  [/^Sonuç (\d+)$/, (m,n)=>`Результат ${n}`],
  [/^Dolmayan (\d+)$/, (m,n)=>`Не заполнено ${n}`],
+ [/^Süresi dolan (\d+)$/, (m,n)=>`Истёкшие ${n}`],
  [/^(\d+) WIN \/ (\d+) LOSS$/, (m,a,b)=>`${a} WIN / ${b} LOSS`],
 
  [/başabaş ~%([\d.]+)/, (m,n)=>`безубыток ~${n}%`],
@@ -1431,8 +1432,10 @@ function renderDuel(signals){
     const rows=(signals||[]).filter(s=>s.direction===dir);
     const w=rows.filter(s=>OUT(s)==="WIN").length;
     const l=rows.filter(s=>OUT(s)==="LOSS").length;
+    // v3.7: bilanco NET R kullanir (baslik KPI'lariyla ayni politika);
+    // net hesaplanamayan eski kayitta brute duser
     const r=rows.filter(s=>["WIN","LOSS"].includes(OUT(s)))
-      .reduce((a,s)=>a+(s.r_multiple||0),0);
+      .reduce((a,s)=>a+(s.r_net!=null?s.r_net:(s.r_multiple||0)),0);
     const open=rows.filter(s=>["PENDING","FILLED"].includes(OUT(s))).length;
     return {w,l,r,open};
   };
@@ -1447,7 +1450,7 @@ function renderDuel(signals){
   };
   const row=(name,d)=>`<div class="drow${DIRF===name?" on":""}" data-d="${name}"
     title="tabloyu ${name} ile filtreler">
-    <div class="top"><b>${name}</b><b class="num ${d.r>0?"pos":d.r<0?"neg":""}">${(d.r>0?"+":"")+num(d.r)}R</b></div>
+    <div class="top"><b>${name}</b><b class="num ${d.r>0?"pos":d.r<0?"neg":""}">${(d.r>0?"+":"")+num(d.r)}R <span class="age">net</span></b></div>
     ${track(d.r)}
     <div class="dstat">${d.w} WIN · ${d.l} LOSS · ${d.open} ${LANG==="ru"?"откр.":"açık"}</div></div>`;
   $("duel").innerHTML=row("LONG",L)+row("SHORT",S)+
@@ -1555,13 +1558,18 @@ function renderPipeline(status){
 
 /* ---------- sinyal tablosu + detay modali ---------- */
 let FILTER="ALL",SIGNALS=[];
-const FILTERS=[["ALL","Tümü"],["OPEN","Açık"],["DONE","Sonuç"],["NF","Dolmayan"]];
+/* v3.7: EXPIRED ayri kovada - "Dolmayan" adi altinda saymak yaniltiyordu
+   (EXPIRED aslinda DOLMUS ama suresi gecmis islemdir). KPI'daki giris
+   isabeti sayaci ile "Dolmayan" cipi artik birebir ayni kumeyi sayar. */
+const FILTERS=[["ALL","Tümü"],["OPEN","Açık"],["DONE","Sonuç"],
+  ["NF","Dolmayan"],["EXP","Süresi dolan"]];
 function matches(s){
   if(DIRF!=="ALL"&&s.direction!==DIRF)return false;
   const o=OUT(s);
   if(FILTER==="OPEN")return o==="PENDING"||o==="FILLED";
   if(FILTER==="DONE")return o==="WIN"||o==="LOSS"||o==="AMBIGUOUS";
-  if(FILTER==="NF")return o==="NOT_FILLED"||o==="EXPIRED";
+  if(FILTER==="NF")return o==="NOT_FILLED";
+  if(FILTER==="EXP")return o==="EXPIRED";
   return true;
 }
 function renderChips(){
@@ -1569,7 +1577,8 @@ function renderChips(){
   const c={ALL:SIGNALS.filter(base).length,
     OPEN:SIGNALS.filter(s=>base(s)&&["PENDING","FILLED"].includes(OUT(s))).length,
     DONE:SIGNALS.filter(s=>base(s)&&["WIN","LOSS","AMBIGUOUS"].includes(OUT(s))).length,
-    NF:SIGNALS.filter(s=>base(s)&&["NOT_FILLED","EXPIRED"].includes(OUT(s))).length};
+    NF:SIGNALS.filter(s=>base(s)&&OUT(s)==="NOT_FILLED").length,
+    EXP:SIGNALS.filter(s=>base(s)&&OUT(s)==="EXPIRED").length};
   let html=FILTERS.map(([k,l])=>
     `<button class="chip${FILTER===k?" on":""}" data-f="${k}">${l} ${c[k]||0}</button>`).join("");
   if(DIRF!=="ALL")html+=`<button class="chip dir" data-clr="1">yön: ${DIRF} ✕</button>`;
@@ -2066,8 +2075,10 @@ function renderFooter(backup,healthy,ms,perf){
     <div class="note" style="margin-top:10px">${_r
       ?"теневой учёт · прошлые результаты не гарантия · не инвестиционная рекомендация"
       :"gölge muhasebe · geçmiş performans garanti değildir · yatırım tavsiyesi değildir"}</div>`;
-  if(perf&&perf.total_r_multiple!=null){
-    const tr=perf.total_r_multiple;
+  if(perf&&(perf.total_r_net!=null||perf.total_r_multiple!=null)){
+    // v3.7: sekme basligi da NET (v3.6 "baslik rakamlari net" politikasi);
+    // net yoksa brute duser
+    const tr=perf.total_r_net!=null?perf.total_r_net:perf.total_r_multiple;
     document.title=`${tr>=0?"▲":"▼"} ${(tr>0?"+":"")+num(tr,1)}R · signal-engine`;
   }
 }
