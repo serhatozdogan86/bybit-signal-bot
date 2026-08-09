@@ -342,6 +342,13 @@ def test_strategy_info_numbers_derived_from_constants():
     p6 = ch.STRATEGY_INFO["S6_SWEEP"]["params"]
     assert str(ch.S6_SWING_N) in p6["giris"]
     assert f"{ch.S6_VOL_MULT:g}" in p6["giris"]
+    p7 = ch.STRATEGY_INFO["S7_WYCKOFF"]["params"]
+    assert str(ch.S7_SWING_N) in p7["giris"]
+    assert f"{ch.S7_VOL_SPRING:g}" in p7["giris"]
+    assert f"{ch.S7_VOL_TEST:g}" in p7["giris"]
+    assert str(ch.S7_TEST_WINDOW) in p7["giris"]
+    assert f"{ch.S7_ATR_PROX:g}" in p7["stop"]
+    assert str(ch.FAST_TIMEOUT) in p7["zaman_asimi"]
 
 
 def test_challengers_endpoint_returns_strategy_info(tmp_path):
