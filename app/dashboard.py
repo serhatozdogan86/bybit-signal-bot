@@ -877,6 +877,13 @@ const RU={
 "Fitil son 96 barın ekstremumunu aşar ama kapanış gerisinde kalır VE hacim ≥ 1.5 × SMA20":
 "Фитиль превышает экстремум последних 96 баров, но закрытие остаётся позади, И объём ≥ 1.5 × SMA20",
 "süpürme fitilinin 0.5 × ATR(15dk) ötesi":"за фитилём свипа + 0.5 × ATR(15м)",
+"Fiyat bilinen bir dibi yüksek işlem hacmiyle kırıp hemen üstüne geri dönerse buna kapan (spring) der. Birkaç mum sonra fiyat aynı dibe bir kez daha yaklaşır ama bu sefer hacim kurumuşsa, satmak isteyen kalmadığını varsayar ve alır. S6 ile aynı olaya bakar ama tam ters filtreyle: S6 teyitte hacim patlaması ister, S7 hacim kuruması ister.":
+"Если цена пробивает известное дно на высоком объёме и сразу возвращается выше, это называется спрингом (ловушкой). Когда через несколько свечей цена ещё раз подходит к тому же дну, но объём уже иссяк, стратегия считает, что продавцов не осталось, и покупает. Смотрит на то же событие, что и S6, но с обратным фильтром: S6 требует всплеска объёма на подтверждении, S7 — его иссякания.",
+"Spring: son 96 barın dibi kırılır (hacim ≥ 1.5 × SMA20) ve kapanış üstüne döner; Test: sonraki 6 bar içinde dibe ≤ 0.25×ATR yaklaşan, spring dibinin üstünde kalan, hacmi ≤ 0.7 × SMA20 olan mum — giriş test mumunun kapanışında (ayna kurgu SHORT)":
+"Спринг: пробито дно последних 96 баров (объём ≥ 1.5 × SMA20) и закрытие возвращается выше; Тест: в следующие 6 баров свеча подходит к дну ≤ 0.25×ATR, остаётся выше минимума спринга, объём ≤ 0.7 × SMA20 — вход на закрытии тестовой свечи (зеркальная схема SHORT)",
+"spring dibinin 0.25 × ATR(15dk) altı":"на 0.25 × ATR(15м) ниже минимума спринга",
+"hacim kapısı çift yönlü: spring ≥ 1.5×, test ≤ 0.7× SMA20; rejim/funding filtresi yok":
+"двусторонние ворота объёма: спринг ≥ 1.5×, тест ≤ 0.7× SMA20; фильтров режима/funding нет",
 "hacim kapısı: tetik mumu ≥ 1.5 × SMA20; rejim/funding filtresi yok":
 "ворота объёма: триггерная свеча ≥ 1.5 × SMA20; фильтров режима/funding нет",
 "Şimdi yenile":"Обновить сейчас","≥ 1.5× ort.":"≥ 1.5× сред.",
@@ -1164,7 +1171,7 @@ function renderHeader(perf,status){
 /* ---------- Faz B: aday stratejiler sekmesi ---------- */
 const CHAL_ADI={S1_TSMOM:"S1 · Trend Takibi",S2_DONCHIAN:"S2 · Kırılım (Donchian)",
   S3_MEANREV:"S3 · Ortalamaya Dönüş",S4_CARRY:"S4 · Fonlama Taşıması",
-  S6_SWEEP:"S6 · Süpürme Dönüşü"};
+  S6_SWEEP:"S6 · Süpürme Dönüşü",S7_WYCKOFF:"S7 · Wyckoff Spring+Test"};
 let CHAL=null;   // /challengers son yaniti - detay penceresi buradan okur
 function renderChallengers(ch){
   const el=$("chalBody");if(!el)return;
