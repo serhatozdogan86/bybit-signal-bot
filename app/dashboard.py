@@ -713,6 +713,12 @@ DASHBOARD_HTML = r"""<!doctype html>
 <script>
 "use strict";
 const $=id=>document.getElementById(id);
+/* v3.7 XSS korumasi: DIS kaynakli metin (RSS basligi vb.) innerHTML'e
+   yalniz esc() ile girer; URL'ler sema dogrulamasindan gecer. */
+const esc=s=>String(s??"").replace(/[&<>"']/g,
+  c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const safeUrl=u=>/^https?:\/\//i.test(String(u??""))
+  ?String(u).replace(/"/g,"%22"):"#";
 /* ================= i18n: TR (kaynak) -> RU cevirisi ================= */
 const RU={
 /* baslik ve kartlar */
@@ -729,7 +735,6 @@ const RU={
 "strateji":"стратегия","açık":"открыто","sonuç":"итоги",
 "Faz B gölge yarışı: 5 aday strateji, şampiyonla AYNI maliyet modeli ve AYNI sınavla (≥50 kapanmış küme + küme-CI alt sınırı > 0) kâğıt üzerinde ölçülür. Gerçek işlem yok. Girişler kapanış bazlı; v1 çıkışları sabit hedefli — trend adayları (S1/S2) için sonuçlar muhafazakâr alt sınırdır. Şampiyon Faz-1 sınavını geçemezse buradaki sıralama bir sonraki denemenin adayını belirler. Çoklu karşılaştırma düzeltmesi: kazanan, seçildikten SONRA toplanan veride de sınavı geçmek zorundadır. Yatırım tavsiyesi değildir.":
  "Теневая гонка Фазы B: 5 стратегий-кандидатов измеряются на бумаге с ТОЙ ЖЕ моделью издержек и ТЕМ ЖЕ экзаменом, что и чемпион (≥50 закрытых кластеров + нижняя граница кластерного CI > 0). Реальных сделок нет. Входы по закрытию; выходы v1 с фиксированной целью — для трендовых кандидатов (S1/S2) результаты являются консервативной нижней оценкой. Если чемпион не сдаст экзамен Фазы-1, этот рейтинг определит кандидата для следующей попытки. Поправка на множественные сравнения: победитель обязан сдать экзамен и на данных, собранных ПОСЛЕ выбора. Не инвестиционная рекомендация.",
-"Kümülatif R (Equity)":"Накопленный R (эквити)",
 "Sonuçlanan işlemlerin R toplamının zaman içindeki birikimi. Kalın mavi çizgi NET eğridir (komisyon, stop kayması ve fonlama düşülmüş); kesikli gri çizgi aynı işlemlerin brüt hâlidir. İki çizgi arasındaki makas, maliyetin zamanla biriken yüküdür — işlem sayısı arttıkça açılır. Noktalar tek tek işlemler: yeşil WIN, kırmızı LOSS. Başlıktaki PF (kâr faktörü), beklenti ve maksDD de net seriden hesaplanır; brüt yalnız kıyas için gösterilir.":
  "Накопление суммы R по завершённым сделкам во времени. Жирная синяя линия — ЧИСТАЯ кривая (за вычетом комиссии, проскальзывания на стопе и фондирования); пунктирная серая — те же сделки без издержек. Зазор между линиями и есть накапливающийся вес затрат: он расширяется по мере роста числа сделок. Точки — отдельные сделки: зелёная WIN, красная LOSS. PF (профит-фактор), ожидание и макс. просадка в заголовке тоже считаются по чистому ряду; валовая величина показана лишь для сравнения.",
 "brüt":"валовый","net":"чисто",
@@ -767,7 +772,7 @@ const RU={
 "Giriş / Stop / TP1 / RR":"Вход / Стоп / TP1 / RR","giriş":"вход","stop":"стоп",
 /* durum rozetleri ve filtreler */
 "Tümü":"Все","Açık":"Открытые","Sonuç":"Результат","Dolmayan":"Не заполнено",
-"açık":"откр.","yükleniyor…":"загрузка…","hesaplanıyor…":"расчёт…",
+"yükleniyor…":"загрузка…","hesaplanıyor…":"расчёт…",
 "henüz sonuçlanan sinyal yok":"пока нет завершённых сигналов",
 "kayıt yok":"нет записей","bu filtrede sinyal yok":"нет сигналов по этому фильтру",
 /* detay modali */
@@ -939,6 +944,7 @@ const RU_PAT=[
  [/^Açık (\d+)$/, (m,n)=>`Открытые ${n}`],
  [/^Sonuç (\d+)$/, (m,n)=>`Результат ${n}`],
  [/^Dolmayan (\d+)$/, (m,n)=>`Не заполнено ${n}`],
+ [/^Süresi dolan (\d+)$/, (m,n)=>`Истёкшие ${n}`],
  [/^(\d+) WIN \/ (\d+) LOSS$/, (m,a,b)=>`${a} WIN / ${b} LOSS`],
 
  [/başabaş ~%([\d.]+)/, (m,n)=>`безубыток ~${n}%`],
@@ -1123,15 +1129,36 @@ document.addEventListener("keydown",e=>{
   if(e.key==="Escape"){$("overlay").classList.remove("show");$("modal").classList.remove("show");$("calc").classList.remove("show");}});
 
 /* ---------- header ---------- */
+/* v3.7 NET basabas: iki bacak da NET seriden. Kayip, maliyet dusuldugunde
+   -1R'den KOTUDUR; yalniz kazanci netlestirip kaybi -1R saymak esigi
+   sistematik iyimser gosterir. p* = |L_net| / (W_net + |L_net|).
+   Net veri yoksa brut yaklasima duser (eski davranis). */
+function netBreakeven(signals,w){
+  const nw=(signals||[]).filter(s=>OUT(s)==="WIN"&&s.r_net!=null).map(s=>s.r_net);
+  const nl=(signals||[]).filter(s=>OUT(s)==="LOSS"&&s.r_net!=null).map(s=>s.r_net);
+  const aw=nw.length?nw.reduce((a,b)=>a+b,0)/nw.length:null;
+  const al=nl.length?nl.reduce((a,b)=>a+b,0)/nl.length:null;
+  if(aw!=null&&aw>0&&al!=null&&al<0)
+    return {be:(100*Math.abs(al)/(aw+Math.abs(al))).toFixed(1),net:true};
+  if(aw!=null&&aw>-1)return {be:(100/(1+aw)).toFixed(1),net:true};
+  if(w&&w.count)return {be:(100/(1+(w.sum_r/w.count))).toFixed(1),net:false};
+  return {be:null,net:false};
+}
 function renderHeader(perf,status){
   const el=$("hsum");
   if(!status){el.innerHTML="⚠ bota ulaşılamıyor — servis uyanıyor olabilir (30-50 sn)";return;}
   if(!perf||!perf.decided_trades){el.innerHTML="<b>Motor çalışıyor</b> · henüz sonuçlanan sinyal yok — filtreler koşul bekliyor";return;}
   const wr=(perf.win_rate*100).toFixed(1),tr=perf.total_r_multiple;
   const w=(perf.closed_by_outcome||{}).WIN||{count:0,sum_r:0};
-  const be=w.count?(100/(1+(w.sum_r/w.count))).toFixed(1):null;
-  const pos=be&&Number(wr)>Number(be);
-  el.innerHTML=`<b>${perf.decided_trades}</b> sinyal sonuçlandı · isabet <b>%${wr}</b>${be?" (başabaş ~%"+be+")":""} · toplam <b class="${tr>=0?"pos":"neg"}">${(tr>0?"+":"")+num(tr)}R</b> · ${pos?'<span class="pos">eşiğin üzerinde</span>':'<span class="neg">eşiğin altında</span>'} · n<30, hüküm için erken`;
+  const be=netBreakeven(SIGNALS,w).be;   // v3.7: KPI ile AYNI net esik
+  const pos=be!=null&&Number(wr)>Number(be);
+  // v3.7: esik yokken hukum verilmez; kucuk-orneklem notu yalniz n<30'da
+  const verdict=be==null?""
+    :(pos?'<span class="pos">eşiğin üzerinde</span> · '
+        :'<span class="neg">eşiğin altında</span> · ');
+  const early=perf.decided_trades<30?"n<30, hüküm için erken":"";
+  el.innerHTML=(`<b>${perf.decided_trades}</b> sinyal sonuçlandı · isabet <b>%${wr}</b>${be?" (başabaş ~%"+be+")":""} · toplam <b class="${tr>=0?"pos":"neg"}">${(tr>0?"+":"")+num(tr)}R</b> · ${verdict}${early}`)
+    .replace(/ · $/,"");
 }
 
 /* ---------- Faz B: aday stratejiler sekmesi ---------- */
@@ -1191,7 +1218,10 @@ function chalDetail(k){
     g("Güven aralığı",ci,s.ci&&s.ci[0]>0?"pos":s.ci&&s.ci[1]<0?"neg":"")+
     g("Belirsiz",s.ambiguous||0)+
     g("Tutuş medyanı",hold)+`</div>`;
-  const rows=(CHAL.recent||[]).filter(r=>r.strategy===k).slice(0,15);
+  // v3.7: yalniz GECERLI ornekleme rejimi - ustteki istatistiklerle ayni
+  // kohort; eski rejim satirlari tabloya karisirsa rakamlar celisir
+  const rows=(CHAL.recent||[]).filter(r=>r.strategy===k
+    &&(r.regime||1)===(CHAL.sampling_regime||1)).slice(0,15);
   if(rows.length){
     html+=`<h4 class="chsec">Son 15 işlem</h4><div style="overflow-x:auto">`+
       `<table class="mini"><thead><tr><th>parite</th><th>yön</th><th>sonuç</th>`+
@@ -1253,13 +1283,9 @@ function renderKpis(perf,status,uni,signals){
   const cbo=(perf&&perf.closed_by_outcome)||{};
   const w=cbo.WIN||{count:0,sum_r:0},l=cbo.LOSS||{count:0,sum_r:0};
   const wrV=perf&&perf.win_rate!=null?perf.win_rate*100:null;
-  // v3.6: basabas esigi NET ortalama kazanca gore (maliyet cikinca cita yukselir)
-  const netWins=(signals||[]).filter(s=>OUT(s)==="WIN"&&s.r_net!=null)
-    .map(s=>s.r_net);
-  const avgWinNet=netWins.length?netWins.reduce((a,b)=>a+b,0)/netWins.length:null;
-  const be=avgWinNet!=null&&avgWinNet>-1?(100/(1+avgWinNet)).toFixed(1)
-    :(w.count?(100/(1+(w.sum_r/w.count))).toFixed(1):null);
-  const beNet=avgWinNet!=null;
+  // v3.7: basabas iki bacakta da NET (kazanc VE kayip) - bkz. netBreakeven
+  const bk=netBreakeven(signals,w);
+  const be=bk.be, beNet=bk.net;
   // v3.6: buyuk rakam NET (kararlarin verildigi sayi), brut alt satirda
   const trNet=perf?perf.total_r_net:null;
   const trGross=perf?perf.total_r_multiple:null;
@@ -1374,7 +1400,10 @@ function renderCurve(signals){
              ticks:{font:{size:10},color:"#8A7F6C",
              callback:v=>(v>0?"+":"")+v+"R"}}}},
       plugins:[shadowPlugin]};
-    if(eqChart){eqChart.data=cfg.data;eqChart.update("none");}
+    /* v3.7: options da tazelenir - tooltip callback'i eski render'in
+       tips/series dizilerine kapanmis kalirsa yeni nokta 'undefined' okur */
+    if(eqChart){eqChart.data=cfg.data;eqChart.options=cfg.options;
+      eqChart.update("none");}
     else eqChart=new Chart(ctx,cfg);
     return;
   }
@@ -1403,8 +1432,10 @@ function renderDuel(signals){
     const rows=(signals||[]).filter(s=>s.direction===dir);
     const w=rows.filter(s=>OUT(s)==="WIN").length;
     const l=rows.filter(s=>OUT(s)==="LOSS").length;
+    // v3.7: bilanco NET R kullanir (baslik KPI'lariyla ayni politika);
+    // net hesaplanamayan eski kayitta brute duser
     const r=rows.filter(s=>["WIN","LOSS"].includes(OUT(s)))
-      .reduce((a,s)=>a+(s.r_multiple||0),0);
+      .reduce((a,s)=>a+(s.r_net!=null?s.r_net:(s.r_multiple||0)),0);
     const open=rows.filter(s=>["PENDING","FILLED"].includes(OUT(s))).length;
     return {w,l,r,open};
   };
@@ -1419,7 +1450,7 @@ function renderDuel(signals){
   };
   const row=(name,d)=>`<div class="drow${DIRF===name?" on":""}" data-d="${name}"
     title="tabloyu ${name} ile filtreler">
-    <div class="top"><b>${name}</b><b class="num ${d.r>0?"pos":d.r<0?"neg":""}">${(d.r>0?"+":"")+num(d.r)}R</b></div>
+    <div class="top"><b>${name}</b><b class="num ${d.r>0?"pos":d.r<0?"neg":""}">${(d.r>0?"+":"")+num(d.r)}R <span class="age">net</span></b></div>
     ${track(d.r)}
     <div class="dstat">${d.w} WIN · ${d.l} LOSS · ${d.open} ${LANG==="ru"?"откр.":"açık"}</div></div>`;
   $("duel").innerHTML=row("LONG",L)+row("SHORT",S)+
@@ -1527,13 +1558,18 @@ function renderPipeline(status){
 
 /* ---------- sinyal tablosu + detay modali ---------- */
 let FILTER="ALL",SIGNALS=[];
-const FILTERS=[["ALL","Tümü"],["OPEN","Açık"],["DONE","Sonuç"],["NF","Dolmayan"]];
+/* v3.7: EXPIRED ayri kovada - "Dolmayan" adi altinda saymak yaniltiyordu
+   (EXPIRED aslinda DOLMUS ama suresi gecmis islemdir). KPI'daki giris
+   isabeti sayaci ile "Dolmayan" cipi artik birebir ayni kumeyi sayar. */
+const FILTERS=[["ALL","Tümü"],["OPEN","Açık"],["DONE","Sonuç"],
+  ["NF","Dolmayan"],["EXP","Süresi dolan"]];
 function matches(s){
   if(DIRF!=="ALL"&&s.direction!==DIRF)return false;
   const o=OUT(s);
   if(FILTER==="OPEN")return o==="PENDING"||o==="FILLED";
   if(FILTER==="DONE")return o==="WIN"||o==="LOSS"||o==="AMBIGUOUS";
-  if(FILTER==="NF")return o==="NOT_FILLED"||o==="EXPIRED";
+  if(FILTER==="NF")return o==="NOT_FILLED";
+  if(FILTER==="EXP")return o==="EXPIRED";
   return true;
 }
 function renderChips(){
@@ -1541,7 +1577,8 @@ function renderChips(){
   const c={ALL:SIGNALS.filter(base).length,
     OPEN:SIGNALS.filter(s=>base(s)&&["PENDING","FILLED"].includes(OUT(s))).length,
     DONE:SIGNALS.filter(s=>base(s)&&["WIN","LOSS","AMBIGUOUS"].includes(OUT(s))).length,
-    NF:SIGNALS.filter(s=>base(s)&&["NOT_FILLED","EXPIRED"].includes(OUT(s))).length};
+    NF:SIGNALS.filter(s=>base(s)&&OUT(s)==="NOT_FILLED").length,
+    EXP:SIGNALS.filter(s=>base(s)&&OUT(s)==="EXPIRED").length};
   let html=FILTERS.map(([k,l])=>
     `<button class="chip${FILTER===k?" on":""}" data-f="${k}">${l} ${c[k]||0}</button>`).join("");
   if(DIRF!=="ALL")html+=`<button class="chip dir" data-clr="1">yön: ${DIRF} ✕</button>`;
@@ -1683,8 +1720,8 @@ function renderNews(n){
   if(!n||!n.items||!n.items.length){
     el.innerHTML='<li class="empty">haber kaynağına ulaşılamadı</li>';return;}
   el.innerHTML=n.items.slice(0,4).map(it=>
-    `<li><a href="${it.url}" target="_blank" rel="noopener">${it.title}</a>
-     <span class="src">${it.source}${it.published_utc?" · "+fmtAge(it.published_utc)+" önce":""}</span></li>`).join("");
+    `<li><a href="${safeUrl(it.url)}" target="_blank" rel="noopener">${esc(it.title)}</a>
+     <span class="src">${esc(it.source)}${it.published_utc?" · "+fmtAge(it.published_utc)+" önce":""}</span></li>`).join("");
 }
 /* ---------- portfoy simulasyonu ---------- */
 function pfLoad(){
@@ -2038,8 +2075,10 @@ function renderFooter(backup,healthy,ms,perf){
     <div class="note" style="margin-top:10px">${_r
       ?"теневой учёт · прошлые результаты не гарантия · не инвестиционная рекомендация"
       :"gölge muhasebe · geçmiş performans garanti değildir · yatırım tavsiyesi değildir"}</div>`;
-  if(perf&&perf.total_r_multiple!=null){
-    const tr=perf.total_r_multiple;
+  if(perf&&(perf.total_r_net!=null||perf.total_r_multiple!=null)){
+    // v3.7: sekme basligi da NET (v3.6 "baslik rakamlari net" politikasi);
+    // net yoksa brute duser
+    const tr=perf.total_r_net!=null?perf.total_r_net:perf.total_r_multiple;
     document.title=`${tr>=0?"▲":"▼"} ${(tr>0?"+":"")+num(tr,1)}R · signal-engine`;
   }
 }

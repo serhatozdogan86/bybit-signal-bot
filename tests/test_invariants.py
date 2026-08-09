@@ -217,6 +217,46 @@ def test_chart_window_autosizes_to_include_exit():
     assert "Math.min(80,Math.max(12,bars+3))" in js, "kapsama hesabi yok"
 
 
+def test_news_titles_escaped_before_innerhtml():
+    """HATA SINIFI (v3.7): DIS kaynak metni escape'siz innerHTML'e girerse
+    pano XSS'e acilir. Haber basliklari RSS'ten AYNEN gelir (market_info
+    bunu belgeler); kotu niyetli bir feed girdisi <img onerror=...> ile
+    DASHBOARD_TOKEN tasiyan oturumda script calistirabilir. Kural: haber
+    render'i baslik/kaynak icin esc(), URL icin sema dogrulamasi kullanir."""
+    import re as _re
+    from app.dashboard import DASHBOARD_HTML
+    js = max(_re.findall(r"<script>(.*?)</script>", DASHBOARD_HTML, _re.S),
+             key=len)
+    news = js[js.index("function renderNews"):]
+    news = news[:news.index("\n}") + 2]
+    assert "esc(it.title)" in news, "haber basligi escape edilmiyor (XSS)"
+    assert "esc(it.source)" in news, "haber kaynagi escape edilmiyor"
+    assert "${it.title}" not in news, "ham baslik interpolasyonu kalmis"
+    assert "safeUrl(it.url)" in news, "URL sema dogrulamasi yok (javascript:)"
+
+
+def test_ru_dictionary_has_no_conflicting_duplicate_keys():
+    """HATA SINIFI (v3.7): JS nesne literalinde ayni anahtar iki kez FARKLI
+    degerle tanimlanirsa sonraki sessizce kazanir - onceki ceviri niyeti
+    kaybolur ('açık': 'открыто' vs 'откр.' vakasi). Ayni degerli tekrar
+    zararsizdir; farkli degerli tekrar yasaktir."""
+    import re as _re
+    from app.dashboard import DASHBOARD_HTML
+    js = max(_re.findall(r"<script>(.*?)</script>", DASHBOARD_HTML, _re.S),
+             key=len)
+    ru_src = js[js.index("const RU={"):]
+    ru_src = ru_src[:ru_src.index("\n};")]
+    pairs = _re.findall(r'"((?:[^"\\]|\\.)+)"\s*:\s*\n?\s*"((?:[^"\\]|\\.)*)"',
+                        ru_src)
+    seen: dict[str, str] = {}
+    conflicts = []
+    for k, v in pairs:
+        if k in seen and seen[k] != v:
+            conflicts.append(f"{k!r}: {seen[k]!r} vs {v!r}")
+        seen[k] = v
+    assert not conflicts, f"RU sozlugunde celisen tekrar anahtar: {conflicts}"
+
+
 def test_alarm_registry_has_no_search_logic():
     """HATA SINIFI: veride kalip ARAYAN otomatik dongu, 150 sinyal ve
     onlarca bolme varken tesadufen 'anlamli' bir sey mutlaka bulur -

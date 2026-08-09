@@ -1082,7 +1082,10 @@ class SignalTracker:
         if not row:
             return None
         sig = dict(row)
-        step = 15 * 60_000                      # 15m ms
+        # v3.7: pencere LTF ayarindan turetilir; 15dk sabitlemek LTF!=15
+        # kurulumda grafigi yanlis dilimler (dakika-disi interval -> 15dk)
+        minutes = int(self._ltf) if str(self._ltf).isdigit() else 15
+        step = minutes * 60_000
         t0 = (sig["entry_candle_ts"] or 0) - before * step
         t1 = (sig["entry_candle_ts"] or 0) + after * step
         candles = self._db.query(

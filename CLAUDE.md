@@ -5,6 +5,15 @@ Bybit perpetual gölge sinyal botu. GERÇEK PARA YOK — tüm işlemler kâğıt
 üzerinde ölçüm. Amaç: istatistiksel kanıt eşiğini (≥50 kapanmış küme +
 küme-CI alt sınırı > 0) geçen bir motor bulmak. Dil: Türkçe, sade.
 
+## İLETİŞİM (2026-08-06, Serhat'ın isteği)
+Serhat yazılımcı DEĞİL. Ona yazarken:
+- Sade Türkçe, jargonsuz. Teknik terim kaçınılmazsa tek cümleyle tanımla
+  (örn. "VM = internette kiralık, hep açık bilgisayar").
+- Yapılacak adımları kopyala-yapıştır komut olarak ver; her komutun ne işe
+  yaradığını bir cümleyle söyle. Mümkünse adımları TEK komutta birleştir.
+- Rapor/özetlerde önce sonuç, sonra kısa gerekçe; uzun teknik döküm yalnız
+  istenirse.
+
 ## DURUM (2026-08-05)
 - Şampiyon (breakout_retest) Faz-1'i GEÇEMEDİ: yanlışlama #2 tetiklendi
   (kilit sonrası maksDD 35.6R > 20R). Otopsi: docs/config-lock.md sonu.
