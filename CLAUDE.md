@@ -17,8 +17,9 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
 ## DURUM (2026-08-05)
 - Şampiyon (breakout_retest) Faz-1'i GEÇEMEDİ: yanlışlama #2 tetiklendi
   (kilit sonrası maksDD 35.6R > 20R). Otopsi: docs/config-lock.md sonu.
-- 5 aday gölge yarışta (app/services/challengers.py), rejim-2 örneklemesi.
-  S7 (Wyckoff) ve S5 beklemede — tetikleyicileri docs/challengers-design.md.
+- 6 aday gölge yarışta (app/services/challengers.py), rejim-2 örneklemesi.
+  S7 (Wyckoff) 2026-08-06'da yarışa girdi (tetik: S6 sınavını doldurdu).
+  S5 beklemede — tetikleyicisi docs/challengers-design.md.
 - v2 şampiyon henüz TASARLANMADI; tasarlanırsa ÖN-KAYITLA yeni aday olur.
 
 ## DEĞİŞTİRİLEMEZ KURALLAR

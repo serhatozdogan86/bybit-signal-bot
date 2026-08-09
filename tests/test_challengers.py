@@ -218,6 +218,92 @@ def test_new_signals_stamped_with_current_regime(tmp_path):
     assert r["regime"] == SAMPLING_REGIME
 
 
+# --------------- S7 Wyckoff Spring+Test (tasarim: 8eecb5a, BIREBIR) --------
+def _s7_series(spring_vol=2000.0, test_vol=500.0, test_low=99.05,
+               mid_low=99.5, spring_low=98.8, n=110):
+    """Spring+Test senaryosu: sw_low=99.0 (idx -30), spring idx -3,
+    ara mum idx -2, aday test mumu = son mum (giris onun kapanisinda)."""
+    ltf = fx.make_series(np.full(n, 100.0), volumes=np.full(n, 1000.0))
+    ltf.candles[-30].low = 99.0                  # 96-bar penceresinin dibi
+    sp = ltf.candles[-3]                         # SPRING: dibi kir + don
+    sp.low, sp.close, sp.volume = spring_low, 100.0, spring_vol
+    ltf.candles[-2].low = mid_low                # ara mum (gecersizlik yok)
+    t = ltf.candles[-1]                          # TEST adayi (son mum)
+    t.low, t.close, t.volume = test_low, 100.0, test_vol
+    return ltf
+
+
+def test_s7_spring_then_low_volume_test_generates_long(tmp_path):
+    """Tasarim: spring (yuksek hacim + geri donus) -> 1-6 bar icinde dusuk
+    hacimli test -> giris test kapanisinda, stop spring dibinin altinda."""
+    eng, db = _eng(tmp_path)
+    assert eng.on_scan("W1USDT", None, _s7_series(), None) == 1
+    row = db.query_one(
+        "SELECT * FROM challenger_signals WHERE strategy='S7_WYCKOFF'")
+    assert row is not None and row["direction"] == "LONG"
+    assert row["entry"] == 100.0                 # test mumunun kapanisi
+    assert row["stop"] < 98.8                    # spring_low - 0.25xATR
+    risk = row["entry"] - row["stop"]
+    assert abs(row["tp"] - (row["entry"] + 2 * risk)) < 1e-6   # TP 2R
+    assert row["timeout_bars"] == 96
+
+
+def test_s7_high_volume_test_rejected(tmp_path):
+    """TERS HACIM FILTRESI - S7'nin varlik nedeni: test mumunda hacim
+    kurumamissa (>0.7xSMA20) kurulum YOK. (S6 tam tersini ister.)"""
+    eng, _ = _eng(tmp_path)
+    assert eng.on_scan("W2USDT", None, _s7_series(test_vol=2000.0), None) == 0
+
+
+def test_s7_break_below_spring_low_invalidates(tmp_path):
+    """Gecersizlik: spring ile test arasinda low <= spring_low -> iptal."""
+    eng, _ = _eng(tmp_path)
+    assert eng.on_scan("W3USDT", None, _s7_series(mid_low=98.7), None) == 0
+    # test mumunun kendisi spring dibinin ALTINA sarkarsa da kurulum yok
+    eng2, _ = _eng(tmp_path / "b")
+    assert eng2.on_scan("W3BUSDT", None, _s7_series(test_low=98.7), None) == 0
+
+
+def test_s7_test_window_is_six_bars(tmp_path):
+    """Tasarim: test, spring'den sonraki 1-6 bar icinde gelmeli; 7. barda
+    gelen test kurulumu tetiklemez."""
+    eng, _ = _eng(tmp_path)
+    ltf = fx.make_series(np.full(110, 100.0), volumes=np.full(110, 1000.0))
+    ltf.candles[-40].low = 99.0
+    sp = ltf.candles[-8]                          # spring 7 bar once (>6)
+    sp.low, sp.close, sp.volume = 98.8, 100.0, 2000.0
+    t = ltf.candles[-1]
+    t.low, t.close, t.volume = 99.05, 100.0, 500.0
+    assert eng.on_scan("W4USDT", None, ltf, None) == 0
+
+
+def test_s7_short_mirror_upthrust(tmp_path):
+    """Ayna kurgu: upthrust (tepeyi kir + geri don, yuksek hacim) ->
+    dusuk hacimli test -> SHORT; stop upthrust tepesinin ustunde."""
+    eng, db = _eng(tmp_path)
+    ltf = fx.make_series(np.full(110, 100.0), volumes=np.full(110, 1000.0))
+    ltf.candles[-30].high = 101.0                 # pencerenin tepesi
+    up = ltf.candles[-3]                          # UPTHRUST
+    up.high, up.close, up.volume = 101.2, 100.0, 2000.0
+    ltf.candles[-2].high = 100.5
+    t = ltf.candles[-1]
+    t.high, t.close, t.volume = 100.96, 100.0, 500.0
+    assert eng.on_scan("W5USDT", None, ltf, None) == 1
+    row = db.query_one(
+        "SELECT * FROM challenger_signals WHERE strategy='S7_WYCKOFF'")
+    assert row["direction"] == "SHORT"
+    assert row["stop"] > 101.2                    # upthrust tepesi + tampon
+    risk = row["stop"] - row["entry"]
+    assert abs(row["tp"] - (row["entry"] - 2 * risk)) < 1e-6
+
+
+def test_s7_no_spring_no_signal(tmp_path):
+    """Duz seri (spring yok) hicbir S7 sinyali uretmez."""
+    eng, _ = _eng(tmp_path)
+    ltf = fx.make_series(np.full(110, 100.0), volumes=np.full(110, 1000.0))
+    assert eng.on_scan("W6USDT", None, ltf, None) == 0
+
+
 # ---------------- v1.2: detay penceresi tek-kaynak sozlugu ----------------
 def test_strategy_info_covers_all_active_strategies():
     """SURUKLENME YASAGI: her aktif stratejinin (S1-S6, beklemedekiler
@@ -256,6 +342,13 @@ def test_strategy_info_numbers_derived_from_constants():
     p6 = ch.STRATEGY_INFO["S6_SWEEP"]["params"]
     assert str(ch.S6_SWING_N) in p6["giris"]
     assert f"{ch.S6_VOL_MULT:g}" in p6["giris"]
+    p7 = ch.STRATEGY_INFO["S7_WYCKOFF"]["params"]
+    assert str(ch.S7_SWING_N) in p7["giris"]
+    assert f"{ch.S7_VOL_SPRING:g}" in p7["giris"]
+    assert f"{ch.S7_VOL_TEST:g}" in p7["giris"]
+    assert str(ch.S7_TEST_WINDOW) in p7["giris"]
+    assert f"{ch.S7_ATR_PROX:g}" in p7["stop"]
+    assert str(ch.FAST_TIMEOUT) in p7["zaman_asimi"]
 
 
 def test_challengers_endpoint_returns_strategy_info(tmp_path):

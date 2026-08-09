@@ -30,7 +30,8 @@ from app.services.signal_tracker import FUNDING_8H, STOP_SLIP, TAKER_FEE
 
 log = logging.getLogger("challengers")
 
-STRATEGIES = ("S1_TSMOM", "S2_DONCHIAN", "S3_MEANREV", "S4_CARRY", "S6_SWEEP")
+STRATEGIES = ("S1_TSMOM", "S2_DONCHIAN", "S3_MEANREV", "S4_CARRY", "S6_SWEEP",
+              "S7_WYCKOFF")   # S7: 2026-08-06, tetik = S6 sinavini doldurdu
 # Acik pozisyon tavani - STRATEJIYE GORE (v1.1 duzeltmesi).
 # NEDEN: tek tavan (15) yarisi adaletsiz kildi. Uzun tutan trend adaylari
 # (S1 medyan 45 bar, S4 37 bar) slotlari doldurup YENI SINYAL URETEMEZ hale
@@ -41,7 +42,11 @@ STRATEGIES = ("S1_TSMOM", "S2_DONCHIAN", "S3_MEANREV", "S4_CARRY", "S6_SWEEP")
 # surede 50 kumeye ulasabilsin. Bu bir OLCUM ALTYAPISI duzeltmesidir;
 # hicbir stratejinin giris/cikis kurali degismedi.
 MAX_OPEN = {"S1_TSMOM": 40, "S2_DONCHIAN": 40, "S4_CARRY": 40,
-            "S3_MEANREV": 15, "S6_SWEEP": 15}
+            "S3_MEANREV": 15, "S6_SWEEP": 15,
+            # S7: tasarimda tavan yazilmadi; rejim-2 kurali uygulanir
+            # ("tavan tutus suresiyle orantili") - zaman asimi 96 bar =
+            # S3/S6 sinifi -> 15 (varsayilanla ayni, ICAT degil turetme)
+            "S7_WYCKOFF": 15}
 MAX_OPEN_DEFAULT = 15
 # Ornekleme rejimi damgasi: tavan degisimi oncesi/sonrasi kohortlar
 # BIRLESTIRILEMEZ (farkli kisitla toplandilar). Istatistikler yalniz
@@ -63,7 +68,7 @@ S3_ADX_MAX = 20.0        # S3: yatay-rejim kapisi (4H ADX ust siniri)
 S3_SMA_N = 20            # S3: ortalama penceresi (15dk bar)
 S3_SIGMA = 2.0           # S3: sapma esigi (standart sapma kati)
 S3_STOP_ATR = 1.5        # S3: stop mesafesi (ATR-15dk kati)
-FAST_TIMEOUT = 96        # S3/S6: zaman asimi (15dk bar) = 24 saat
+FAST_TIMEOUT = 96        # S3/S6/S7: zaman asimi (15dk bar) = 24 saat
 S4_ANN_FUNDING = 0.30    # S4: yillik |funding| esigi
 S4_RISK_ATR = 2.0        # S4: risk birimi (ATR-4H kati)
 S4_TP_RISK = 2.0         # S4: hedef (risk kati)
@@ -71,6 +76,13 @@ S6_SWING_N = 96          # S6: swing penceresi (15dk bar)
 S6_VOL_MULT = 1.5        # S6: hacim esigi (SMA20 kati)
 S6_WICK_ATR = 0.5        # S6: stop tamponu (fitil otesi, ATR-15dk kati)
 S6_TP_RISK = 2.0         # S6: hedef (risk kati)
+# S7 Wyckoff Spring+Test - tasarim 8eecb5a'daki sayilar BIREBIR:
+S7_SWING_N = 96          # S7: swing penceresi (15dk bar)
+S7_VOL_SPRING = 1.5      # S7: spring hacmi >= 1.5 x SMA20 (yuksek)
+S7_VOL_TEST = 0.7        # S7: test hacmi   <= 0.7 x SMA20 (KURUMUS - S6'nin tersi)
+S7_ATR_PROX = 0.25       # S7: test yaklasma VE stop tamponu (ATR-15dk kati)
+S7_TEST_WINDOW = 6       # S7: spring sonrasi test icin 1-6 bar
+S7_TP_RISK = 2.0         # S7: hedef (risk kati)
 
 
 def _saat(bars: int) -> str:
@@ -166,6 +178,30 @@ STRATEGY_INFO: dict[str, dict] = {
             "tavan": f"{MAX_OPEN['S4_CARRY']} açık pozisyon",
             "filtreler": (f"funding kapısı: yıllık |funding| > "
                           f"%{S4_ANN_FUNDING * 100:g}; rejim/hacim filtresi yok"),
+        },
+    },
+    "S7_WYCKOFF": {
+        "name": "Wyckoff Spring+Test",
+        "how": ("Fiyat bilinen bir dibi yüksek işlem hacmiyle kırıp hemen "
+                "üstüne geri dönerse buna kapan (spring) der. Birkaç mum "
+                "sonra fiyat aynı dibe bir kez daha yaklaşır ama bu sefer "
+                "hacim kurumuşsa, satmak isteyen kalmadığını varsayar ve "
+                "alır. S6 ile aynı olaya bakar ama tam ters filtreyle: S6 "
+                "teyitte hacim patlaması ister, S7 hacim kuruması ister."),
+        "params": {
+            "giris": (f"Spring: son {S7_SWING_N} barın dibi kırılır (hacim ≥ "
+                      f"{S7_VOL_SPRING:g} × SMA20) ve kapanış üstüne döner; "
+                      f"Test: sonraki {S7_TEST_WINDOW} bar içinde dibe ≤ "
+                      f"{S7_ATR_PROX:g}×ATR yaklaşan, spring dibinin üstünde "
+                      f"kalan, hacmi ≤ {S7_VOL_TEST:g} × SMA20 olan mum — "
+                      "giriş test mumunun kapanışında (ayna kurgu SHORT)"),
+            "stop": f"spring dibinin {S7_ATR_PROX:g} × ATR(15dk) altı",
+            "hedef": f"risk × {S7_TP_RISK:g} — plan RR {S7_TP_RISK:g}",
+            "zaman_asimi": _saat(FAST_TIMEOUT),
+            "tavan": f"{MAX_OPEN['S7_WYCKOFF']} açık pozisyon",
+            "filtreler": (f"hacim kapısı çift yönlü: spring ≥ "
+                          f"{S7_VOL_SPRING:g}×, test ≤ {S7_VOL_TEST:g}× "
+                          "SMA20; rejim/funding filtresi yok"),
         },
     },
     "S6_SWEEP": {
@@ -418,6 +454,67 @@ class ChallengerEngine:
                     out.append(("S6_SWEEP",
                                 ("LONG", stop,
                                  entry + S6_TP_RISK * risk, FAST_TIMEOUT)))
+
+        # S7 WYCKOFF SPRING+TEST (tasarim 8eecb5a, BIREBIR):
+        # Faz 1 (spring): low < swing_low VE hacim >= 1.5xSMA20 VE kapanis
+        #   swing dibinin ustune doner. Faz 2 (test): sonraki 1-6 barda
+        #   low <= swing_low + 0.25xATR14 AMA low > spring_low VE hacim
+        #   <= 0.7xSMA20. Giris test kapanisinda; stop spring_low-0.25xATR;
+        #   TP 2R; 96 bar zaman asimi. Ayna kurgu SHORT (upthrust+test).
+        # Gecersizlik: arada low <= spring_low -> iptal (test penceresi 6
+        #   bar; disarida kalan spring zaten taranmaz). S6'dan yapisal
+        #   fark: teyitte YUKSEK degil DUSUK hacim aranir (ters filtre).
+        if atr_l and len(l_close) >= S7_SWING_N + S7_TEST_WINDOW + 2:
+            n_ = len(l_close)
+            cur = n_ - 1                       # aday TEST mumu = son mum
+
+            def _vol_sma20(idx: int) -> float | None:
+                if idx < 20:
+                    return None
+                s = sum(l_vol[idx - 20:idx]) / 20
+                return s if s > 0 else None
+
+            cur_sma = _vol_sma20(cur)
+            if cur_sma and l_vol[cur] <= S7_VOL_TEST * cur_sma:
+                for back in range(1, S7_TEST_WINDOW + 1):
+                    j = cur - back             # aday SPRING/UPTHRUST mumu
+                    if j < S7_SWING_N:
+                        break
+                    j_sma = _vol_sma20(j)
+                    if not j_sma or l_vol[j] < S7_VOL_SPRING * j_sma:
+                        continue
+                    sw_low = min(l_low[j - S7_SWING_N:j])
+                    sw_high = max(l_high[j - S7_SWING_N:j])
+                    if l_low[j] < sw_low and l_close[j] > sw_low:
+                        spring_low = l_low[j]
+                        if any(l_low[k] <= spring_low
+                               for k in range(j + 1, cur)):
+                            continue           # gecersizlik: dibe geri donus
+                        if (l_low[cur] <= sw_low + S7_ATR_PROX * atr_l
+                                and l_low[cur] > spring_low):
+                            stop = spring_low - S7_ATR_PROX * atr_l
+                            risk = entry - stop
+                            if risk > 0:
+                                out.append(("S7_WYCKOFF",
+                                            ("LONG", stop,
+                                             entry + S7_TP_RISK * risk,
+                                             FAST_TIMEOUT)))
+                                break
+                    elif l_high[j] > sw_high and l_close[j] < sw_high:
+                        up_high = l_high[j]
+                        if any(l_high[k] >= up_high
+                               for k in range(j + 1, cur)):
+                            continue           # gecersizlik: tepeye donus
+                        if (l_high[cur] >= sw_high - S7_ATR_PROX * atr_l
+                                and l_high[cur] < up_high):
+                            stop = up_high + S7_ATR_PROX * atr_l
+                            risk = stop - entry
+                            if risk > 0:
+                                out.append(("S7_WYCKOFF",
+                                            ("SHORT", stop,
+                                             entry - S7_TP_RISK * risk,
+                                             FAST_TIMEOUT)))
+                                break
         return out
 
     # ------------------------------------------------------- degerlendirme
