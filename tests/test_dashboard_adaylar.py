@@ -122,7 +122,11 @@ def test_chal_verdict_logic_runs_in_node(tmp_path):
           + ";\nconsole.log(JSON.stringify(cases.map(c=>chalVerdict(c).t)));\n")
     f = tmp_path / "verdict.js"
     f.write_text(js, encoding="utf-8")
-    out = subprocess.run(["node", str(f)], capture_output=True, text=True)
+    # encoding acikca UTF-8: text=True Windows'ta yerel kod sayfasini (cp1252)
+    # kullanir ve node'un UTF-8 ciktisindaki Turkce harfleri bozar
+    # ("YARIŞIYOR" -> "YARIÅIYOR"), test yalniz o makinelerde kirmizi verir.
+    out = subprocess.run(["node", str(f)], capture_output=True, text=True,
+                         encoding="utf-8")
     assert out.returncode == 0, out.stderr
     got = json.loads(out.stdout)
     assert got == [exp for _, exp in CASES]

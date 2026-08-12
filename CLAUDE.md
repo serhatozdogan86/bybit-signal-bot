@@ -42,6 +42,13 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
 3. Yeni hata bulunca: önce SINIFINI kapatan değişmezlik testi
    (tests/test_invariants.py), test hatalı kodda KIRMIZI vermeli, sonra
    düzeltme. docs/error-prevention.md'deki 9 kural bağlayıcıdır.
+3b. İKİZ DEPO: bu bot ile midas-signal-bot aynı iskeletten doğdu. Kanıtlı
+   mekanizma hatası, ölçüm/muhasebe düzeltmesi veya yeni ölçüm aleti
+   çıktığında **ikizde karşılığı açıkça kontrol edilir** ve sonuç
+   docs/ikiz-depo-notu.md'ye yazılır (bulunmasa bile). Kontrol "okudum,
+   yok" ile kapanmaz; ikizde aynı davranışı tetikleyen test yazılır.
+   Gerekçe: retest kusuru midas'ta 08-08'de düzeltilmişti, burada
+   08-12'ye kadar canlı kaldı — bakılacak bir yer olmadığı için.
 4. Ölçüm eşikleri / maliyet sabitleri / karar kuralları veriden türetilip
    doğrudan kural yapılamaz — önce docs/ideas.md'ye ÖN-KAYIT (H-1 örneği),
    GELECEK veride test.

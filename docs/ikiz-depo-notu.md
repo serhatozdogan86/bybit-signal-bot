@@ -1,0 +1,199 @@
+# İkiz Depo Notu — midas ↔ bybit
+
+> Bu dosyanın ikizi `bybit-signal-bot/docs/ikiz-depo-notu.md` içindedir ve
+> aynı içeriği taşır. Biri değişirse diğeri de güncellenir.
+>
+> Oluşturma: 2026-08-12, iki depoyu birlikte inceleyen dış oturum.
+
+## Neden bu dosya var
+
+`midas-signal-bot`, `bybit-signal-bot` iskeletinden doğdu. İkisi aynı boru
+hattını (rejim → yapı → kurulum → hacim → risk/ödül → sinyal), aynı gölge
+defter mantığını ve aynı ön-kayıt kültürünü paylaşıyor.
+
+Bunun pratik sonucu şu: **birinde bulunan bir kusur, diğerinde de aday
+kusurdur.** Ama bu bugüne kadar tek yönlü işledi — bybit'ten midas'a bilgi
+taşındı, midas'ta öğrenilenler bybit'e geri taşınmadı.
+
+### Kanıt: retest kusuru
+
+`detect_breakout_retest` içinde kırılım sonrası dilimler `break_i`'den
+başlıyordu. Kırılım mumunun kapanışı tanımı gereği seviyenin doğru
+tarafındadır, ve o mum seviyeyi aşağıdan geçtiği için low'u neredeyse her
+zaman tolerans altındadır. Sonuç: acceptance sayacı 2 yerine fiilen 1, ve
+**retest şartı tamamen boş** — yani "breakout+retest", retestsiz kovalama
+girişi.
+
+| | |
+|---|---|
+| midas'ta düzeltildi | 2026-08-08 (v4.23) |
+| midas'taki faturası | kilit-1 defterinin 16/17 işlemi, −12R |
+| bybit'te düzeltildi | 2026-08-12 (KİLİT-2) — **dört gün sonra** |
+
+Dört gün boyunca aynı kusur, aynı kod, ikinci depoda canlı kaldı. Kimse
+bakmadığı için değil; **bakılacak bir yer olmadığı için.**
+
+## Kural: çift yönlü aktarım
+
+Bir depoda şu üç şeyden biri olduğunda, diğer depoda karşılığı **açıkça
+kontrol edilir ve sonuç bu dosyaya yazılır** (bulunmasa bile):
+
+1. **Kanıtlı mekanizma hatası** (kilit açan türden)
+2. **Ölçüm/muhasebe düzeltmesi** (defterin sayıları değişiyorsa)
+3. **Yeni ölçüm veya deney aleti**
+
+Kontrol "okudum, yok" ile kapanmaz — ikizde aynı davranışı tetikleyen bir
+test yazılır. Retest kusuru sentetik veriyle böyle kanıtlanmıştı: fiyatın
+seviyeyi kırıp bir daha hiç dönmediği seride eski kod setup üretiyor,
+düzeltilmiş kod üretmiyordu.
+
+## Yetenek envanteri (2026-08-12)
+
+Örüntü: **midas deney altyapısında, bybit ölçüm altyapısında öne geçmiş.**
+
+| Yetenek | midas | bybit |
+|---|---|---|
+| Bağımsız sonuç denetçisi (`verifier.py`) | **yok** | var |
+| Küme-blok bootstrap güven aralığı | **yok** | var |
+| NOT_FILLED anatomisi (`nf_anatomy`) | **yok** | var |
+| Kayma senaryolu hayalet R | **yok** | var |
+| Güven etiketi permütasyon testi | **yok** | var |
+| Önceden ilan edilmiş alarm kaydı | kısmen (`self_audit`) | var (`alarms.py`) |
+| Aday strateji yarışı | **yok** | var (`challengers.py`) |
+| Çıkış varyantı laboratuvarı | var (`exit_lab`) | **yok** |
+| Giriş stratejisi laboratuvarı | var (`strategy_lab`) | **yok** |
+| Hipotez kohortu (blocked=5) | var (`hypo_lab`) | **yok** |
+| Öz-denetim değişmezleri | var (`self_audit`) | **yok** |
+| Bağımsız dolum doğrulama (kâğıt hesap) | var ama **kapalı** (`alpaca_mirror`) | **yok** |
+
+## Açık maddeler — midas tarafı
+
+Aşağıdakiler 2026-08-12 itibarıyla **açık**. Hiçbiri motora dokunmaz;
+üçü ölçüm katmanı, biri belge tutarlılığı.
+
+### M1 — Go-live eşiği tesadüfe açık (öncelik: yüksek)
+
+`docs/go-live-kriteri.md` beş şart sayıyor ama hiçbiri **istatistiksel
+anlamlılık** istemiyor. bybit'in Faz-1 kapısı istiyor: *≥50 küme VE
+küme-bootstrap CI alt sınırı > 0.*
+
+Gerçek defterden ölçüm (22 sonuçlanmış işlem, 2026-08-11):
+
+- işlem başına net-R standart sapması: **1,112**
+- 60 işlemde ortalamanın standart hatası: **0,144R**
+- yani `GOLIVE_MIN_EXPECTANCY_R = 0.15` eşiği ≈ **1,0 standart hata**
+
+20.000 denemelik bootstrap, gerçek üstünlük = 0 varsayımıyla:
+
+| Gözlem birimi | Tesadüfen ≥ +0,15R çıkma olasılığı |
+|---|---|
+| 60 işlem | **%15,3** |
+| 25 bağımsız küme | **%24,6** |
+
+Yani hiçbir üstünlüğü olmayan bir motor bu kapıdan dörtte bir ihtimalle
+geçebilir — ve geçtiği gün gerçek para konur.
+
+**Öneri:** bybit'in `measurement.cluster_bootstrap` fonksiyonu midas'a
+taşınsın ve go-live'a altıncı şart eklensin: *küme-CI alt sınırı > 0.*
+Bu bir **sıkılaştırmadır**; `config-lock.md` gevşetmeyi yasaklar,
+sıkılaştırmayı serbest bırakır. Eşik değerleri değişmediği için kohort
+sıfırlanmaz.
+
+### M2 — Bağımsız sonuç denetçisi yok (öncelik: yüksek)
+
+bybit'teki `verifier.py`'nin gerekçesi: *"Tracker'ın kendi değerlendirme
+döngüsünü tekrar kullanan bir denetim, o döngüdeki hatayı göremez — hata
+kendini doğrular."* Sonucu mumlardan sıfırdan, ayrı bir uygulamayla
+yeniden türetip kayıtla karşılaştırır. bybit'te canlı sonuç: 291 kayıt
+denetlendi, 0 uyuşmazlık.
+
+midas'ta karşılığı yok — oysa midas'ın gölge muhasebesinde **tek bir
+sürümde (v4.22) dört ayrı hata** düzeltildi: gap sırası, dolum barı,
+time-stop çapası, net-DD. Yani daha çok hata çıkarmış bir muhasebe ve onu
+bağımsız kontrol eden hiçbir şey yok.
+
+**Öneri:** `verifier.py` midas'a uyarlansın (1h bar + gap muhasebesi
+farkıyla). Salt ölçüm katmanı, kilit ihlali değil.
+
+### M3 — Dolum kuralı her işleme peşin zarar yazıyor (öncelik: orta, ölçüm gerekli)
+
+`signal_tracker._evaluate_signal`, LONG için:
+
+```python
+touched    = c["low"] <= sig["entry_min"]   # TETİK: bölgenin DİBİ
+fill_price = sig["entry_max"]               # FİYAT: bölgenin TEPESİ
+```
+
+Yani bir işlem ancak fiyat bölgenin dibine indiğinde "girildi" sayılıyor,
+ama giriş fiyatı bölgenin tepesi yazılıyor. İşlem defterde doğduğu anda
+bölge genişliği kadar zararda başlıyor.
+
+Gerçek defterden ölçüm (26 dolmuş işlem):
+
+| Sonuç | n | Ortalama peşin zarar (bölge/risk) |
+|---|---|---|
+| WIN | 4 | 0,15R |
+| LOSS | 16 | 0,28R |
+| EXPIRED | 2 | 1,06R |
+| **tümü** | **26** | **0,33R** |
+
+Net beklenti −0,50R iken peşin zarar 0,33R — açığın üçte ikisi buradan.
+Ayrıca bölge genişledikçe sonuç kötüleşiyor.
+
+Mevcut korumalar bunu yakalamıyor: `MAX_ENTRY_ZONE_ATR` ve
+`WORST_FILL_TP1_R_MIN` bölgeyi **ATR'ye** oranlıyor, **riske**
+oranlamıyor. Stop yapısal olduğunda risk 1,2 ATR'den küçük olabiliyor ve
+bölge/risk oranı 1,0'ı aşabiliyor (defterde GM 1,10 · V 1,02).
+
+**Uyarı — bu gerçek bir strateji kusuru DA olabilir, ölçüm aracının fazla
+kötümser olması DA.** Dolum kuralı bilinçli konmuş (2 Ağu, konsey 5/5;
+emirler elle giriliyor, 30-60 sn gecikme). Kodla ayırt edilemez.
+Ayırt etmenin tek yolu `alpaca_mirror` — zaten bunun için yazılmış,
+4 adımlık planın 2. adımında, şu an kapalı.
+
+**Önerilen hipotez (karar kuralı önceden yazıldı, `research-log.md`
+yöntemi):** Kilit-2 kohortu 40 sonuçlanan işleme ulaştığında, bölge/risk
+oranı medyanın üstündeki ve altındaki işlemlerin net-R beklentileri
+karşılaştırılır. Üst dilim alt dilimden en az **0,20R kötüyse** ve işaret
+iki yarı dönemde aynıysa, bölge/risk tavanı (öneri: 0,25R) motora eklenir.
+Aksi halde hipotez yanlışlanmış sayılır ve kayda geçer.
+
+### M4 — Rejim filtresinin fırsat maliyeti ölçülmüyor (öncelik: düşük)
+
+bybit'te piyasa kapısı boru hattının **sonunda**: engellenen karar tam
+plan seviyeleri taşır ve `blocked=1` karşı-olgu kohortuna yazılır, böylece
+kapının koruma mı fırsat maliyeti mi olduğu ölçülebilir.
+
+midas'ta `MARKET_REGIME` **2. sırada** sert kesiyor; plan hiç kurulmuyor,
+dolayısıyla filtrenin kaç iyi işlemi engellediği bilinemiyor. İlginç olan:
+aynı prensip midas'ta kill-switch (`blocked=3`) ve açılış penceresi
+(`blocked=4`) için zaten uygulanmış — sadece ana rejim filtresine
+uygulanmamış.
+
+### M5 — Belge kodla çelişiyor (öncelik: düşük, dakikalık iş)
+
+`signal_tracker` docstring'i hâlâ *"Fill fiyati: bölgenin ilk değen
+kenarı"* diyor. Bu **bybit'in davranışının tarifi**; midas'ın kendi kodu
+tam katetme istiyor (M3). `stats()` içindeki not doğru
+("conservative fills (full zone traversal)"), docstring güncellenmemiş.
+
+## Açık maddeler — bybit tarafı
+
+2026-08-12 itibarıyla, bu incelemenin bulduğu üç madde de **kapandı**:
+
+| Bulgu | Durum |
+|---|---|
+| Retest kusuru | ✔ KİLİT-2 (2026-08-12) ile düzeltildi, sayaçlar 08-13'ten sıfırdan |
+| Ölü maksimum düşüş alarmı | ✔ `d198aac` (2026-08-12) ile düzeltildi |
+| S1_TSMOM örnekleminin tavanla boğulması | ✔ tavan 40 → 70, bütçe devri (toplam sabit) |
+
+Kalan tek yapısal madde: midas'taki deney altyapısının (çıkış/giriş
+laboratuvarı, hipotez kohortu, öz-denetim değişmezleri) bybit'te karşılığı
+yok. Öncelik düşük — bybit'in asıl darboğazı ölçüm değil, kenar bulmak.
+
+## Kaynak
+
+Bu notu üreten inceleme: her iki botun karar üreten katmanlarının satır
+satır okunması + canlı uçlardan (`/performance`, `/signals`, `/diag`,
+`/alarms`, `/challengers`) doğrulama + iki koşturulmuş kanıt testi
+(retest kusuru, ölü alarm). 2026-08-11/12.
