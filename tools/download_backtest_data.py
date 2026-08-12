@@ -98,7 +98,10 @@ def fetch_window(session: requests.Session, base: str, symbol: str,
             oldest = ts if oldest is None else min(oldest, ts)
         if oldest is None or oldest <= start_ms:
             break
-        cursor_end = oldest             # bir sonraki sayfa: en eskinin oncesi
+        # Bybit v5'te start/end DAHILdir: imlec 'oldest' birakilirsa ayni mum
+        # tekrar doner ve pencere baslangicindan sonra listelenen paritede
+        # dongu sonsuza gider (2026-08-12 canli vaka). Strict kucult.
+        cursor_end = oldest - 1         # bir sonraki sayfa: en eskinin oncesi
         time.sleep(pause)
     return [rows_by_ts[t] for t in sorted(rows_by_ts)]
 
