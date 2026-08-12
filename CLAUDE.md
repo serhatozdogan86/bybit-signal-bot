@@ -13,6 +13,11 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
   yaradığını bir cümleyle söyle. Mümkünse adımları TEK komutta birleştir.
 - Rapor/özetlerde önce sonuç, sonra kısa gerekçe; uzun teknik döküm yalnız
   istenirse.
+- (2026-08-13) VM'de çalıştırılacak her komut tarifinde ÖNCE bağlantı
+  adımını hatırlat: PowerShell'e
+  `ssh -i C:\Users\serha\Downloads\ssh-key-2026-07-31.key ubuntu@132.145.247.85`
+  yapıştırılır; satır başı `ubuntu@bybit-bot:~$` olunca VM'desin, komutlar
+  oraya. (`PS C:\...` görünüyorsa hâlâ kendi bilgisayarındasın.)
 
 ## DURUM (2026-08-05)
 - Şampiyon (breakout_retest) kilit-1'i GEÇEMEDİ (yanlışlama #2 + CI);
