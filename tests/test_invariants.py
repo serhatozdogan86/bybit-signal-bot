@@ -290,12 +290,14 @@ def test_declared_alarms_can_actually_fire(tmp_path):
            "fill_price,r_multiple,cluster_id,blocked) VALUES(?,?,?,?,100,"
            "101,98,106,110,2,'CLOSED',?,101,?,?,0)")
     # 25 ayri kumede -1R: hem maksDD>20R hem kume-CI ust siniri<0 uretir
+    # tarihler AKTIF kilit (kilit-2) SONRASI: since-lock sayaclari
+    # kilit-2'den okur; kilit-1 kohortu arsivdir
     for i in range(25):
-        db.execute(ins, (f"L{i:02d}USDT", "LONG", "2026-08-01T00:00:00Z",
-                         "2026-08-01T01:00:00Z", "LOSS", -1.0, f"L{700+i}"))
+        db.execute(ins, (f"L{i:02d}USDT", "LONG", "2026-08-14T00:00:00Z",
+                         "2026-08-14T01:00:00Z", "LOSS", -1.0, f"L{700+i}"))
     # etiketsiz kapanmis kayit -> UNCLUSTERED kosulu
-    db.execute(ins, ("UNCUSDT", "LONG", "2026-08-01T02:00:00Z",
-                     "2026-08-01T03:00:00Z", "WIN", 2.0, ""))
+    db.execute(ins, ("UNCUSDT", "LONG", "2026-08-14T02:00:00Z",
+                     "2026-08-14T03:00:00Z", "WIN", 2.0, ""))
     st = tr.stats()
     rep = alarms.evaluate(
         st, {"outcome_audit": {"checked": 10, "mismatches": 2}}, None,
@@ -338,8 +340,8 @@ def test_maxdd_metric_matches_declared_scope(tmp_path):
     db.execute(ins, ("2026-07-01T00:00:00Z", "2026-07-01T01:00:00Z", "WIN", 20.0))
     db.execute(ins, ("2026-07-02T00:00:00Z", "2026-07-02T01:00:00Z", "LOSS", -15.0))
     # kilit SONRASI kucuk: +2R sonra -3R  -> kohort DD ~3, tum zaman DD ~16
-    db.execute(ins, (measurement.LOCK_UTC, "2026-07-30T01:00:00Z", "WIN", 2.0))
-    db.execute(ins, ("2026-07-31T00:00:00Z", "2026-07-31T01:00:00Z", "LOSS", -3.0))
+    db.execute(ins, (measurement.ACTIVE_LOCK_UTC, "2026-08-14T01:00:00Z", "WIN", 2.0))
+    db.execute(ins, ("2026-08-14T02:00:00Z", "2026-08-14T03:00:00Z", "LOSS", -3.0))
     kohort = tr.max_drawdown_r()          # varsayilan = ilan edilen kapsam
     tumu = tr.max_drawdown_r(False)
     assert kohort < tumu, "varsayilan kapsam gercek kohort olmali"

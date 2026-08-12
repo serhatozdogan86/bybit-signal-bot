@@ -153,3 +153,12 @@ walk-forward doğrulaması S1 için bu ilanla başlar.
   hüküm otomatik okunur (`/challengers → strategies.S1_TSMOM.validation`).
 - Diğer adaylar etkilenmez; S3/S6'nın kenar-ölümü alarmları ayrı karar
   konusudur.
+
+
+### Değişiklik notu (2026-08-12, aynı gün — kohort boşken)
+Karar toplantısı Madde 4: S3/S6 kenar ölümüyle EMEKLİ; boşalan 30 slot
+S1'e devredildi (tavan 40→70, efektif toplam bütçe sabit). Yukarıdaki
+"tavan bilerek BÜYÜTÜLMEDİ" cümlesi bu kararla değiştirildi — doğrulama
+kohortu henüz BOŞ olduğundan pencere tek tip (tavan-70) kısıtla toplanır;
+sonuç-bağımlı örnekleme oluşmadı. Seçim kohortu (tavan-40) arşivde ayrıdır.
+Ayrıntı ve gerekçe: config-lock.md → KİLİT-2 İLANI, Madde 4.

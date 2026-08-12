@@ -224,3 +224,69 @@ ayrıştırmaz. Ölçüm eki (motor davranışı değişmez):
 - `/measurement`: `gate_blocked_regime_dist` artık kolondan okur (restore
   sonrası da çalışır); gerçek kohort için `market_bias_dist` eklendi.
 Kural 7 uygulandı: 5 test önce KIRMIZI gösterildi, düzeltme sonrası yeşil.
+
+
+# ============================================================
+# KİLİT-2 İLANI — 2026-08-12 KARAR TOPLANTISI (Serhat onayı)
+# ============================================================
+Kaynak: iki-bot karşılaştırma raporu (bot-kod-analizi.md) + her bulgunun
+bu depoda bağımsız yeniden üretimi. Dört madde, tek oturum, tarihli tutanak.
+
+## Madde 1 — TUTANAK: maksDD alarmı ölüydü; tavan 2.7× aşılmıştı
+Alarm, düşüş değerini stats üst düzeyinde arıyordu; değer measurement
+içinde yaşıyor → alarm İLK GÜNDEN BERİ hiç ateşlenemedi. Dış denetimin
+kanıt testine göre gerçek (tüm-zaman, maliyet-modelli) maksimum düşüş
+≈54.5R — ilan edilen 20R tavanının 2.7 katı. 35.6R'lik yanlışlama-#2
+ihlalini alarm değil İNSAN yakalamıştı; şimdi kayda geçiyor. Düzeltme +
+sınıf-kapatan test (test_declared_alarms_can_actually_fire) + Kural 10
+(error-prevention.md) bu ilana eşlik eden commit'lerdedir. Motor dışı
+katman; hiçbir sayaç sıfırlanmadı.
+
+## Madde 2 — RETEST DÜZELTMESİ (motor değişikliği, kilit-2'nin gerekçesi)
+Kusur: retest/acceptance dilimleri kırılım mumunun KENDİSİNDEN başlıyordu;
+kırılım mumunun dibi seviye toleransı içinde kaldığı için retest şartı
+fiilen BOŞTU — motor kırılımı görür görmez kovalıyordu. Kanıt: fiyatın
+kırıp HİÇ geri dönmediği sentetik seride eski kod kurulum buldu (kırmızı
+test: test_breakout_retest_requires_actual_retest; düzeltme sonrası aynı
+seri kurulum üretmez, gerçek retest'li seri üretmeye devam eder).
+Düzeltme: dilimler break_i+1'den başlar (structure_analyzer.py).
+AÇIK SINIR: "düzeltilince kâra geçer" DENMEDİ ve DENMEZ — bunu yalnız
+kilit-2 kohortu söyleyebilir.
+
+## Madde 3 — KİLİT-1 HÜKMÜ ARŞİVLENDİ (seçenek b, gerekçeli)
+Botun kendi alarmı: örneklem doldu (≥50 küme), CI koşulu sağlanmadı →
+hüküm "GEÇEMEDİ". Bu hüküm ESKİ (retest'i boş) motora aittir ve zaten
+2026-08-05'te yanlışlama-#2 ile pencere kapanmıştı. Karar: şampiyon
+durdurulmaz; hüküm kilit-1 arşivine yazılır, düzeltilmiş motor KİLİT-2
+penceresinde SIFIRDAN ölçülür. Gerekçe: aynı anda hem motoru düzeltip hem
+eski defterden hüküm sürdürmek iki farklı motorun karnesini karıştırırdı.
+
+## KİLİT-2 KURALLARI
+- Pencere başlangıcı: **LOCK2_UTC = 2026-08-13T00:00:00Z**
+  (measurement.ACTIVE_LOCK_UTC). Tüm "kilit sonrası" sayaçlar (Faz-1
+  küme sayacı, küme-CI, maksDD, kenar-ölümü alarmı) SIFIRDAN bu andan okur.
+- ŞART: bu ilanın commit'i LOCK2_UTC'den ÖNCE canlıya alınmalıdır
+  (main'e merge → autodeploy). Alınamazsa pencere fiili deploy anına
+  kayar ve buraya tarihli not düşülür.
+- Eşikler, maliyet modeli v0, küme tanımı, gölge kuralları, portföy ısısı,
+  evren kuralı: kilit-1 ile AYNEN (hiçbiri değişmedi).
+- Yanlışlama kriterleri (1: kenar ölümü, 2: maksDD>20R, 3: açlık) AYNEN
+  devralınır ve kilit-2 kohortunda izlenir.
+- `app/strategies/` bu commit'ten itibaren YENİDEN DONMUŞTUR (CLAUDE.md
+  kural 1); bu ilandaki break_i+1 değişikliği donmanın kayıtlı istisnası
+  değil, kilidin kendisinin parçasıdır.
+
+## Madde 4 — ADAY BÜTÇESİ (ölçüm katmanı; ayrı tarihli not)
+S3_MEANREV ve S6_SWEEP kenar ölümü İLAN EDİLMİŞ koşulla kanıtlandı
+(CHALLENGER_DEAD: küme-CI üst sınırı < 0, ≥20 küme; S3: 83 küme
+[−0.30,−0.07], S6: 82 küme [−0.38,−0.03]) → EMEKLİ (RETIRED sözlüğü).
+Yeni sinyal üretimi durur; açık pozisyonlar normal değerlendirilir;
+kapanmış kohort arşivde kalır ve stats'ta retired_utc ile görünür;
+alarmları susturulur (hüküm verildi, gürültü olmaz).
+Boşalan 15+15=30 slot, tavana boğulan S1'e devredildi: **S1 tavanı
+40→70; efektif toplam bütçe SABİT (165)** — türetme, icat değil.
+KIYASLANABİLİRLİK: S1'in doğrulama penceresi AYNI GÜN açıldı ve kohortu
+henüz BOŞTU → doğrulama kohortu tamamen tavan-70 altında toplanır; seçim
+kohortu (tavan-40) arşivde ayrı durur. Dünkü "tavan büyütülmedi" ilanı
+bu kararla AYNI GÜN, kohort boşken değiştirildi — sonuç-bağımlı örnekleme
+oluşmadı; çelişki bu notla kapatıldı.

@@ -50,6 +50,9 @@ def test_s2_donchian_edge_trigger_and_win_evaluation(tmp_path):
 
 
 def test_s6_sweep_short_generation(tmp_path):
+    """S6 emekli (2026-08-12) ama uretim MEKANIZMASI arsiv dogrulugu icin
+    test edilmeye devam eder: _generate adayi hala dogru kurar; on_scan
+    emeklilik filtresiyle deftere YAZMAZ."""
     eng, db = _eng(tmp_path)
     closes = np.full(120, 100.0)
     ltf = fx.make_series(closes, volumes=np.full(120, 1000.0))
@@ -59,10 +62,14 @@ def test_s6_sweep_short_generation(tmp_path):
     c.high = sw * 1.01
     c.close = sw * 0.998
     c.volume = 2000.0
-    assert eng.on_scan("BUSDT", None, ltf, None) == 1
-    row = db.query_one("SELECT * FROM challenger_signals")
-    assert row["strategy"] == "S6_SWEEP" and row["direction"] == "SHORT"
-    assert row["stop"] > c.high  # stop ekstremum otesinde
+    cands = dict(eng._generate("BUSDT", None, ltf, None))
+    assert "S6_SWEEP" in cands
+    direction, stop, tp, timeout = cands["S6_SWEEP"]
+    assert direction == "SHORT"
+    assert stop > c.high  # stop ekstremum otesinde
+    # emeklilik filtresi: deftere kayit dusmez
+    assert eng.on_scan("BUSDT", None, ltf, None) == 0
+    assert db.query_one("SELECT COUNT(*) n FROM challenger_signals")["n"] == 0
 
 
 def test_s4_carry_sign_mapping(tmp_path):
@@ -400,6 +407,62 @@ def test_recent_rows_carry_net_r(tmp_path):
     assert rows["AUSDT"]["net_r"] is not None
     assert rows["AUSDT"]["net_r"] < 3.0             # maliyet dusuldu
     assert rows["BUSDT"]["net_r"] is None           # acik kayit: hesap yok
+
+
+def test_retired_strategies_stop_generating_keep_evaluating(tmp_path):
+    """KARAR (2026-08-12, Madde 4): kenar olumu ILAN EDILMIS kosulla
+    kanitlanan adaylar (S3, S6 - CHALLENGER_DEAD: kume-CI ust siniri < 0,
+    >=20 kume) emekliye ayrilir. Yeni sinyal uretimi DURUR; acik
+    pozisyonlar normal degerlendirilir; kapanmis kohort arsivde kalir.
+    Bosalan slot butcesi (15+15) tavana bogulan S1'e devredilir: toplam
+    efektif butce SABIT kalir (turetme, icat degil)."""
+    from app.services.challengers import RETIRED, MAX_OPEN
+    assert set(RETIRED) == {"S3_MEANREV", "S6_SWEEP"}
+    # butce devri: S1 40+30=70; efektif toplam degismedi
+    assert MAX_OPEN["S1_TSMOM"] == 70
+    aktif = [s for s in ("S1_TSMOM", "S2_DONCHIAN", "S4_CARRY",
+                         "S6_SWEEP", "S3_MEANREV", "S7_WYCKOFF")
+             if s not in RETIRED]
+    assert sum(MAX_OPEN[s] for s in aktif) == 165   # emeklilik oncesi butce
+    # S6'nin kusursuz uretim senaryosu artik SIFIR sinyal uretmeli
+    eng, db = _eng(tmp_path)
+    closes = np.full(120, 100.0)
+    ltf = fx.make_series(closes, volumes=np.full(120, 1000.0))
+    c = ltf.candles[-1]
+    sw = max(x.high for x in ltf.candles[-98:-2])
+    c.high, c.close, c.volume = sw * 1.01, sw * 0.998, 2000.0
+    assert eng.on_scan("RETUSDT", None, ltf, None) == 0
+    assert db.query_one("SELECT COUNT(*) n FROM challenger_signals")["n"] == 0
+    # ama ONCEDEN acilmis S6 pozisyonu hala degerlendirilir ve kapanir
+    db.execute("INSERT INTO challenger_signals(strategy,pair,direction,"
+               "created_utc,entry_ts,entry,stop,tp,timeout_bars,cluster_id,"
+               "regime) VALUES('S6_SWEEP','OPNUSDT','LONG',"
+               "'2026-08-10T00:00:00Z',1000000,100,98,104,96,'S6:L1',2)")
+    _put_candles(db, "OPNUSDT", [(104.5, 99.5, 104.0)], start_ts=1_900_000)
+    eng.evaluate_open("OPNUSDT")
+    row = db.query_one("SELECT outcome FROM challenger_signals")
+    assert row["outcome"] == "WIN"
+    # stats emekliligi acikca raporlar (sessiz kaybolma yok)
+    s = eng.stats()["strategies"]
+    assert s["S6_SWEEP"].get("retired_utc")
+    assert s["S3_MEANREV"].get("retired_utc")
+    assert "retired_utc" not in s["S1_TSMOM"]
+
+
+def test_alarms_skip_retired_challengers():
+    """Emekli aday icin CHALLENGER_CAPPED/DEAD alarmi URETILMEZ - hukmu
+    verilmis stratejinin alarmi kalici gurultuye doner."""
+    from app.services import alarms
+    ch = {"max_open": {"S3_MEANREV": 15, "S1_TSMOM": 70},
+          "strategies": {
+              "S3_MEANREV": {"open": 15, "clusters": 83,
+                             "ci": [-0.3, -0.07], "retired_utc": "2026-08-12"},
+              "S1_TSMOM": {"open": 70, "clusters": 10, "ci": None}}}
+    rep = alarms.evaluate({}, None, ch)
+    codes = [a["code"] for a in rep["alarms"]]
+    assert "CHALLENGER_DEAD" not in codes      # emekli: hukum zaten verildi
+    # emekli OLMAYAN tavandaki aday hala uyarilir
+    assert "CHALLENGER_CAPPED" in codes
 
 
 def test_s1_validation_window_measured_separately(tmp_path):

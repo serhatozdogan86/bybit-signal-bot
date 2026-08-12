@@ -41,12 +41,22 @@ STRATEGIES = ("S1_TSMOM", "S2_DONCHIAN", "S3_MEANREV", "S4_CARRY", "S6_SWEEP",
 # Tavan artik ortalama tutus suresiyle ORANTILI: yavas adaylar da makul
 # surede 50 kumeye ulasabilsin. Bu bir OLCUM ALTYAPISI duzeltmesidir;
 # hicbir stratejinin giris/cikis kurali degismedi.
-MAX_OPEN = {"S1_TSMOM": 40, "S2_DONCHIAN": 40, "S4_CARRY": 40,
+# 2026-08-12 karar toplantisi (Madde 4): S3/S6 kenar olumu ILAN EDILMIS
+# kosulla kanitlandi (CHALLENGER_DEAD) -> emekli. Bosalan 15+15=30 slot,
+# tavana bogulan S1'e devredildi (40->70). Efektif toplam butce SABIT
+# (165): bu bir TURETMEDIR, yeni butce icat edilmedi. S1 dogrulama
+# penceresi ayni gun acildigi icin dogrulama kohortu TAMAMEN tavan-70
+# altinda toplanir; secim kohortu (tavan-40) arsivde ayri durur.
+MAX_OPEN = {"S1_TSMOM": 70, "S2_DONCHIAN": 40, "S4_CARRY": 40,
             "S3_MEANREV": 15, "S6_SWEEP": 15,
             # S7: tasarimda tavan yazilmadi; rejim-2 kurali uygulanir
             # ("tavan tutus suresiyle orantili") - zaman asimi 96 bar =
             # S3/S6 sinifi -> 15 (varsayilanla ayni, ICAT degil turetme)
             "S7_WYCKOFF": 15}
+# Emekli adaylar: yeni sinyal uretimi DURUR; acik pozisyonlar normal
+# degerlendirilir, kapanmis kohort arsivde kalir ve stats'ta
+# retired_utc ile raporlanir (sessiz kaybolma yok).
+RETIRED = {"S3_MEANREV": "2026-08-12", "S6_SWEEP": "2026-08-12"}
 MAX_OPEN_DEFAULT = 15
 # Ornekleme rejimi damgasi: tavan degisimi oncesi/sonrasi kohortlar
 # BIRLESTIRILEMEZ (farkli kisitla toplandilar). Istatistikler yalniz
@@ -339,6 +349,8 @@ class ChallengerEngine:
         bucket = int(last.ts // 14_400_000)
         made = 0
         for strat, sig in self._generate(symbol, htf, ltf, funding):
+            if strat in RETIRED:
+                continue        # emekli: hukum verildi, yeni sinyal yok
             direction, stop, tp, timeout = sig
             cid = f"{strat}:{direction[0]}{bucket}"
             if self._dup(strat, symbol, cid) or self._crowded(strat):
@@ -644,6 +656,8 @@ class ChallengerEngine:
                     [float(r["hold_bars"]) for r in closed
                      if r.get("hold_bars") is not None]),
             }
+            if strat in RETIRED:
+                out["strategies"][strat]["retired_utc"] = RETIRED[strat]
             # --- on-kayitli dogrulama penceresi muhasebesi (varsa) ---
             vstart = VALIDATION_WINDOWS.get(strat)
             if vstart:

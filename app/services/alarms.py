@@ -121,6 +121,8 @@ def evaluate(stats: dict, diagnostics: dict | None = None,
     if challengers:
         caps = challengers.get("max_open") or {}
         for name, s in (challengers.get("strategies") or {}).items():
+            if s.get("retired_utc"):
+                continue   # hukum verilmis emekli aday: alarm gurultusu olmaz
             cap = caps.get(name, 15)
             if (s.get("open") or 0) >= cap:
                 out.append(_alarm(

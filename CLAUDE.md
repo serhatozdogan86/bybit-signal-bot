@@ -15,8 +15,11 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
   istenirse.
 
 ## DURUM (2026-08-05)
-- Şampiyon (breakout_retest) Faz-1'i GEÇEMEDİ: yanlışlama #2 tetiklendi
-  (kilit sonrası maksDD 35.6R > 20R). Otopsi: docs/config-lock.md sonu.
+- Şampiyon (breakout_retest) kilit-1'i GEÇEMEDİ (yanlışlama #2 + CI);
+  hüküm arşivlendi. KİLİT-2 (2026-08-12): retest düzeltmeli motor,
+  sayaçlar 2026-08-13'ten SIFIRDAN — config-lock.md sonu.
+- S3/S6 kenar ölümüyle EMEKLİ (2026-08-12); S1 tavanı 40→70 (bütçe
+  devri, toplam sabit). Ölü maksDD alarmı düzeltildi (Kural 10).
 - 6 aday gölge yarışta (app/services/challengers.py), rejim-2 örneklemesi.
   S7 (Wyckoff) 2026-08-06'da yarışa girdi (tetik: S6 sınavını doldurdu).
   S5 beklemede — tetikleyicisi docs/challengers-design.md.
@@ -26,7 +29,9 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
   aynı kurallar) — challengers-design.md sonu.
 
 ## DEĞİŞTİRİLEMEZ KURALLAR
-1. `app/strategies/` DONMUŞTUR. Davranışı etkileyen tek satır bile yasak.
+1. `app/strategies/` DONMUŞTUR (KİLİT-2, 2026-08-12: retest düzeltmesi
+   kilit ilanının parçası olarak yapıldı; o commit'ten itibaren donma
+   YENİDEN başlar). Davranışı etkileyen tek satır bile yasak.
    KAYITLI İSTİSNA (2026-08-05, f61333e): karar davranışını DEĞİŞTİRMEYEN
    salt-metadata enstrümantasyonu, (a) davranış-kimliği kanıtı (aynı girdi
    → market_bias hariç bayt-bayt aynı karar, üç senaryoda doğrulandı) ve
