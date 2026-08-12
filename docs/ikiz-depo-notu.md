@@ -71,7 +71,16 @@ düzeltilmiş kod üretmiyordu.
 Aşağıdakiler 2026-08-12 itibarıyla **açık**. Hiçbiri motora dokunmaz;
 üçü ölçüm katmanı, biri belge tutarlılığı.
 
-### M1 — Go-live eşiği tesadüfe açık (öncelik: yüksek)
+### M1 — Go-live eşiği tesadüfe açık ✔ KAPANDI (v4.30, 2026-08-12)
+
+**Durum: çözüldü.** `v4.30` go-live'a altıncı şartı ekledi: işlem başına net
+beklentinin küme-blok bootstrap güven aralığının alt sınırı > 0
+(`signal_tracker.cluster_bootstrap_ci`, eşikler `GOLIVE_CI_*`, rapor
+`golive_status.criteria.ci_low_r`; 10.000 tur, %95, sabit tohum).
+Kapıyı yalnızca sıkılaştırdığı için KİLİT-2 sayacı sıfırlanmadı.
+Aşağıdaki ölçüm, o kararın gerekçesi olarak kayıtta kalıyor.
+
+
 
 `docs/go-live-kriteri.md` beş şart sayıyor ama hiçbiri **istatistiksel
 anlamlılık** istemiyor. bybit'in Faz-1 kapısı istiyor: *≥50 küme VE
@@ -99,7 +108,7 @@ Bu bir **sıkılaştırmadır**; `config-lock.md` gevşetmeyi yasaklar,
 sıkılaştırmayı serbest bırakır. Eşik değerleri değişmediği için kohort
 sıfırlanmaz.
 
-### M2 — Bağımsız sonuç denetçisi yok (öncelik: yüksek)
+### M2 — Bağımsız sonuç denetçisi yok (öncelik: yüksek; `docs/ideas.md`'ye ön-kayıt yapıldı 2026-08-12)
 
 bybit'teki `verifier.py`'nin gerekçesi: *"Tracker'ın kendi değerlendirme
 döngüsünü tekrar kullanan bir denetim, o döngüdeki hatayı göremez — hata
@@ -158,7 +167,7 @@ karşılaştırılır. Üst dilim alt dilimden en az **0,20R kötüyse** ve işa
 iki yarı dönemde aynıysa, bölge/risk tavanı (öneri: 0,25R) motora eklenir.
 Aksi halde hipotez yanlışlanmış sayılır ve kayda geçer.
 
-### M4 — Rejim filtresinin fırsat maliyeti ölçülmüyor (öncelik: düşük)
+### M4 — Rejim filtresinin fırsat maliyeti ölçülmüyor (öncelik: düşük; `docs/ideas.md`'ye ön-kayıt yapıldı 2026-08-12)
 
 bybit'te piyasa kapısı boru hattının **sonunda**: engellenen karar tam
 plan seviyeleri taşır ve `blocked=1` karşı-olgu kohortuna yazılır, böylece
