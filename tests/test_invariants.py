@@ -274,6 +274,41 @@ def test_alarm_registry_has_no_search_logic():
     assert "ONCEDEN" in src.upper() and "ARAMAZ" in src.upper()
 
 
+def test_declared_alarms_can_actually_fire(tmp_path):
+    """HATA SINIFI (v3.8): alarm kosulu, stats()'in GERCEKTE urettigi
+    anahtarla eslesmiyorsa alarm sessizce OLU dogar - MAX_DD boyle bulundu
+    (deger measurement icinde, alarm ust duzeyde ariyordu; 35.6R'lik ihlali
+    insan yakaladi, alarm hic otmedi). Kural: ilan edilmis her alarm, GERCEK
+    tracker.stats() ciktisiyla uctan uca ateslenebildigini kanitlamali."""
+    from app.services import alarms
+    from app.services.database import Database
+    from app.services.signal_tracker import SignalTracker
+    db = Database(str(tmp_path / "al.db"))
+    tr = SignalTracker(db, "15")
+    ins = ("INSERT INTO signals(pair,direction,created_utc,closed_utc,"
+           "entry_min,entry_max,stop_loss,tp1,tp2,rr,status,outcome,"
+           "fill_price,r_multiple,cluster_id,blocked) VALUES(?,?,?,?,100,"
+           "101,98,106,110,2,'CLOSED',?,101,?,?,0)")
+    # 25 ayri kumede -1R: hem maksDD>20R hem kume-CI ust siniri<0 uretir
+    for i in range(25):
+        db.execute(ins, (f"L{i:02d}USDT", "LONG", "2026-08-01T00:00:00Z",
+                         "2026-08-01T01:00:00Z", "LOSS", -1.0, f"L{700+i}"))
+    # etiketsiz kapanmis kayit -> UNCLUSTERED kosulu
+    db.execute(ins, ("UNCUSDT", "LONG", "2026-08-01T02:00:00Z",
+                     "2026-08-01T03:00:00Z", "WIN", 2.0, ""))
+    st = tr.stats()
+    rep = alarms.evaluate(
+        st, {"outcome_audit": {"checked": 10, "mismatches": 2}}, None,
+        last_scan_utc="2026-08-01T00:00:00Z",     # cok eski -> SCAN_STALLED
+        last_backup_utc="2026-08-01T00:00:00Z")   # cok eski -> BACKUP_STALE
+    codes = {a["code"] for a in rep["alarms"]}
+    for beklenen in ("MAX_DD", "EDGE_DEATH", "UNCLUSTERED",
+                     "AUDIT_MISMATCH", "SCAN_STALLED", "BACKUP_STALE"):
+        assert beklenen in codes, (
+            f"{beklenen} alarmi gercek stats() ciktisiyla ateslenemiyor - "
+            f"olu alarm (gelenler: {sorted(codes)})")
+
+
 def test_audit_summary_reaches_backup_payload(tmp_path):
     """HATA SINIFI: denetim calisir ama sonucu disariya ULASMAZ - agac
     ormanda devrilir. Ozet stats()'a, dolayisiyla gist yedegine girmeli."""

@@ -54,6 +54,16 @@ MAX_OPEN_DEFAULT = 15
 SAMPLING_REGIME = 2
 FAZ1_TARGET = 50                # sampiyonla ayni sinav esigi
 
+# ---- ON-KAYITLI dogrulama pencereleri (secim-sonrasi walk-forward) ----
+# Kural (challengers-design.md, coklu karsilastirma): one cikan aday,
+# ilan ANINDAN SONRA toplanan veride sinavi YENIDEN gecmek zorundadir.
+# Ilan sonuca bakilarak uzatilamaz/geri alinamaz; hukum = yeni kohortta
+# >=FAZ1_TARGET kapanmis kume VE kume-CI alt siniri > 0. Strateji
+# kurallari, tavan ve maliyet modeli AYNEN kalir (rejim degismez).
+# S1: secim penceresi 50 kumede doldu, CI alt siniri -0.053 -> kil payi
+# gecemedi; dogrulama penceresi 2026-08-12'de ilan edildi (Serhat onayi).
+VALIDATION_WINDOWS = {"S1_TSMOM": "2026-08-12T00:00:00Z"}
+
 # ---- strateji parametre sabitleri: TEK KAYNAK (v1.2, suruklenme yasagi) ----
 # Hem _generate() hem STRATEGY_INFO (pano detay penceresi) BU sabitleri okur;
 # kod degisince aciklama otomatik guncellenir, elle es tutulan metin yoktur.
@@ -634,6 +644,35 @@ class ChallengerEngine:
                     [float(r["hold_bars"]) for r in closed
                      if r.get("hold_bars") is not None]),
             }
+            # --- on-kayitli dogrulama penceresi muhasebesi (varsa) ---
+            vstart = VALIDATION_WINDOWS.get(strat)
+            if vstart:
+                vclosed = [r for r in closed
+                           if (r.get("created_utc") or "") >= vstart]
+                vdecided = [r for r in vclosed
+                            if r["outcome"] in ("WIN", "LOSS")]
+                vclusters: dict[str, list[float]] = {}
+                vnet = 0.0
+                for r in vclosed:
+                    n = self._net_r(r)
+                    if n is not None:
+                        vnet += n
+                        vclusters.setdefault(
+                            r["cluster_id"] or "?", []).append(n)
+                vboot = measurement.cluster_bootstrap(vclusters)
+                out["strategies"][strat]["validation"] = {
+                    "start_utc": vstart,
+                    "decided": len(vdecided),
+                    "net_r": round(vnet, 2),
+                    "clusters": len(vclusters),
+                    "target_clusters": FAZ1_TARGET,
+                    "ci": ([vboot["ci_low"], vboot["ci_high"]]
+                           if vboot and vboot.get("ci_low") is not None
+                           else None),
+                    "note": ("on-kayitli walk-forward dogrulama; hukum "
+                             "YALNIZ bu kohorttan (ilan oncesi kayitlar "
+                             "karisamaz)"),
+                }
         return out
 
     def strategy_info(self) -> dict:

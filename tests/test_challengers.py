@@ -402,6 +402,39 @@ def test_recent_rows_carry_net_r(tmp_path):
     assert rows["BUSDT"]["net_r"] is None           # acik kayit: hesap yok
 
 
+def test_s1_validation_window_measured_separately(tmp_path):
+    """ON-KAYIT (2026-08-12): S1 secim penceresini 50 kumede doldurdu,
+    kume-CI alt siniri -0.053 ile sinavi KIL PAYI GECEMEDI. Coklu
+    karsilastirma kurali geregi hukum, ilan ANINDAN SONRA dogan yeni
+    kohorttan verilir. Bu test pencere muhasebesini zorlar: ilan oncesi
+    kayitlar dogrulama istatistigine KARISAMAZ."""
+    from app.services.challengers import VALIDATION_WINDOWS
+    assert "S1_TSMOM" in VALIDATION_WINDOWS      # pencere ilan edilmis olmali
+    start = VALIDATION_WINDOWS["S1_TSMOM"]
+    eng, db = _eng(tmp_path)
+    ins = ("INSERT INTO challenger_signals(strategy,pair,direction,"
+           "created_utc,entry_ts,entry,stop,tp,timeout_bars,cluster_id,"
+           "status,outcome,r_multiple,hold_bars,regime) VALUES("
+           "'S1_TSMOM',?,?,?,1,100,98,106,192,?,'CLOSED',?,?,20,2)")
+    # ilan ONCESI kayit (secim penceresi) - dogrulamaya girmemeli
+    db.execute(ins, ("ESKIUSDT", "LONG", "2026-08-01T00:00:00Z",
+                     "S1:Lold", "WIN", 3.0))
+    # ilan SONRASI iki kayit (dogrulama kohortu)
+    db.execute(ins, ("YENIUSDT", "LONG", "2026-09-01T00:00:00Z",
+                     "S1:Lnew1", "WIN", 3.0))
+    db.execute(ins, ("YENI2USDT", "LONG", "2026-09-01T05:00:00Z",
+                     "S1:Lnew2", "LOSS", -1.0))
+    s = eng.stats()["strategies"]["S1_TSMOM"]
+    assert s["decided"] == 3                     # genel sayac hepsini gorur
+    v = s["validation"]
+    assert v["start_utc"] == start
+    assert v["decided"] == 2                     # yalniz ilan sonrasi
+    assert v["clusters"] == 2
+    assert v["target_clusters"] == 50
+    # pencere ilani olmayan stratejide validation alani yok
+    assert "validation" not in eng.stats()["strategies"]["S2_DONCHIAN"]
+
+
 def test_strategy_info_texts_have_ru_entries():
     """Kural: yeni UI metinlerinin TAMAMI RU sozlugune girer. Turkce
     karakter iceren her STRATEGY_INFO metni panoda birebir anahtar olmali.

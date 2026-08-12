@@ -112,3 +112,15 @@ yazılır (H-1 gibi), GELECEK veride test edilir, çoklu karşılaştırma sayı
 "ağaç ormanda devriliyordu". Artık `stats().measurement.outcome_audit` ile
 gist'e yazılıyor; uzaktan denetlenebilir. maksDD de eklendi (yanlışlama
 kriteri sayısal olarak izlenebilsin diye).
+
+
+## Kural 10 (2026-08-12): ilan edilmiş alarm, ateşlenebildiğini kanıtlamalı
+MAX_DD alarmı ilk yazıldığı günden beri ÖLÜYDÜ: değeri `stats` üst düzeyinde
+arıyordu, değer `measurement` içinde yaşıyordu. 35.6R'lik yanlışlama ihlalini
+alarm değil İNSAN yakaladı — koruma mekanizması sessizce yoktu. Kusuru dış
+denetim (ikinci Claude oturumu, kanıt testiyle) buldu.
+
+Kural: **her ilan edilmiş alarm koşulu, GERÇEK üretici çıktısıyla (sahte
+sözlük değil, `tracker.stats()` gibi) uçtan uca ateşlenebildiğini gösteren
+bir teste sahip olmalıdır.** Var olması değil, ÖTMESİ test edilir.
+→ `test_declared_alarms_can_actually_fire`
