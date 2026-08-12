@@ -238,6 +238,14 @@ DASHBOARD_HTML = r"""<!doctype html>
   .b-NOT_FILLED,.b-EXPIRED{background:var(--grey-bg);color:#5B5344}
   .b-AMBIGUOUS{background:var(--blue-bg);color:var(--blue-ink)}
   .b-OPEN{background:var(--amber-bg);color:var(--amber-ink)}
+  /* aday durum rozeti: metin chalVerdict() ile KODDAN turetilir (drift yasagi) */
+  .vd{display:inline-block;padding:1px 7px;border-radius:99px;
+      font-size:9.5px;font-weight:700;letter-spacing:.02em;white-space:nowrap}
+  .vd-run{background:var(--blue-bg);color:var(--blue-ink)}
+  .vd-out{background:var(--grey-bg);color:#5B5344}
+  .vd-fail{background:var(--red-bg);color:var(--red-ink)}
+  .vd-pass{background:var(--green-bg);color:var(--green-ink)}
+  #chalBody td .vd{display:block;width:fit-content;margin-top:3px}
   .age{font-size:10px;color:var(--muted)}
   .conf{display:inline-block;margin-left:5px;width:15px;text-align:center;
         border-radius:4px;font-size:9.5px;font-weight:700;font-family:var(--mono)}
@@ -382,7 +390,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     .step .d{display:none}
   }
   /* ---------- MOBIL (<=760px): sekmeli tek kolon + menekse vurgu ---------- */
-  .col[data-tab="ayar"],.col[data-tab="adaylar"]{display:none}   /* yalniz mobil sekmede gorunur */
+  .col[data-tab="ayar"],.col[data-tab="adaylar"]{display:none}   /* ayar yalniz mobil sekme; adaylar masaustunde asagidaki blokla acilir */
   .setrow{display:flex;align-items:center;justify-content:space-between;
      gap:12px;padding:11px 0;border-bottom:1px dashed var(--line)}
   .setrow:last-child{border-bottom:0}
@@ -396,6 +404,18 @@ DASHBOARD_HTML = r"""<!doctype html>
   .syslist{font-family:var(--mono);font-size:11.5px;line-height:2}
   .syslist b{color:var(--head);font-weight:600}
   .tabbar{display:none}
+  /* ---------- MASAUSTU (>=761px): Adaylar paneli orta kolonda, sinyal
+     tablosunun altinda ayri serit. Kolon genislikleri AYNEN kalir
+     (220px / 1fr / 300px): sol ve sag kolon iki satiri kaplar, sinyal
+     tablosu DARALMAZ; orta kolon dikeyde bolunur. ---------- */
+  @media (min-width:761px){
+    .cols{grid-template-rows:minmax(0,1fr) minmax(0,auto)}
+    .col[data-tab="ozet"]{grid-column:1;grid-row:1/span 2}
+    .col[data-tab="sinyaller"]{grid-column:2;grid-row:1}
+    .col[data-tab="adaylar"]{display:flex;grid-column:2;grid-row:2;
+       max-height:clamp(200px,32vh,320px)}
+    .col[data-tab="piyasa"]{grid-column:3;grid-row:1/span 2}
+  }
   @media (max-width:760px){
     /* Claude Design mobil paleti: menekse vurgu, hafif lila zemin */
     :root{--blue:#6D28D9;--bg:#F6F4FB;--card:#FFFFFF;--card2:#F3F0FB;
@@ -578,7 +598,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     <div class="col" data-tab="adaylar">
       <div class="card fill">
-        <div class="chead"><span class="tipwrap" tabindex="0" data-tip="Faz B gölge yarışı: 5 aday strateji, şampiyonla AYNI maliyet modeli ve AYNI sınavla (≥50 kapanmış küme + küme-CI alt sınırı > 0) kâğıt üzerinde ölçülür. Gerçek işlem yok. Girişler kapanış bazlı; v1 çıkışları sabit hedefli — trend adayları (S1/S2) için sonuçlar muhafazakâr alt sınırdır. Şampiyon Faz-1 sınavını geçemezse buradaki sıralama bir sonraki denemenin adayını belirler. Çoklu karşılaştırma düzeltmesi: kazanan, seçildikten SONRA toplanan veride de sınavı geçmek zorundadır. Yatırım tavsiyesi değildir.">Aday Stratejiler · Gölge Yarış <span class="i">ⓘ</span></span> <span class="tag">Faz B</span> <span class="tag">satıra tıkla → detay</span></div>
+        <div class="chead"><span class="tipwrap" tabindex="0" data-tip="Faz B gölge yarışı: tablodaki aday stratejiler, şampiyonla AYNI maliyet modeli ve AYNI sınavla (≥50 kapanmış küme + küme-CI alt sınırı > 0) kâğıt üzerinde ölçülür. Gerçek işlem yok. Girişler kapanış bazlı; v1 çıkışları sabit hedefli — trend adayları (S1/S2) için sonuçlar muhafazakâr alt sınırdır. Şampiyonun ilk sınavı GEÇİLEMEDİ (hüküm arşivlendi); yarış, bir sonraki şampiyon adayını belirlemek için sürüyor. Rozetler: YARIŞIYOR = küme <50; ELENDİ = küme ≥20 ve CI üst sınırı <0 (kenar ölümü); SINAV BİTTİ · GEÇEMEDİ = küme ≥50 ve CI alt sınırı ≤0. Çoklu karşılaştırma düzeltmesi: kazanan, seçildikten SONRA toplanan veride de sınavı geçmek zorundadır. Yatırım tavsiyesi değildir.">Aday Stratejiler · Gölge Yarış <span class="i">ⓘ</span></span> <span class="tag" id="chalCount">Faz B</span> <span class="tag">satıra tıkla → detay</span></div>
         <div class="cbody scroll" id="chalBody"><div class="empty">aday verisi birikiyor…</div></div>
       </div>
     </div>
@@ -733,8 +753,12 @@ const RU={
 "Faz B":"Фаза B","aday verisi birikiyor…":"данные кандидатов накапливаются…",
 "henüz sonuçlanan aday işlemi yok — veri birikiyor":"завершённых сделок кандидатов пока нет — данные накапливаются",
 "strateji":"стратегия","açık":"открыто","sonuç":"итоги",
-"Faz B gölge yarışı: 5 aday strateji, şampiyonla AYNI maliyet modeli ve AYNI sınavla (≥50 kapanmış küme + küme-CI alt sınırı > 0) kâğıt üzerinde ölçülür. Gerçek işlem yok. Girişler kapanış bazlı; v1 çıkışları sabit hedefli — trend adayları (S1/S2) için sonuçlar muhafazakâr alt sınırdır. Şampiyon Faz-1 sınavını geçemezse buradaki sıralama bir sonraki denemenin adayını belirler. Çoklu karşılaştırma düzeltmesi: kazanan, seçildikten SONRA toplanan veride de sınavı geçmek zorundadır. Yatırım tavsiyesi değildir.":
- "Теневая гонка Фазы B: 5 стратегий-кандидатов измеряются на бумаге с ТОЙ ЖЕ моделью издержек и ТЕМ ЖЕ экзаменом, что и чемпион (≥50 закрытых кластеров + нижняя граница кластерного CI > 0). Реальных сделок нет. Входы по закрытию; выходы v1 с фиксированной целью — для трендовых кандидатов (S1/S2) результаты являются консервативной нижней оценкой. Если чемпион не сдаст экзамен Фазы-1, этот рейтинг определит кандидата для следующей попытки. Поправка на множественные сравнения: победитель обязан сдать экзамен и на данных, собранных ПОСЛЕ выбора. Не инвестиционная рекомендация.",
+"Faz B gölge yarışı: tablodaki aday stratejiler, şampiyonla AYNI maliyet modeli ve AYNI sınavla (≥50 kapanmış küme + küme-CI alt sınırı > 0) kâğıt üzerinde ölçülür. Gerçek işlem yok. Girişler kapanış bazlı; v1 çıkışları sabit hedefli — trend adayları (S1/S2) için sonuçlar muhafazakâr alt sınırdır. Şampiyonun ilk sınavı GEÇİLEMEDİ (hüküm arşivlendi); yarış, bir sonraki şampiyon adayını belirlemek için sürüyor. Rozetler: YARIŞIYOR = küme <50; ELENDİ = küme ≥20 ve CI üst sınırı <0 (kenar ölümü); SINAV BİTTİ · GEÇEMEDİ = küme ≥50 ve CI alt sınırı ≤0. Çoklu karşılaştırma düzeltmesi: kazanan, seçildikten SONRA toplanan veride de sınavı geçmek zorundadır. Yatırım tavsiyesi değildir.":
+ "Теневая гонка Фазы B: стратегии-кандидаты в таблице измеряются на бумаге с ТОЙ ЖЕ моделью издержек и ТЕМ ЖЕ экзаменом, что и чемпион (≥50 закрытых кластеров + нижняя граница кластерного CI > 0). Реальных сделок нет. Входы по закрытию; выходы v1 с фиксированной целью — для трендовых кандидатов (S1/S2) результаты являются консервативной нижней оценкой. Первый экзамен чемпиона НЕ СДАН (вердикт в архиве); гонка продолжается, чтобы определить следующего кандидата в чемпионы. Значки: В ГОНКЕ = кластеров <50; ВЫБЫЛ = кластеров ≥20 и верхняя граница CI <0 (смерть преимущества); ЭКЗАМЕН ЗАВЕРШЁН · НЕ СДАН = кластеров ≥50 и нижняя граница CI ≤0. Поправка на множественные сравнения: победитель обязан сдать экзамен и на данных, собранных ПОСЛЕ выбора. Не инвестиционная рекомендация.",
+/* aday durum rozetleri (chalVerdict) */
+"YARIŞIYOR":"В ГОНКЕ","ELENDİ":"ВЫБЫЛ",
+"SINAV BİTTİ · GEÇEMEDİ":"ЭКЗАМЕН ЗАВЕРШЁН · НЕ СДАН",
+"SINAV BİTTİ · GEÇTİ":"ЭКЗАМЕН ЗАВЕРШЁН · СДАН",
 "Sonuçlanan işlemlerin R toplamının zaman içindeki birikimi. Kalın mavi çizgi NET eğridir (komisyon, stop kayması ve fonlama düşülmüş); kesikli gri çizgi aynı işlemlerin brüt hâlidir. İki çizgi arasındaki makas, maliyetin zamanla biriken yüküdür — işlem sayısı arttıkça açılır. Noktalar tek tek işlemler: yeşil WIN, kırmızı LOSS. Başlıktaki PF (kâr faktörü), beklenti ve maksDD de net seriden hesaplanır; brüt yalnız kıyas için gösterilir.":
  "Накопление суммы R по завершённым сделкам во времени. Жирная синяя линия — ЧИСТАЯ кривая (за вычетом комиссии, проскальзывания на стопе и фондирования); пунктирная серая — те же сделки без издержек. Зазор между линиями и есть накапливающийся вес затрат: он расширяется по мере роста числа сделок. Точки — отдельные сделки: зелёная WIN, красная LOSS. PF (профит-фактор), ожидание и макс. просадка в заголовке тоже считаются по чистому ряду; валовая величина показана лишь для сравнения.",
 "brüt":"валовый","net":"чисто",
@@ -945,6 +969,7 @@ const RU_PAT=[
  [/girişe ([+\-][\d.]+%)/, (m,n)=>`до входа ${n}`],
  [/([+\-][\d.]+)R canlı/, (m,n)=>`${n}R сейчас`],
  [/(\d+) parite/, (m,n)=>`${n} пар`],
+ [/^(\d+) aday$/, (m,n)=>`кандидатов: ${n}`],
  [/(\d+) tarama/, (m,n)=>`${n} сканов`],
  [/^ · likit (\d+)$/, (m,n)=>` · ликвидных ${n}`],
  [/^Tümü (\d+)$/, (m,n)=>`Все ${n}`],
@@ -1173,6 +1198,19 @@ const CHAL_ADI={S1_TSMOM:"S1 · Trend Takibi",S2_DONCHIAN:"S2 · Kırılım (Don
   S3_MEANREV:"S3 · Ortalamaya Dönüş",S4_CARRY:"S4 · Fonlama Taşıması",
   S6_SWEEP:"S6 · Süpürme Dönüşü",S7_WYCKOFF:"S7 · Wyckoff Spring+Test"};
 let CHAL=null;   // /challengers son yaniti - detay penceresi buradan okur
+/* Durum rozeti PROGRAMATIK olarak sunucu verisinden (kume/CI/emeklilik)
+   turetilir — elle yazilmis strateji-durum listesi YOK (drift yasagi).
+   Kurallar (on-ilanli): ELENDİ = emekli VEYA kume>=20 ve CI ustu<0;
+   kume>=50 -> SINAV BİTTİ (CI alti>0 ise GEÇTİ, degilse GEÇEMEDİ);
+   digerleri YARIŞIYOR. */
+function chalVerdict(s){
+  if(!s)return null;
+  const cl=s.clusters||0, ci=Array.isArray(s.ci)?s.ci:null;
+  if(s.retired_utc||(cl>=20&&ci&&ci[1]<0))return{t:"ELENDİ",cls:"vd-out"};
+  if(cl>=50)return(ci&&ci[0]>0)?{t:"SINAV BİTTİ · GEÇTİ",cls:"vd-pass"}
+                               :{t:"SINAV BİTTİ · GEÇEMEDİ",cls:"vd-fail"};
+  return{t:"YARIŞIYOR",cls:"vd-run"};
+}
 function renderChallengers(ch){
   const el=$("chalBody");if(!el)return;
   if(!ch||!ch.strategies){el.innerHTML='<div class="empty">aday verisi birikiyor…</div>';return;}
@@ -1180,12 +1218,16 @@ function renderChallengers(ch){
   const sgn=v=>v==null?"—":(v>0?"+":"")+num(v,2);
   let h='<table class="sig"><thead><tr><th>strateji</th><th>açık</th>'+
     '<th>sonuç</th><th>WR</th><th>net R</th><th>küme</th><th>CI</th></tr></thead><tbody>';
+  let nRow=0;
   for(const k of Object.keys(CHAL_ADI)){
     const s=ch.strategies[k];if(!s)continue;
+    nRow++;
+    const v=chalVerdict(s);
     const wr=s.win_rate==null?"—":(s.win_rate*100).toFixed(0)+"%";
     const ci=s.ci?`[${sgn(s.ci[0])}, ${sgn(s.ci[1])}]`:"—";
     const ciCls=s.ci&&s.ci[0]>0?"pos":(s.ci&&s.ci[1]<0?"neg":"");
-    h+=`<tr data-k="${k}"><td>${CHAL_ADI[k]}</td><td class="num">${s.open}</td>`+
+    h+=`<tr data-k="${k}"><td>${CHAL_ADI[k]}`+
+       `<span class="vd ${v.cls}">${v.t}</span></td><td class="num">${s.open}</td>`+
        `<td class="num">${s.decided}${s.expired?` <span class="muted">(+${s.expired}e)</span>`:""}</td>`+
        `<td class="num">${wr}</td>`+
        `<td class="num ${s.net_r>0?"pos":s.net_r<0?"neg":""}">${sgn(s.net_r)}</td>`+
@@ -1199,6 +1241,8 @@ function renderChallengers(ch){
     `açık pozisyon tavanı stratejiye göre ayarlandı. Önceki ${ch.retired_rows} kayıt farklı kısıtla toplandığı için `+
     `hesaba GİRMEZ (tabloda durur, silinmedi).</div>`;
   el.innerHTML=h;
+  // baslik etiketi: aday sayisi elle degil, cizilen satirdan sayilir
+  const cc=$("chalCount");if(cc)cc.textContent=`Faz B · ${nRow} aday`;
   el.querySelectorAll("tbody tr[data-k]").forEach(row=>
     row.addEventListener("click",()=>chalDetail(row.dataset.k)));
 }
@@ -1214,7 +1258,9 @@ function chalDetail(k){
   const wr=s.win_rate==null?"—":(s.win_rate*100).toFixed(0)+"%";
   const ci=s.ci?`[${sgn(s.ci[0])}, ${sgn(s.ci[1])}]`:"—";
   const hold=s.hold_bars_median==null?"—":num(s.hold_bars_median*0.25,1)+" sa";
+  const v=chalVerdict(s);   // tabloda gorunen rozetle AYNI kaynak
   let html=`<h4 class="chsec">İstatistikler</h4><div class="kvgrid">`+
+    g("Durum",`<span class="vd ${v.cls}">${v.t}</span>`)+
     g("Sonuçlanan",s.decided)+
     g("Kazanma oranı",wr)+
     g("Brüt R",sgn(s.gross_r),s.gross_r>0?"pos":s.gross_r<0?"neg":"")+
