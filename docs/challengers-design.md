@@ -133,3 +133,32 @@ eklendi; istatistikler yalnız geçerli rejimi sayar, eski kayıtlar tabloda
 kalır (silinmez) ve sayısı `retired_rows` ile hem API'de hem panoda
 gösterilir. S1/S2/S4 sayaçları fiilen sıfırdan başlar. Sessiz sıfırlama
 yoktur — kullanıcı ne kaybettiğini görür.
+
+
+## S1 doğrulama penceresi (ÖN-KAYIT — 2026-08-12, Serhat onayı)
+**Seçim penceresi hükmü:** S1_TSMOM rejim-2 kohortunda 50 kümeyi doldurdu:
+56 işlem, net +24.17R, küme-CI **[−0.053, +0.406]** — alt sınır sıfırın
+altında → ilan edilmiş kurala göre sınavı **KIL PAYI GEÇEMEDİ**. Bu hüküm
+kayda geçti; seçim penceresi rakamları bundan sonraki hiçbir hükme karışmaz.
+
+**Ön-kayıt (bu ilandan İLERİYE):** Çoklu karşılaştırma kuralının öngördüğü
+walk-forward doğrulaması S1 için bu ilanla başlar.
+- Başlangıç: **2026-08-12T00:00:00Z** (`VALIDATION_WINDOWS`, challengers.py).
+- Kohort: yalnız bu andan sonra DOĞAN S1 sinyalleri.
+- Hüküm kuralı seçimle AYNI: ≥50 kapanmış küme VE küme-CI alt sınırı > 0.
+- Strateji kuralları, tavan (40), maliyet modeli v0, küme tanımı ve
+  örnekleme rejimi (2) AYNEN kalır — tavan bilerek BÜYÜTÜLMEDİ: sonuca
+  bakıp örneklemi hızlandırmak/uzatmak sonuç-bağımlı örnekleme olurdu.
+- İlan geri alınamaz, sonuca bakılarak uzatılamaz; pencere dolduğunda
+  hüküm otomatik okunur (`/challengers → strategies.S1_TSMOM.validation`).
+- Diğer adaylar etkilenmez; S3/S6'nın kenar-ölümü alarmları ayrı karar
+  konusudur.
+
+
+### Değişiklik notu (2026-08-12, aynı gün — kohort boşken)
+Karar toplantısı Madde 4: S3/S6 kenar ölümüyle EMEKLİ; boşalan 30 slot
+S1'e devredildi (tavan 40→70, efektif toplam bütçe sabit). Yukarıdaki
+"tavan bilerek BÜYÜTÜLMEDİ" cümlesi bu kararla değiştirildi — doğrulama
+kohortu henüz BOŞ olduğundan pencere tek tip (tavan-70) kısıtla toplanır;
+sonuç-bağımlı örnekleme oluşmadı. Seçim kohortu (tavan-40) arşivde ayrıdır.
+Ayrıntı ve gerekçe: config-lock.md → KİLİT-2 İLANI, Madde 4.

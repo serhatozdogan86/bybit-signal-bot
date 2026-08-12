@@ -119,6 +119,38 @@ def test_market_bias_recorded_in_contract():
     assert d2.contract_dict()["market_bias"] == "bear"
 
 
+def test_breakout_retest_requires_actual_retest():
+    """KILIT-2 (2026-08-12, Bulgu 1): retest/acceptance dilimleri kirilim
+    mumunun KENDISINDEN basliyordu; kirilim mumunun dibi seviyenin altinda
+    kaldigi icin 'geri test' sarti fiilen BOSTU - motor kirilimi gorur
+    gormez kovaliyordu. Kural: fiyat kirip HIC geri donmuyorsa kurulum YOK.
+    (midas'ta ayni hata 8 Agu'da kanitlanip duzeltildi; kilit-1 defterinin
+    16/17 islemi bu setup ve -12R idi.)"""
+    import numpy as np
+    import pandas as pd
+    from app.strategies.structure_analyzer import detect_breakout_retest
+
+    # Duz zemin (100.0) + idx 60'ta tek igne pivot (100.5). idx 100'de
+    # kirilim mumu seviyeyi ARALIGI ICINDEN gecer (low 100.4, close 101) -
+    # eski kod bu mumun kendi dibini 'retest' sayardi. Sonrasi monoton
+    # ralli: hicbir mum seviyeye geri DONMEZ -> dogru cevap: kurulum yok.
+    n = 120
+    close = np.concatenate([np.full(100, 100.0), np.linspace(101, 112, 20)])
+    high = close + 0.05
+    low = close - 0.05
+    high[60] = 100.5                     # pivot tepe
+    low[100] = 100.4                     # kirilim mumu seviyeden geciyor
+    df = pd.DataFrame({"close": close, "low": low, "high": high,
+                       "open": close, "volume": 1000.0})
+    assert detect_breakout_retest(df, Direction.LONG, PARAMS) is None, (
+        "geri test HIC olmadan kurulum bulundu - retest sarti bos")
+    # asiri sikilastirma kontrolu: GERCEK retest'li fixture hala bulunmali
+    ltf = fx.make_series(fx.bullish_ltf_closes(), interval="15",
+                         volumes=fx.breakout_volumes(), seed=4)
+    real = detect_breakout_retest(ltf.to_dataframe(), Direction.LONG, PARAMS)
+    assert real is not None and real.setup_type is SetupType.BREAKOUT_RETEST
+
+
 # ------------------------------------------------------------- v3.0
 def test_market_gate_blocks_counter_regime_long():
     htf, ltf = _long_scenario()

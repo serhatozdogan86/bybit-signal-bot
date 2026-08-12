@@ -77,16 +77,21 @@ def detect_breakout_retest(ltf: pd.DataFrame, direction: Direction,
         if break_i < n - _MAX_BREAK_AGE:
             continue
 
-        after = closes[break_i:n]
+        # KILIT-2 (2026-08-12): dilimler break_i+1'den baslar. Kirilim
+        # mumunun kendisi 'geri test' SAYILMAZ - o mum seviyeyi zaten
+        # icinden gectigi icin dibi/tepesi tolerans bandindadir ve retest
+        # sartini bosaltiyordu (kilit-1 otopsisi + dis denetim Bulgu 1;
+        # kirmizi test: test_breakout_retest_requires_actual_retest).
+        after = closes[break_i + 1:n]
         accepted = (after > level) if direction is Direction.LONG else (after < level)
         if int(accepted.sum()) < _MIN_ACCEPTANCE:
             continue
 
         if direction is Direction.LONG:
-            touched = (lows[break_i:n] <= level * (1 + _RETEST_TOL)).any()
+            touched = (lows[break_i + 1:n] <= level * (1 + _RETEST_TOL)).any()
             still_ok = closes[-1] > level
         else:
-            touched = (highs[break_i:n] >= level * (1 - _RETEST_TOL)).any()
+            touched = (highs[break_i + 1:n] >= level * (1 - _RETEST_TOL)).any()
             still_ok = closes[-1] < level
         if not touched or not still_ok:
             continue

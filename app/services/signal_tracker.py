@@ -786,7 +786,7 @@ class SignalTracker:
                     unclustered += 1
                     continue
                 cluster_map_all.setdefault(cid, []).append(net)
-                if (r.get("created_utc") or "") >= measurement.LOCK_UTC:
+                if (r.get("created_utc") or "") >= measurement.ACTIVE_LOCK_UTC:
                     cluster_map_lock.setdefault(cid, []).append(net)
         total_r_net = round(sum(net_vals), 2) if net_vals else None
         clusters = len({r["cluster_id"] for r in closed_rows
@@ -890,7 +890,7 @@ class SignalTracker:
         params: tuple = ()
         if since_lock:
             sql += " AND created_utc >= ?"
-            params = (measurement.LOCK_UTC,)
+            params = (measurement.ACTIVE_LOCK_UTC,)
         rows = self._db.query(sql + " ORDER BY closed_utc ASC", params)
         peak = cum = dd = 0.0
         for r in rows:

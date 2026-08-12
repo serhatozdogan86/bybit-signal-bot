@@ -25,8 +25,16 @@ from __future__ import annotations
 import random
 from statistics import mean, median
 
-# Kilit ani (docs/config-lock.md): Faz-1 sayaclari bu andan baslar.
+# Kilit-1 ani (docs/config-lock.md) - ARSIV: pencere yanlislama #2 ile
+# kapandi, hukum "gecemedi" olarak kayitli. Rakamlari degismez.
 LOCK_UTC = "2026-07-29T00:00:00Z"
+# KILIT-2 ani (2026-08-12 karar toplantisi): retest duzeltmeli motorun
+# olcum penceresi. Faz-1 sayaclari SIFIRDAN bu andan baslar. NOT: motor
+# bu andan ONCE deploy edilmis olmalidir; edilmezse pencere fiili deploy
+# anina kayar ve config-lock.md'ye tarihli not dusulur.
+LOCK2_UTC = "2026-08-13T00:00:00Z"
+# Aktif pencere: tum "since_lock" olcumleri bunu okur.
+ACTIVE_LOCK_UTC = LOCK2_UTC
 
 # Faz-1 kapisi (2026-08-02 sikilastirmasi, konsey medyani):
 # >=50 bagimsiz KAPANMIS kume VE kume-CI alt siniri > 0.

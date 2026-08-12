@@ -41,18 +41,38 @@ STRATEGIES = ("S1_TSMOM", "S2_DONCHIAN", "S3_MEANREV", "S4_CARRY", "S6_SWEEP",
 # Tavan artik ortalama tutus suresiyle ORANTILI: yavas adaylar da makul
 # surede 50 kumeye ulasabilsin. Bu bir OLCUM ALTYAPISI duzeltmesidir;
 # hicbir stratejinin giris/cikis kurali degismedi.
-MAX_OPEN = {"S1_TSMOM": 40, "S2_DONCHIAN": 40, "S4_CARRY": 40,
+# 2026-08-12 karar toplantisi (Madde 4): S3/S6 kenar olumu ILAN EDILMIS
+# kosulla kanitlandi (CHALLENGER_DEAD) -> emekli. Bosalan 15+15=30 slot,
+# tavana bogulan S1'e devredildi (40->70). Efektif toplam butce SABIT
+# (165): bu bir TURETMEDIR, yeni butce icat edilmedi. S1 dogrulama
+# penceresi ayni gun acildigi icin dogrulama kohortu TAMAMEN tavan-70
+# altinda toplanir; secim kohortu (tavan-40) arsivde ayri durur.
+MAX_OPEN = {"S1_TSMOM": 70, "S2_DONCHIAN": 40, "S4_CARRY": 40,
             "S3_MEANREV": 15, "S6_SWEEP": 15,
             # S7: tasarimda tavan yazilmadi; rejim-2 kurali uygulanir
             # ("tavan tutus suresiyle orantili") - zaman asimi 96 bar =
             # S3/S6 sinifi -> 15 (varsayilanla ayni, ICAT degil turetme)
             "S7_WYCKOFF": 15}
+# Emekli adaylar: yeni sinyal uretimi DURUR; acik pozisyonlar normal
+# degerlendirilir, kapanmis kohort arsivde kalir ve stats'ta
+# retired_utc ile raporlanir (sessiz kaybolma yok).
+RETIRED = {"S3_MEANREV": "2026-08-12", "S6_SWEEP": "2026-08-12"}
 MAX_OPEN_DEFAULT = 15
 # Ornekleme rejimi damgasi: tavan degisimi oncesi/sonrasi kohortlar
 # BIRLESTIRILEMEZ (farkli kisitla toplandilar). Istatistikler yalniz
 # gecerli rejimi sayar; eski kayitlar tabloda kalir ama hesaba girmez.
 SAMPLING_REGIME = 2
 FAZ1_TARGET = 50                # sampiyonla ayni sinav esigi
+
+# ---- ON-KAYITLI dogrulama pencereleri (secim-sonrasi walk-forward) ----
+# Kural (challengers-design.md, coklu karsilastirma): one cikan aday,
+# ilan ANINDAN SONRA toplanan veride sinavi YENIDEN gecmek zorundadir.
+# Ilan sonuca bakilarak uzatilamaz/geri alinamaz; hukum = yeni kohortta
+# >=FAZ1_TARGET kapanmis kume VE kume-CI alt siniri > 0. Strateji
+# kurallari, tavan ve maliyet modeli AYNEN kalir (rejim degismez).
+# S1: secim penceresi 50 kumede doldu, CI alt siniri -0.053 -> kil payi
+# gecemedi; dogrulama penceresi 2026-08-12'de ilan edildi (Serhat onayi).
+VALIDATION_WINDOWS = {"S1_TSMOM": "2026-08-12T00:00:00Z"}
 
 # ---- strateji parametre sabitleri: TEK KAYNAK (v1.2, suruklenme yasagi) ----
 # Hem _generate() hem STRATEGY_INFO (pano detay penceresi) BU sabitleri okur;
@@ -329,6 +349,8 @@ class ChallengerEngine:
         bucket = int(last.ts // 14_400_000)
         made = 0
         for strat, sig in self._generate(symbol, htf, ltf, funding):
+            if strat in RETIRED:
+                continue        # emekli: hukum verildi, yeni sinyal yok
             direction, stop, tp, timeout = sig
             cid = f"{strat}:{direction[0]}{bucket}"
             if self._dup(strat, symbol, cid) or self._crowded(strat):
@@ -634,6 +656,37 @@ class ChallengerEngine:
                     [float(r["hold_bars"]) for r in closed
                      if r.get("hold_bars") is not None]),
             }
+            if strat in RETIRED:
+                out["strategies"][strat]["retired_utc"] = RETIRED[strat]
+            # --- on-kayitli dogrulama penceresi muhasebesi (varsa) ---
+            vstart = VALIDATION_WINDOWS.get(strat)
+            if vstart:
+                vclosed = [r for r in closed
+                           if (r.get("created_utc") or "") >= vstart]
+                vdecided = [r for r in vclosed
+                            if r["outcome"] in ("WIN", "LOSS")]
+                vclusters: dict[str, list[float]] = {}
+                vnet = 0.0
+                for r in vclosed:
+                    n = self._net_r(r)
+                    if n is not None:
+                        vnet += n
+                        vclusters.setdefault(
+                            r["cluster_id"] or "?", []).append(n)
+                vboot = measurement.cluster_bootstrap(vclusters)
+                out["strategies"][strat]["validation"] = {
+                    "start_utc": vstart,
+                    "decided": len(vdecided),
+                    "net_r": round(vnet, 2),
+                    "clusters": len(vclusters),
+                    "target_clusters": FAZ1_TARGET,
+                    "ci": ([vboot["ci_low"], vboot["ci_high"]]
+                           if vboot and vboot.get("ci_low") is not None
+                           else None),
+                    "note": ("on-kayitli walk-forward dogrulama; hukum "
+                             "YALNIZ bu kohorttan (ilan oncesi kayitlar "
+                             "karisamaz)"),
+                }
         return out
 
     def strategy_info(self) -> dict:

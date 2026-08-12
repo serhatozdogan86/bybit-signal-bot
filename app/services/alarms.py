@@ -92,7 +92,10 @@ def evaluate(stats: dict, diagnostics: dict | None = None,
             f"kume-CI ust siniri {ci_hi} < 0 ({n_cl} kume) - onceden ilan "
             "edilmis kenar olumu kriteri tetiklendi.",
             "config-lock.md yanlislama"))
-    dd = (stats or {}).get("max_drawdown_r")
+    # v3.8 duzeltme: deger stats.measurement ICINDE yasar; ust duzeyde
+    # aramak alarmi olu doguruyordu (35.6R ihlalini insan yakaladi, alarm
+    # hic otmedi). Sinifi kapatan test: test_declared_alarms_can_actually_fire
+    dd = meas.get("max_drawdown_r")
     if dd is not None and abs(dd) > MAX_DD_LIMIT_R:
         out.append(_alarm(
             WARNING, "MAX_DD",
@@ -118,6 +121,8 @@ def evaluate(stats: dict, diagnostics: dict | None = None,
     if challengers:
         caps = challengers.get("max_open") or {}
         for name, s in (challengers.get("strategies") or {}).items():
+            if s.get("retired_utc"):
+                continue   # hukum verilmis emekli aday: alarm gurultusu olmaz
             cap = caps.get(name, 15)
             if (s.get("open") or 0) >= cap:
                 out.append(_alarm(
