@@ -902,6 +902,16 @@ const RU={
 "Годовая |funding| > 60% (глубже, чем у S4) И последнее 15м-закрытие подтверждает разворот (отрицательная→разворот вверх LONG, положительная→разворот вниз SHORT)",
 "funding kapısı: yıllık |funding| > %60 + fiyat teyidi; rejim/hacim filtresi yok":
 "ворота funding: годовая |funding| > 60% + подтверждение ценой; фильтров режима/объёма нет",
+"Fiyat grafiğine hiç bakmaz; saate bakar. New York borsası kapandıktan sonra, Asya güne başlamadan önceki gece penceresinde (21:00'den itibaren) Bitcoin tarihsel olarak günün en güçlü ortalama getirisini vermiştir — her akşam 21:00–21:59 UTC'deki ilk taramada girer, girişten ~2 saat sonra (fiilen 23:15–00:00 UTC arasında) çıkar. Görevi bu takvim etkisinin hâlâ yaşayıp yaşamadığını ucuza ve hızla ölçmektir.":
+"Вообще не смотрит на график цены; смотрит на часы. После закрытия нью-йоркской биржи и до начала азиатского дня, в ночном окне (с 21:00), биткоин исторически давал самую сильную среднюю доходность суток — каждый вечер входит на первом скане в окне 21:00–21:59 UTC и выходит через ~2 часа после входа (фактически между 23:15 и 00:00 UTC). Его задача — дёшево и быстро измерить, жив ли ещё этот календарный эффект.",
+"Yalnız BTCUSDT; 21:00–21:59 UTC penceresindeki ilk taramada kapanıştan LONG — fiyat/hacim koşulu yok":
+"Только BTCUSDT; LONG по закрытию на первом скане в окне 21:00–21:59 UTC — без ценовых/объёмных условий",
+"2 × ATR(15dk) — yalnız felaket freni; R bu mesafeyle tanımlanır":
+"2 × ATR(15м) — только аварийный тормоз; R определяется этой дистанцией",
+"risk × 100 (sentetik, erişilemez) — çıkış hedefle değil SÜREYLE olur":
+"риск × 100 (синтетическая, недостижимая) — выход не по цели, а ПО ВРЕМЕНИ",
+"yok — takvim tetikli; rejim/hacim/funding bakılmaz":
+"нет — триггер календарный; режим/объём/funding не учитываются",
 "Fiyat bilinen bir tepeyi ya da dibi iğneyle aşıp hemen geri dönerse, bunun stopları toplamak için yapılmış bir hamle olduğunu varsayar ve dönüş yönüne girer. Teyit için o mumda işlem hacminin de sıçramış olmasını ister.":
 "Если цена иглой прокалывает известную вершину или дно и сразу возвращается, считает это охотой за стопами и входит в сторону разворота. Для подтверждения требует всплеска объёма на той же свече.",
 "Fitil son 96 barın ekstremumunu aşar ama kapanış gerisinde kalır VE hacim ≥ 1.5 × SMA20":
@@ -990,7 +1000,7 @@ const RU_PAT=[
  [/güven (HIGH|MEDIUM|LOW)/, (m,g)=>`уверенность ${g}`],
  [/(\d+) küme \/ (\d+)/, (m,a,b)=>`${a} кластеров / ${b}`],
  [/^(\d+) bar \((\d+) saat\)$/, (m,a,b)=>`${a} бар (${b} ч)`],
- [/^(\d+) açık pozisyon$/, (m,n)=>`${n} открытых позиций`],
+ [/^(\d+) açık pozisyon$/, (m,n)=>n==="1"?"1 открытая позиция":`${n} открытых позиций`],
  [/^([\d.]+) sa$/, (m,n)=>`${n} ч`],
  [/riskin %([\d.]+)'i/, (m,n)=>`${n}% от риска`],
  [/~([\d]+)x/, (m,n)=>`~${n}x`]
@@ -1203,7 +1213,7 @@ function renderHeader(perf,status){
 const CHAL_ADI={S1_TSMOM:"S1 · Trend Takibi",S2_DONCHIAN:"S2 · Kırılım (Donchian)",
   S3_MEANREV:"S3 · Ortalamaya Dönüş",S4_CARRY:"S4 · Fonlama Taşıması",
   S6_SWEEP:"S6 · Süpürme Dönüşü",S7_WYCKOFF:"S7 · Wyckoff Spring+Test",
-  S8_FUNDSQUEEZE:"S8 · Fonlama Sıkışması"};
+  S8_FUNDSQUEEZE:"S8 · Fonlama Sıkışması",S9_GECE:"S9 · Gece Penceresi"};
 let CHAL=null;   // /challengers son yaniti - detay penceresi buradan okur
 /* Durum rozeti PROGRAMATIK olarak sunucu verisinden (kume/CI/emeklilik)
    turetilir — elle yazilmis strateji-durum listesi YOK (drift yasagi).

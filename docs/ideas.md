@@ -255,3 +255,39 @@ küme-CI alt>0.
 **İzolasyon:** ayrı tablo (challenger_signals), şampiyona sıfır dokunuş,
 bayt-bayt izolasyon testi yeşil. İkiz (midas) kontrolü: N/A — midas ABD
 hisse botu, funding kavramı yok (docs/ikiz-depo-notu.md).
+
+## S9 GECE PENCERESİ — ÖN-KAYIT + CANLI (2026-08-13, Serhat onayı)
+Kaynak: docs/aile-arastirmasi-2026-08-13.md #1 (Vojtko-Javorská SSRN 4581124
++ Quantpedia/Concretum bağımsız replikasyonları; rakamlar özet düzeyi,
+birincil PDF doğrulanamadı — DOĞRULANAMADI statüsüyle anılır).
+
+**Hipotez:** NY kapanışı sonrası / Asya öncesi (21:00–23:00 UTC) BTC günün
+en güçlü ortalama getirisini verir. Görev kenarı kanıtlamak DEĞİL, bu
+takvim etkisinin hâlâ yaşayıp yaşamadığını ucuza/hızla ölçmek (örneklem
+2022'de bitiyor; ETF sonrası ölmüş olabilir — bilinçli risk).
+
+**Dondurulmuş kurallar (challengers.py sabitleri):**
+- Yalnız BTCUSDT (S9_PAIR). Genişletme (likit 5 parite) AYRI ön-kayıt ister.
+- Giriş: 21:00–21:59 UTC penceresindeki İLK taramada son 15dk kapanıştan
+  LONG. Fiyat/hacim/rejim koşulu YOK (takvim tetikli).
+- Çıkış: girişten 8 KAPANMIŞ 15dk bar sonra (2s00–2s15dk; giriş barına göre
+  fiilen 23:15–00:00 UTC arası) zaman-çıkışı → defterde EXPIRED,
+  R = pnl/risk. Hedef sentetik-erişilemez (risk×100); stop 2×ATR(15dk)
+  yalnız felaket freni ve R paydası.
+- Küme = takvim günü (dedup 4H kovası 20–24 penceresini kapsar → günde tek
+  kayıt). Tavan 1. Faz-1 kapısı DİĞERLERİYLE AYNI: ≥50 küme + küme-CI alt>0.
+- Bot 21–22 UTC arası kapalıysa o gün atlanır (eksik veri eksik kalır).
+
+**Bilinen zayıflıklar (önceden kabul):** 24 saatten seçilmiş 2 saat = veri
+madenciliği şüphesi taşır; koşulsuz long ayı rejiminde kanar; kenar saat
+başına küçük → maliyet modeli belirleyici. 50 küme ≈ 2–2.5 ayda dolar —
+envanterin en hızlı hükmü; kötüyse ucuza öğrenilmiş olur.
+
+## KORELASYON ÖLÇÜM ALETİ — Faz A (2026-08-13, Serhat onayı)
+app/services/correlation.py + /correlation rotası. SALT RAPOR: strateji-çifti
+günlük brüt-R korelasyon matrisi (çiftin her iki tarafında ≥10 aktif gün),
+etkin bağımsız bahis sayısı N_eff = N/(1+(N−1)·ort_korelasyon), aynı-gün-
+aynı-yön çakışma oranı. Hiçbir karar/eşik üretmez; test_report_is_measurement_only
+bunu zorlar. Yeni aday ön-kayıtlarının şart koştuğu örtüşme ölçümlerinin
+(S8↔türevleri, V1/S-ATT1 çakışma raporları) altyapısıdır. Faz B (ağırlıklama)
+AYRI ön-kayıt ister; en erken 3 ay rapor birikince.

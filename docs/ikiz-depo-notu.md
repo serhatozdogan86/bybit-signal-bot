@@ -225,3 +225,18 @@ karşılığı ARANDI:
 "bulunmasa bile yaz" gereğidir — kontrol yapıldı, uygulanamaz olduğu
 gerekçesiyle kapandı (S4_CARRY için de aynı mantık geçerlidir; midas'ta
 funding ailesi yoktur).
+
+## Korelasyon ölçüm aleti — ikiz kontrolü (2026-08-13)
+
+**Sonuç: TAŞINABİLİR — midas'ta AÇIK İŞ.** bybit'e çoklu-strateji
+korelasyon/örtüşme aleti eklendi (app/services/correlation.py + /correlation;
+Faz A salt-rapor: çift korelasyonu, N_eff, aynı-gün-aynı-yön oranı).
+midas'ta karşılığı arandı: **StrategyLab çoklu paralel strateji işletiyor**
+(Trade.strategy alanı, strateji bazlı defter) ve korelasyon/örtüşme ölçümü
+YOK (grep: 'correlation/korelasyon' sıfır sonuç). Yani alet ikize birebir
+taşınabilir ve StrategyLab varyantlarının bağımsızlığını ölçer.
+Bu oturumun midas'a yazma erişimi yok → **midas oturumuna açık iş**:
+correlation.py'nin uyarlanması + ölçüm-only anahtar testi. (S9_GECE
+stratejisi ise 3b kapsamı DIŞI — mekanizma hatası/ölçüm düzeltmesi değil,
+yeni bahis; ayrıca hisse piyasası gece kapalıyken kriptonun 21–23 UTC
+penceresi midas evreninde tanımsız.)
