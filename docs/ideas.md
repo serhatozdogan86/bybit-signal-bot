@@ -211,3 +211,47 @@ Kombinasyon/vol-ayarlı/farklı-bakış varyantlarını AYNI veride aramak
 YASAK (p-hacking) — her biri ayrı ön-kayıt + gelecek/başka veri ister.
 Momentum ailesi şimdilik rafta; canlı gölge yarışın kendi ileriye dönük
 verisi bir gün trend/çöküş rejimi görürse aile yeniden değerlendirilir.
+
+## MOMENTUM AİLESİ RAFTAN ÇIKARMA TETİĞİ (ÖN-KAYIT — 2026-08-13, Serhat onayı)
+S5 (kesitsel) + TSM (zaman-serisi) 90 günlük backtest'te kenar göstermedi
+(tek rejim: yükselen/çırpınan, trend/çöküş yok). Aile RAFTA. Aşağıdaki
+tetiklerden **HERHANGİ BİRİ** olursa yeniden değerlendirilir:
+
+1. **Canlı kanıt:** S1_TSMOM (zaten canlıda, momentum ailesinden) küme-CI
+   ALT sınırı > 0 verirse — momentum ileriye dönük gerçek veride çalışmaya
+   başladı demektir.
+2. **Rejim olayı (nesnel):** BTC 4H'de 90 günlük getiri büyüklüğü ≥ **%40**
+   (güçlü sürekli trend) VEYA 60 gün içinde tepe-dip düşüş ≥ **%25** (çöküş/
+   kriz rejimi).
+
+**Tetik gelince:** o rejimi kapsayan TAZE veri indirilir ve DONMUŞ S5/TSM
+araçları (tools/backtest_s5.py, backtest_tsm.py) HİÇ DEĞİŞTİRİLMEDEN yeni
+pencerede koşulur. Yeni parametre/varyant = p-hacking (yasak). Momentum
+yeni rejimde kenar gösterirse canlıya yeniden değerlendirilir.
+
+## S8 FONLAMA SIKIŞMASI — ÖN-KAYIT + CANLI (2026-08-13, Serhat onayı)
+Funding yön sinyali; backtest ATLANDI çünkü indirilen veride funding geçmişi
+YOK (yalnız fiyat mumu) ve araştırma funding'i "hipotez seviyesi" işaretledi.
+Kuralımız (Kural 4/5): veriden türetilen fikir gelecek/canlı veride test
+edilir → S8 doğrudan canlı gölge yarışa aday olarak girdi.
+
+**S4'ten AYRIŞMA (yönü örtüşür — funding-yönü doğası gereği; fark girişte):**
+- (a) DAHA DERİN eşik: yıllık |funding| > **%60** (S4: %30) — yalnız aşırı
+  kalabalık.
+- (b) FİYAT TEYİDİ şart: son 15dk kapanış sıkışma yönünde dönmüş olmalı
+  (negatif funding → kapanış YUKARI → LONG; pozitif → kapanış AŞAĞI → SHORT).
+  S4 teyit istemez, hemen girer; S8 fiyat dönüşünü bekler → daha seyrek,
+  daha yüksek güven.
+
+**Dondurulmuş kurallar (challengers.py sabitleri):** S8_ANN_FUNDING=0.60,
+stop 2×ATR(4H), hedef 2R, zaman aşımı 192 bar (48 saat), tavan 15.
+Küme=yön+4H penceresi (diğerleriyle aynı). Faz-1 kapısı AYNI: ≥50 küme +
+küme-CI alt>0.
+
+**Dürüst etiket:** S8 sıfırdan yeni kenar değil, RAFİNASYON hipotezi —
+"aşırılık + fiyat teyidi, S4'ün mekanik carry'sini geçer mi?" Hüküm canlı
+50 küme + walk-forward'dan çıkar; backtest yok.
+
+**İzolasyon:** ayrı tablo (challenger_signals), şampiyona sıfır dokunuş,
+bayt-bayt izolasyon testi yeşil. İkiz (midas) kontrolü: N/A — midas ABD
+hisse botu, funding kavramı yok (docs/ikiz-depo-notu.md).

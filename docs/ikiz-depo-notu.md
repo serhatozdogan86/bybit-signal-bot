@@ -206,3 +206,22 @@ Bu notu üreten inceleme: her iki botun karar üreten katmanlarının satır
 satır okunması + canlı uçlardan (`/performance`, `/signals`, `/diag`,
 `/alarms`, `/challengers`) doğrulama + iki koşturulmuş kanıt testi
 (retest kusuru, ölü alarm). 2026-08-11/12.
+
+## S8 Fonlama Sıkışması — ikiz kontrolü (2026-08-13)
+
+**Sonuç: UYGULANAMAZ (N/A) — gerekçeli.** bybit'e S8_FUNDSQUEEZE adayı
+eklendi (aşırı funding + fiyat teyidi, S4'ten derin eşik). midas'ta
+karşılığı ARANDI:
+
+- midas bir **ABD hisse** botudur (Alpaca; earnings/fundamentals/premarket/
+  market_calendar servisleri). Hisse senedinde **funding oranı YOKTUR** —
+  funding perpetual-futures'a özgü bir mekanizmadır.
+- midas'ta tek "funding" geçişi bir yorum satırıdır: "funding yerine not"
+  (app/server.py) — yani midas funding kavramını bilinçle YOKA sayar.
+- Dolayısıyla S8'in midas'ta ne karşılığı ne de "aynı davranışı tetikleyen
+  test"i mümkün: tetikleyecek girdi (funding) o evrende mevcut değil.
+
+**Karar:** S8 crypto-perp'e özgüdür; ikiz aktarımı gerekmez. Bu, Kural 3b'nin
+"bulunmasa bile yaz" gereğidir — kontrol yapıldı, uygulanamaz olduğu
+gerekçesiyle kapandı (S4_CARRY için de aynı mantık geçerlidir; midas'ta
+funding ailesi yoktur).

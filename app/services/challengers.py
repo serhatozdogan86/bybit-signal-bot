@@ -31,7 +31,11 @@ from app.services.signal_tracker import FUNDING_8H, STOP_SLIP, TAKER_FEE
 log = logging.getLogger("challengers")
 
 STRATEGIES = ("S1_TSMOM", "S2_DONCHIAN", "S3_MEANREV", "S4_CARRY", "S6_SWEEP",
-              "S7_WYCKOFF")   # S7: 2026-08-06, tetik = S6 sinavini doldurdu
+              "S7_WYCKOFF", "S8_FUNDSQUEEZE")
+# S7: 2026-08-06, tetik = S6 sinavini doldurdu.
+# S8: 2026-08-13, funding sikisma teyidi (on-kayit docs/ideas.md). Momentum
+# ailesi (S5 kesitsel + TSM) 90-gun backtest'te kenar gostermedi -> rafta;
+# funding-yonu S4'te var ama S8 asiri esik + fiyat teyidiyle ayrisir.
 # Acik pozisyon tavani - STRATEJIYE GORE (v1.1 duzeltmesi).
 # NEDEN: tek tavan (15) yarisi adaletsiz kildi. Uzun tutan trend adaylari
 # (S1 medyan 45 bar, S4 37 bar) slotlari doldurup YENI SINYAL URETEMEZ hale
@@ -52,7 +56,12 @@ MAX_OPEN = {"S1_TSMOM": 70, "S2_DONCHIAN": 40, "S4_CARRY": 40,
             # S7: tasarimda tavan yazilmadi; rejim-2 kurali uygulanir
             # ("tavan tutus suresiyle orantili") - zaman asimi 96 bar =
             # S3/S6 sinifi -> 15 (varsayilanla ayni, ICAT degil turetme)
-            "S7_WYCKOFF": 15}
+            "S7_WYCKOFF": 15,
+            # S8: TREND_TIMEOUT sinifi (S4 kardesi) AMA asiri esik + fiyat
+            # teyidi nadir tetiklenir -> footprint kucuk tutuldu (15,
+            # varsayilan sinif); kanitlanmamis yeni aday. Yeni slot ICAT
+            # degil: S8 yeni bir aday (S7 gibi kendi kotasiyla girer).
+            "S8_FUNDSQUEEZE": 15}
 # Emekli adaylar: yeni sinyal uretimi DURUR; acik pozisyonlar normal
 # degerlendirilir, kapanmis kohort arsivde kalir ve stats'ta
 # retired_utc ile raporlanir (sessiz kaybolma yok).
@@ -103,6 +112,13 @@ S7_VOL_TEST = 0.7        # S7: test hacmi   <= 0.7 x SMA20 (KURUMUS - S6'nin ter
 S7_ATR_PROX = 0.25       # S7: test yaklasma VE stop tamponu (ATR-15dk kati)
 S7_TEST_WINDOW = 6       # S7: spring sonrasi test icin 1-6 bar
 S7_TP_RISK = 2.0         # S7: hedef (risk kati)
+# S8 FUNDSQUEEZE (2026-08-13): funding SIKISMA teyidi. S4'ten farki iki
+# noktada: (a) DAHA DERIN esik (yalniz asiri kalabalik), (b) FIYAT TEYIDI
+# (squeeze basladi mi) sart. Yon S4 ile ortusur (funding-yonu dogasi geregi);
+# ayrisma giris zamanlamasindan gelir. On-kayit: docs/ideas.md 2026-08-13.
+S8_ANN_FUNDING = 0.60    # S8: yillik |funding| esigi (S4'in %30'undan DERIN)
+S8_RISK_ATR = 2.0        # S8: stop (ATR-4H kati)
+S8_TP_RISK = 2.0         # S8: hedef (risk kati)
 
 
 def _saat(bars: int) -> str:
@@ -198,6 +214,28 @@ STRATEGY_INFO: dict[str, dict] = {
             "tavan": f"{MAX_OPEN['S4_CARRY']} açık pozisyon",
             "filtreler": (f"funding kapısı: yıllık |funding| > "
                           f"%{S4_ANN_FUNDING * 100:g}; rejim/hacim filtresi yok"),
+        },
+    },
+    "S8_FUNDSQUEEZE": {
+        "name": "Fonlama Sıkışması",
+        "how": ("Vadeli piyasada bir tarafa AŞIRI kalabalık binmişse "
+                "(fonlama ücreti çok uçlanmışsa) VE fiyat ters yöne dönmeye "
+                "başlamışsa, sıkışan tarafın zorla kapatılacağına oynar. "
+                "S4 ile aynı yöne bakar ama iki farkla: S4 ücret eşiği "
+                "aşılınca hemen girer; S8 hem daha uç bir eşik arar hem de "
+                "önce fiyatın dönüşü teyit etmesini bekler — daha seyrek "
+                "ama daha yüksek güvenli giriş."),
+        "params": {
+            "giris": (f"Yıllıklandırılmış |funding| > %{S8_ANN_FUNDING * 100:g} "
+                      "(S4'ten derin) VE son 15dk kapanış ters yönde teyit "
+                      "(negatif→yukarı dönüş LONG, pozitif→aşağı dönüş SHORT)"),
+            "stop": f"{S8_RISK_ATR:g} × ATR(4H)",
+            "hedef": f"risk × {S8_TP_RISK:g} — plan RR {S8_TP_RISK:g}",
+            "zaman_asimi": _saat(TREND_TIMEOUT),
+            "tavan": f"{MAX_OPEN['S8_FUNDSQUEEZE']} açık pozisyon",
+            "filtreler": (f"funding kapısı: yıllık |funding| > "
+                          f"%{S8_ANN_FUNDING * 100:g} + fiyat teyidi; "
+                          "rejim/hacim filtresi yok"),
         },
     },
     "S7_WYCKOFF": {
@@ -452,6 +490,22 @@ class ChallengerEngine:
                 out.append(("S4_CARRY",
                             ("LONG", entry - risk,
                              entry + S4_TP_RISK * risk, TREND_TIMEOUT)))
+
+        # S8 FUNDSQUEEZE: ASIRI funding (S4'ten derin) + FIYAT TEYIDI. Squeeze
+        # basladi mi? Negatif funding (short kalabalik) + son 15dk kapanis
+        # YUKARI -> LONG; pozitif (long kalabalik) + kapanis ASAGI -> SHORT.
+        # S4 hemen girer; S8 fiyatin donusunu bekler (daha seyrek, yuksek guven).
+        if atr_h and funding is not None and len(l_close) >= 2:
+            ann = funding * 3 * 365
+            risk = S8_RISK_ATR * atr_h
+            if ann < -S8_ANN_FUNDING and l_close[-1] > l_close[-2]:
+                out.append(("S8_FUNDSQUEEZE",
+                            ("LONG", entry - risk,
+                             entry + S8_TP_RISK * risk, TREND_TIMEOUT)))
+            elif ann > S8_ANN_FUNDING and l_close[-1] < l_close[-2]:
+                out.append(("S8_FUNDSQUEEZE",
+                            ("SHORT", entry + risk,
+                             entry - S8_TP_RISK * risk, TREND_TIMEOUT)))
 
         # S6 SWEEP: swing ekstremumu asilir ama kapanis gerisinde + hacim
         if atr_l and len(l_close) >= S6_SWING_N + 4:
