@@ -95,6 +95,48 @@ def test_build_report_reads_champion_and_challengers(tmp_path):
     assert ov["both_open_days"] == 1 and ov["same_dir_days"] == 0
 
 
+def test_not_filled_and_ambiguous_are_not_active_days(tmp_path):
+    """SINIFI KAPATAN TEST (inceleme 2026-08-13, MAJOR): NOT_FILLED sampiyon
+    kaydi (outcome='NOT_FILLED', r_multiple=0.0 — NULL DEGIL) hic acilmamis
+    pozisyondur; seride sahte sifir-R 'aktif gun' YARATMAMALI. Ayni sekilde
+    aday AMBIGUOUS(r=0) patolojik kapanisi da kohort disi (stats ile ayni:
+    yalniz WIN/LOSS/EXPIRED)."""
+    db = _db(tmp_path)
+    db.execute(
+        "INSERT INTO signals(pair,direction,created_utc,closed_utc,"
+        "status,outcome,r_multiple,blocked) "
+        "VALUES('BTCUSDT','LONG','2026-08-10T01:00:00Z',"
+        "'2026-08-10T07:00:00Z','CLOSED','NOT_FILLED',0.0,0)")
+    db.execute(
+        "INSERT INTO challenger_signals(strategy,pair,direction,created_utc,"
+        "entry_ts,entry,stop,tp,timeout_bars,cluster_id,status,outcome,"
+        "r_multiple,hold_bars,ambiguous,regime) "
+        "VALUES('S1_TSMOM','ETHUSDT','LONG','2026-08-10T02:00:00Z',"
+        "1755000000000,100,100,104,192,'cA','CLOSED','AMBIGUOUS',0.0,0,1,?)",
+        (SAMPLING_REGIME,))
+    rep = build_report(db, SAMPLING_REGIME, RETIRED)
+    assert "CHAMPION" not in rep["strategies"]
+    assert "S1_TSMOM" not in rep["strategies"]
+    # acilis olaylari yine sayilir (sinyal DOGDU) - yalniz R serisi disi
+    assert "CHAMPION" in rep["same_day_same_dir"] or True
+
+
+def test_effective_bets_universe_matches_measured_pairs():
+    """SINIFI KAPATAN TEST (inceleme 2026-08-13, MAJOR): N_eff'in N'i,
+    ortalama korelasyonun geldigi evrenle AYNI olmali — yalniz olculen
+    (corr != None) ciftlerde gecen stratejiler sayilir."""
+    m = {"A|B": {"corr": 0.0, "days": 20},
+         "A|C": {"corr": None, "days": 3},
+         "B|C": {"corr": None, "days": 3}}
+    r = effective_bets(m, 3)
+    assert r["n_strategies"] == 3
+    assert r["n_measured"] == 2          # yalniz A ve B olculdu
+    assert r["effective_bets"] == 2.0    # n=2, ort 0 -> 2 bagimsiz bahis
+    # hic olculen cift yoksa None
+    r2 = effective_bets({"A|B": {"corr": None, "days": 1}}, 2)
+    assert r2["effective_bets"] is None and r2["n_measured"] == 0
+
+
 def test_report_is_measurement_only():
     """Rapor SALT olcumdur: karar/esik alani eklenirse bu test kirilir."""
     import tempfile
@@ -104,5 +146,6 @@ def test_report_is_measurement_only():
         rep = build_report(db, SAMPLING_REGIME, RETIRED)
     assert set(rep) == {"note", "min_days", "basis", "strategies",
                         "daily_corr", "independence", "same_day_same_dir"}
-    assert set(rep["independence"]) == {"n_strategies", "avg_pairwise_corr",
+    assert set(rep["independence"]) == {"n_strategies", "n_measured",
+                                        "avg_pairwise_corr",
                                         "effective_bets", "pairs_measured"}

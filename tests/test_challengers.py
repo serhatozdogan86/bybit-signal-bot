@@ -180,6 +180,30 @@ def test_s9_gece_one_entry_per_evening_and_time_exit(tmp_path):
     assert abs(row["r_multiple"] - 0.5) < 0.05
 
 
+def test_s9_no_reentry_same_evening_after_early_stop(tmp_path):
+    """Inceleme 2026-08-13: 'gunde tek kayit' on-kaydinin kritik yolu.
+    Ilk sinyal ayni aksam STOP olsa bile (status CLOSED), cluster_id dedup'u
+    ayni 4H kovasinda yeniden girisi ENGELLEMELI."""
+    eng, db = _eng(tmp_path)
+    ltf = _s9_ltf(21)
+    assert eng.on_scan("BTCUSDT", None, ltf, None) == 1
+    row = db.query_one("SELECT * FROM challenger_signals WHERE strategy='S9_GECE'")
+    # hemen stop: ilk mumda stop seviyesinin altina in
+    _put_candles(db, "BTCUSDT",
+                 [(row["entry"], row["stop"] - 1.0, row["stop"] - 0.5)],
+                 start_ts=row["entry_ts"] + 900_000)
+    eng.evaluate_open("BTCUSDT")
+    assert db.query_one("SELECT outcome o FROM challenger_signals WHERE "
+                        "strategy='S9_GECE'")["o"] == "LOSS"
+    # ayni aksam 21:30 taramasi: yeniden giris YOK
+    ltf2 = _s9_ltf(21)
+    ltf2.candles[-1].ts += 2 * 900_000          # 21:30
+    assert eng.on_scan("BTCUSDT", None, ltf2, None) == 0
+    n = db.query_one("SELECT COUNT(*) n FROM challenger_signals WHERE "
+                     "strategy='S9_GECE'")["n"]
+    assert n == 1
+
+
 def test_same_candle_stop_and_tp_is_conservative_loss(tmp_path):
     eng, db = _eng(tmp_path)
     db.execute("INSERT INTO challenger_signals(strategy,pair,direction,"

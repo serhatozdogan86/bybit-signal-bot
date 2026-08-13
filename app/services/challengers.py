@@ -128,7 +128,8 @@ S8_TP_RISK = 2.0         # S8: hedef (risk kati)
 # Cikis ZAMANLADIR (stop yalniz felaket freni; hedef sentetik-erisilemez).
 S9_PAIR = "BTCUSDT"      # S9: v1 yalniz BTC (genisletme AYRI on-kayit ister)
 S9_HOUR_UTC = 21         # S9: giris penceresi 21:00-21:59 UTC'deki ilk tarama
-S9_HOLD_BARS = 8         # S9: 8 x 15dk = 2 saat tutus (cikis ~23:00 UTC)
+S9_HOLD_BARS = 8         # S9: 8 kapanmis 15dk bar = 2s00-2s15dk tutus
+                         #     (giris barina gore cikis fiilen 23:15-00:00 UTC)
 S9_STOP_ATR = 2.0        # S9: felaket stopu (15dk ATR kati) - R paydasi
 S9_TP_RISK = 100.0       # S9: SENTETIK erisilemez hedef (cikis zamanla)
 
@@ -253,11 +254,13 @@ STRATEGY_INFO: dict[str, dict] = {
     "S9_GECE": {
         "name": "Gece Penceresi",
         "how": ("Fiyat grafiğine hiç bakmaz; saate bakar. New York borsası "
-                "kapandıktan sonra, Asya güne başlamadan önceki iki saatte "
-                "(21:00–23:00 UTC) Bitcoin tarihsel olarak günün en güçlü "
-                "ortalama getirisini vermiştir — her akşam o iki saati alır, "
-                "süre dolunca çıkar. Görevi bu takvim etkisinin hâlâ yaşayıp "
-                "yaşamadığını ucuza ve hızla ölçmektir."),
+                "kapandıktan sonra, Asya güne başlamadan önceki gece "
+                "penceresinde (21:00'den itibaren) Bitcoin tarihsel olarak "
+                "günün en güçlü ortalama getirisini vermiştir — her akşam "
+                "21:00–21:59 UTC'deki ilk taramada girer, girişten ~2 saat "
+                "sonra (fiilen 23:15–00:00 UTC arasında) çıkar. Görevi bu "
+                "takvim etkisinin hâlâ yaşayıp yaşamadığını ucuza ve hızla "
+                "ölçmektir."),
         "params": {
             "giris": (f"Yalnız {S9_PAIR}; {S9_HOUR_UTC}:00–"
                       f"{S9_HOUR_UTC}:59 UTC penceresindeki ilk taramada "

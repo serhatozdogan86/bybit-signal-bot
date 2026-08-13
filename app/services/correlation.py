@@ -72,16 +72,30 @@ def correlation_matrix(series: dict[str, dict[str, float]],
 
 def effective_bets(matrix: dict, n: int) -> dict:
     """N_eff = N / (1 + (N-1) * ort_korelasyon). Kac BAGIMSIZ bahsimiz var?
-    Tum ciftler ayni yonde hareket ediyorsa (ort~1) tek bahis var demektir."""
-    vals = [v["corr"] for v in matrix.values() if v["corr"] is not None]
-    if n < 2 or not vals:
-        return {"n_strategies": n, "avg_pairwise_corr": None,
-                "effective_bets": None,
+    Tum ciftler ayni yonde hareket ediyorsa (ort~1) tek bahis var demektir.
+
+    EVREN TUTARLILIGI (inceleme 2026-08-13, MAJOR): ortalama korelasyon
+    yalniz OLCULEN ciftlerden gelir; N de ayni evrenden sayilmali —
+    olculen ciftlerde gecen FARKLI strateji sayisi (n_measured). Aksi
+    halde olculmemis stratejiler N_eff'i temelsizce sisirir."""
+    measured = {k: v for k, v in matrix.items() if v["corr"] is not None}
+    names: set[str] = set()
+    for k in measured:
+        a, b = k.split("|", 1)
+        names.update((a, b))
+    n_measured = len(names)
+    vals = [v["corr"] for v in measured.values()]
+    if n_measured < 2 or not vals:
+        return {"n_strategies": n, "n_measured": n_measured,
+                "avg_pairwise_corr": None, "effective_bets": None,
                 "pairs_measured": len(vals)}
     avg = sum(vals) / len(vals)
-    n_eff = n / (1 + (n - 1) * avg) if (1 + (n - 1) * avg) > 0 else float(n)
-    return {"n_strategies": n, "avg_pairwise_corr": round(avg, 3),
-            "effective_bets": round(min(max(n_eff, 1.0), float(n)), 2),
+    denom = 1 + (n_measured - 1) * avg
+    n_eff = n_measured / denom if denom > 0 else float(n_measured)
+    return {"n_strategies": n, "n_measured": n_measured,
+            "avg_pairwise_corr": round(avg, 3),
+            "effective_bets": round(
+                min(max(n_eff, 1.0), float(n_measured)), 2),
             "pairs_measured": len(vals)}
 
 
@@ -114,7 +128,11 @@ def build_report(db, sampling_regime: int, retired: dict) -> dict:
         if day_open:
             opens.setdefault("CHAMPION", {}).setdefault(
                 day_open, set()).add(r["direction"])
-        if r["outcome"] is None or r["r_multiple"] is None:
+        # yalniz GERCEK pozisyonlar (stats ile ayni kohort): NOT_FILLED hic
+        # acilmamis pozisyondur, r=0.0 ile sahte 'aktif gun' uretirdi
+        # (inceleme 2026-08-13, MAJOR); AMBIGUOUS patolojik kapanis da disi.
+        if r["outcome"] not in ("WIN", "LOSS", "EXPIRED") \
+                or r["r_multiple"] is None:
             continue
         day = (r["closed_utc"] or r["created_utc"] or "")[:10]
         if day:
@@ -124,14 +142,15 @@ def build_report(db, sampling_regime: int, retired: dict) -> dict:
     # --- adaylar: gecerli ornekleme rejimi; kapanis ~ entry_ts + tutus ---
     for r in db.query(
             "SELECT strategy, direction, created_utc, entry_ts, hold_bars, "
-            "r_multiple, status, regime FROM challenger_signals"):
+            "r_multiple, status, outcome, regime FROM challenger_signals"):
         if (r.get("regime") or 1) != sampling_regime:
             continue
         day_open = (r["created_utc"] or "")[:10]
         if day_open:
             opens.setdefault(r["strategy"], {}).setdefault(
                 day_open, set()).add(r["direction"])
-        if r["status"] != "CLOSED" or r["r_multiple"] is None:
+        if r["status"] != "CLOSED" or r["r_multiple"] is None \
+                or r["outcome"] not in ("WIN", "LOSS", "EXPIRED"):
             continue
         close_ms = (r["entry_ts"] or 0) + (r["hold_bars"] or 0) * _BAR_MS
         if close_ms <= 0:
@@ -145,7 +164,12 @@ def build_report(db, sampling_regime: int, retired: dict) -> dict:
         "note": ("Faz A OLCUM ALETI — salt rapor, karar/esik uretmez. "
                  "Korelasyon BRUT gunluk R uzerinden (maliyet ~sabit "
                  "kaydirma, yapiyi degistirmez). Korelasyon icin ciftin "
-                 f"HER IKI tarafinda >= {MIN_DAYS} aktif gun ister."),
+                 f"HER IKI tarafinda >= {MIN_DAYS} aktif gun ister. "
+                 "Kohort: yalniz WIN/LOSS/EXPIRED (gercek pozisyonlar). "
+                 "Aday kapanis gunu entry_ts + tutus yaklasik atfidir "
+                 "(mum boslugunda gercek kapanistan sapabilir); sampiyonda "
+                 "closed_utc kullanilir. N_eff yalniz OLCULEN ciftlerin "
+                 "evreninden turetilir (n_measured)."),
         "min_days": MIN_DAYS,
         "basis": "gross_daily_r",
         "strategies": {k: {"active_days": len(v),

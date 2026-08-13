@@ -270,7 +270,8 @@ takvim etkisinin hâlâ yaşayıp yaşamadığını ucuza/hızla ölçmek (örne
 - Yalnız BTCUSDT (S9_PAIR). Genişletme (likit 5 parite) AYRI ön-kayıt ister.
 - Giriş: 21:00–21:59 UTC penceresindeki İLK taramada son 15dk kapanıştan
   LONG. Fiyat/hacim/rejim koşulu YOK (takvim tetikli).
-- Çıkış: 8×15dk bar sonra (≈2 saat, ~23:00) zaman-çıkışı → defterde EXPIRED,
+- Çıkış: girişten 8 KAPANMIŞ 15dk bar sonra (2s00–2s15dk; giriş barına göre
+  fiilen 23:15–00:00 UTC arası) zaman-çıkışı → defterde EXPIRED,
   R = pnl/risk. Hedef sentetik-erişilemez (risk×100); stop 2×ATR(15dk)
   yalnız felaket freni ve R paydası.
 - Küme = takvim günü (dedup 4H kovası 20–24 penceresini kapsar → günde tek
