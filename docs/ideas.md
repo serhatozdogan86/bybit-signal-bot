@@ -137,3 +137,15 @@ getirisi+Sharpe reddedildi (yeni altyapı, şampiyon diliyle kıyaslanamaz).
 **Kilit/izolasyon:** bu adım docs + tools/backtest_s5.py; şampiyon motoruna,
 eşiklerine, canlı DB'ye SIFIR dokunuş. S5 canlıya (challengers.py) ancak
 backtest'i geçerse ve AYRI izolasyonlu bir dalgada girer.
+
+### S5 BACKTEST SONUCU (2026-08-13, tek atış — ön-kayıt kuralıyla)
+90 günlük gerçek veri (2026-05-12 → 08-12), 150 parite, 39 denge, 78 küme,
+1008 pozisyon (504L/504S). **Brüt R −26.26, net R −66.54, küme-CI
+[−0.413, +0.261], E_net −0.066.** İlan edilmiş kurala göre **BELİRSİZ**
+(küme-CI üst sınırı <0 değil → elenmedi; ama alt<0 ve net<0 → "umut vaat
+etti" DENMEZ). Maliyetten ÖNCE bile ekside — hipotezin beklediği kenar YOK.
+Araştırma uyarısını doğruluyor (kripto'da kesitsel momentum, zaman-serisi
+momentumdan zayıf).
+**Karar:** S5 canlı yarışa EKLENMEDİ (backtest'te net kenar yok; slot daha
+güçlü adaya). Vol-ayarlı sıralama AYRI hipotezdir; aynı veride yeniden
+koşmak p-hacking olur — ayrı ön-kayıt + gelecek veri gerektirir.
