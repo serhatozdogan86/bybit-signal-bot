@@ -149,3 +149,40 @@ momentumdan zayıf).
 **Karar:** S5 canlı yarışa EKLENMEDİ (backtest'te net kenar yok; slot daha
 güçlü adaya). Vol-ayarlı sıralama AYRI hipotezdir; aynı veride yeniden
 koşmak p-hacking olur — ayrı ön-kayıt + gelecek veri gerektirir.
+
+## TSM ZAMAN-SERİSİ MOMENTUM — ÖN-KAYIT (2026-08-13, Serhat onayı)
+Bu belge TSM'i geçmiş veride TEST ETMEDEN ÖNCE yazıldı; kurallar donduruldu.
+
+**Tasarım: S5'in TEMİZ KONTROL KOLU.** TSM = S5 ile birebir aynı boru hattı,
+TEK fark sinyalde: S5 evreni kıyaslar (kesitsel/göreli sıralama); TSM her
+pariteye KENDİ geçmişine göre bakar (mutlak/zaman-serisi işaret). Diğer her
+şey aynı: 14 gün (84×4H) bakış, 48s (12×4H) tutuş, ATR-normalize R, aynı
+maliyet, küme=yön+denge, Faz-1 kapısı ≥50 küme + küme-CI alt>0. Amaç:
+"kripto'da mutlak trend mi göreli sıralama mı kazanır" sorusunu AYNI veride
+temiz kıyasla ölçmek (Moskowitz-Ooi-Pedersen 2012; araştırma: kripto'da
+TSM > kesitsel momentum).
+
+**Dondurulmuş kurallar (v1):**
+- Sinyal: her uygun parite için ret = close[t]/close[t−84] − 1.
+  ret>0 → LONG, ret<0 → SHORT, ret==0 → atla. (Ölü bant YOK; ayrı hipotez.)
+- Sepet YOK: uygun evrendeki HER parite işaretine göre pozisyonlanır
+  (S5'teki %10 decile burada yok — mutlak sinyal herkese uygulanır).
+- Giriş close[t], çıkış close[t+12]. R paydası ATR(14,4H)/close.
+  net R = (getiri − maliyet)/atr_frac; maliyet = 2×taker + funding×6.
+- Küme: yön + denge zaman damgası. Faz-1 kapısı diğerleriyle AYNI.
+
+**Başarı ölçütü (önceden ilan — S5 ile aynı):**
+- ADAY: küme-CI alt ≥ 0 VE net R > 0 (VE ≥50 küme).
+- ELENİR: küme-CI üst < 0.
+- BELİRSİZ (arası): canlıya aday, "umut vaat etti" DENMEZ.
+- Backtest HÜKÜM DEĞİL, budama. Kesin söz canlı 50 küme + walk-forward'dan.
+
+**Dürüstlük notu (araştırmadan):** TSM başarısının çoğu momentum
+"zamanlamasından" değil vol-ölçeklemeden gelebilir. ATR-normalize R bizim
+vol-ölçeklememizdir ve S5 ile TSM'de AYNIdır → iki aday arasındaki fark
+yalnız sinyal türüne (mutlak vs göreli) atfedilebilir; bu, kıyası temiz
+kılar ama "TSM zamanlaması mutlak değer katıyor mu" ayrı bir sorudur.
+
+**Bilinen zayıflıklar:** yatay piyasada whipsaw; sert dönüşte geç çıkış;
+90 gün tek rejim. **Kilit/izolasyon:** docs + tools/backtest_tsm.py;
+şampiyona/canlı DB'ye sıfır dokunuş.
