@@ -31,11 +31,13 @@ from app.services.signal_tracker import FUNDING_8H, STOP_SLIP, TAKER_FEE
 log = logging.getLogger("challengers")
 
 STRATEGIES = ("S1_TSMOM", "S2_DONCHIAN", "S3_MEANREV", "S4_CARRY", "S6_SWEEP",
-              "S7_WYCKOFF", "S8_FUNDSQUEEZE")
+              "S7_WYCKOFF", "S8_FUNDSQUEEZE", "S9_GECE")
 # S7: 2026-08-06, tetik = S6 sinavini doldurdu.
 # S8: 2026-08-13, funding sikisma teyidi (on-kayit docs/ideas.md). Momentum
 # ailesi (S5 kesitsel + TSM) 90-gun backtest'te kenar gostermedi -> rafta;
 # funding-yonu S4'te var ama S8 asiri esik + fiyat teyidiyle ayrisir.
+# S9: 2026-08-13, gece penceresi (arastirma raporu #1; on-kayit ideas.md).
+# Takvim-tetikli ILK aday: fiyat kalibina bakmaz, gunun saatine bakar.
 # Acik pozisyon tavani - STRATEJIYE GORE (v1.1 duzeltmesi).
 # NEDEN: tek tavan (15) yarisi adaletsiz kildi. Uzun tutan trend adaylari
 # (S1 medyan 45 bar, S4 37 bar) slotlari doldurup YENI SINYAL URETEMEZ hale
@@ -61,7 +63,9 @@ MAX_OPEN = {"S1_TSMOM": 70, "S2_DONCHIAN": 40, "S4_CARRY": 40,
             # teyidi nadir tetiklenir -> footprint kucuk tutuldu (15,
             # varsayilan sinif); kanitlanmamis yeni aday. Yeni slot ICAT
             # degil: S8 yeni bir aday (S7 gibi kendi kotasiyla girer).
-            "S8_FUNDSQUEEZE": 15}
+            "S8_FUNDSQUEEZE": 15,
+            # S9: tek parite (BTCUSDT), gunde tek 2 saatlik islem -> tavan 1.
+            "S9_GECE": 1}
 # Emekli adaylar: yeni sinyal uretimi DURUR; acik pozisyonlar normal
 # degerlendirilir, kapanmis kohort arsivde kalir ve stats'ta
 # retired_utc ile raporlanir (sessiz kaybolma yok).
@@ -119,6 +123,14 @@ S7_TP_RISK = 2.0         # S7: hedef (risk kati)
 S8_ANN_FUNDING = 0.60    # S8: yillik |funding| esigi (S4'in %30'undan DERIN)
 S8_RISK_ATR = 2.0        # S8: stop (ATR-4H kati)
 S8_TP_RISK = 2.0         # S8: hedef (risk kati)
+# S9 GECE (2026-08-13): NY kapanisi sonrasi / Asya oncesi gece penceresi.
+# Kaynak: Vojtko-Javorska SSRN 4581124 + bagimsiz replikasyonlar (rapor).
+# Cikis ZAMANLADIR (stop yalniz felaket freni; hedef sentetik-erisilemez).
+S9_PAIR = "BTCUSDT"      # S9: v1 yalniz BTC (genisletme AYRI on-kayit ister)
+S9_HOUR_UTC = 21         # S9: giris penceresi 21:00-21:59 UTC'deki ilk tarama
+S9_HOLD_BARS = 8         # S9: 8 x 15dk = 2 saat tutus (cikis ~23:00 UTC)
+S9_STOP_ATR = 2.0        # S9: felaket stopu (15dk ATR kati) - R paydasi
+S9_TP_RISK = 100.0       # S9: SENTETIK erisilemez hedef (cikis zamanla)
 
 
 def _saat(bars: int) -> str:
@@ -236,6 +248,27 @@ STRATEGY_INFO: dict[str, dict] = {
             "filtreler": (f"funding kapısı: yıllık |funding| > "
                           f"%{S8_ANN_FUNDING * 100:g} + fiyat teyidi; "
                           "rejim/hacim filtresi yok"),
+        },
+    },
+    "S9_GECE": {
+        "name": "Gece Penceresi",
+        "how": ("Fiyat grafiğine hiç bakmaz; saate bakar. New York borsası "
+                "kapandıktan sonra, Asya güne başlamadan önceki iki saatte "
+                "(21:00–23:00 UTC) Bitcoin tarihsel olarak günün en güçlü "
+                "ortalama getirisini vermiştir — her akşam o iki saati alır, "
+                "süre dolunca çıkar. Görevi bu takvim etkisinin hâlâ yaşayıp "
+                "yaşamadığını ucuza ve hızla ölçmektir."),
+        "params": {
+            "giris": (f"Yalnız {S9_PAIR}; {S9_HOUR_UTC}:00–"
+                      f"{S9_HOUR_UTC}:59 UTC penceresindeki ilk taramada "
+                      "kapanıştan LONG — fiyat/hacim koşulu yok"),
+            "stop": (f"{S9_STOP_ATR:g} × ATR(15dk) — yalnız felaket freni; "
+                     "R bu mesafeyle tanımlanır"),
+            "hedef": (f"risk × {S9_TP_RISK:g} (sentetik, erişilemez) — "
+                      "çıkış hedefle değil SÜREYLE olur"),
+            "zaman_asimi": _saat(S9_HOLD_BARS),
+            "tavan": f"{MAX_OPEN['S9_GECE']} açık pozisyon",
+            "filtreler": "yok — takvim tetikli; rejim/hacim/funding bakılmaz",
         },
     },
     "S7_WYCKOFF": {
@@ -506,6 +539,19 @@ class ChallengerEngine:
                 out.append(("S8_FUNDSQUEEZE",
                             ("SHORT", entry + risk,
                              entry - S8_TP_RISK * risk, TREND_TIMEOUT)))
+
+        # S9 GECE: yalniz BTCUSDT, 21:00-21:59 UTC penceresindeki ilk tarama.
+        # Fiyat kalibina BAKMAZ - takvim tetikli. Cikis zaman-cikisidir
+        # (8 bar -> EXPIRED, R = pnl/risk); stop yalniz felaket freni, hedef
+        # sentetik-erisilemez. Dedup 4H kovasi (20-24) -> gunde tek kayit,
+        # kume = takvim gunu (on-kayit ideas.md 2026-08-13).
+        if atr_l and symbol == S9_PAIR:
+            hour = (ltf.candles[-1].ts // 3_600_000) % 24
+            if hour == S9_HOUR_UTC:
+                risk = S9_STOP_ATR * atr_l
+                out.append(("S9_GECE",
+                            ("LONG", entry - risk,
+                             entry + S9_TP_RISK * risk, S9_HOLD_BARS)))
 
         # S6 SWEEP: swing ekstremumu asilir ama kapanis gerisinde + hacim
         if atr_l and len(l_close) >= S6_SWING_N + 4:

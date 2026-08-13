@@ -134,6 +134,52 @@ def test_s8_no_funding_no_signal(tmp_path):
     assert "S8_FUNDSQUEEZE" not in c
 
 
+def _s9_ltf(hour_utc):
+    """Son mumu verilen UTC saatine damgalanmis duz seri."""
+    ltf = fx.make_series(np.full(60, 100.0))
+    # gun 1000, istenen saat: ts = (1000*24 + saat) * 3600 * 1000
+    ltf.candles[-1].ts = (1000 * 24 + hour_utc) * 3_600_000
+    return ltf
+
+
+def test_s9_gece_only_btc_only_window(tmp_path):
+    eng, _ = _eng(tmp_path)
+    # 21:xx penceresi + BTCUSDT -> LONG, zaman-cikisli kurgu
+    c = dict(eng._generate("BTCUSDT", None, _s9_ltf(21), None))
+    assert "S9_GECE" in c
+    d, stop, tp, timeout = c["S9_GECE"]
+    assert d == "LONG" and timeout == 8
+    assert stop < 100.0 < tp
+    assert tp > 100.0 * 1.5          # sentetik hedef gercekten erisilemez
+    # ayni saat baska parite -> YOK (v1 yalniz BTC)
+    assert "S9_GECE" not in dict(eng._generate("ETHUSDT", None, _s9_ltf(21), None))
+    # BTC ama pencere disi saatler -> YOK
+    for h in (20, 22, 3):
+        assert "S9_GECE" not in dict(eng._generate("BTCUSDT", None, _s9_ltf(h), None))
+
+
+def test_s9_gece_one_entry_per_evening_and_time_exit(tmp_path):
+    eng, db = _eng(tmp_path)
+    ltf = _s9_ltf(21)
+    assert eng.on_scan("BTCUSDT", None, ltf, None) == 1
+    # ayni aksam ikinci tarama (15dk sonra, ayni 4H kovasi) -> dedup
+    ltf2 = _s9_ltf(21)
+    ltf2.candles[-1].ts += 900_000              # 21:15
+    assert eng.on_scan("BTCUSDT", None, ltf2, None) == 0
+    # zaman-cikisi: 8 duz mum -> EXPIRED, R = pnl/risk
+    row = db.query_one("SELECT * FROM challenger_signals WHERE strategy='S9_GECE'")
+    risk = row["entry"] - row["stop"]
+    final_close = row["entry"] + 0.5 * risk     # 2 saatte +0.5R suruklendi
+    _put_candles(db, "BTCUSDT",
+                 [(row["entry"] * 1.001, row["entry"] * 0.999, row["entry"])] * 7
+                 + [(final_close * 1.001, final_close * 0.999, final_close)],
+                 start_ts=row["entry_ts"] + 900_000)
+    eng.evaluate_open("BTCUSDT")
+    row = db.query_one("SELECT * FROM challenger_signals WHERE strategy='S9_GECE'")
+    assert row["outcome"] == "EXPIRED" and row["hold_bars"] == 8
+    assert abs(row["r_multiple"] - 0.5) < 0.05
+
+
 def test_same_candle_stop_and_tp_is_conservative_loss(tmp_path):
     eng, db = _eng(tmp_path)
     db.execute("INSERT INTO challenger_signals(strategy,pair,direction,"

@@ -273,6 +273,20 @@ def create_app(store: StateStore, scheduler: Scheduler,
         return app.response_class(json.dumps(data, indent=2),
                                   mimetype="application/json")
 
+    @app.get("/correlation")
+    def correlation_view():
+        """Faz A olcum aleti: strateji-cifti gunluk R korelasyonu, etkin
+        bagimsiz bahis sayisi, ayni-gun-ayni-yon cakisma orani. Salt rapor;
+        karar/esik uretmez (docs/aile-arastirmasi-2026-08-13.md)."""
+        eng = getattr(scheduler, "challengers", None)
+        if eng is None or tracker is None:
+            return jsonify({"error": "correlation needs tracker+challengers"}), 404
+        from app.services import correlation
+        from app.services.challengers import RETIRED, SAMPLING_REGIME
+        rep = correlation.build_report(eng._db, SAMPLING_REGIME, RETIRED)
+        return app.response_class(json.dumps(rep, indent=2),
+                                  mimetype="application/json")
+
     @app.get("/signals")
     def signals():
         if tracker is None:

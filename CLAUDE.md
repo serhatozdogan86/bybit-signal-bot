@@ -25,9 +25,11 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
   sayaçlar 2026-08-13'ten SIFIRDAN — config-lock.md sonu.
 - S3/S6 kenar ölümüyle EMEKLİ (2026-08-12); S1 tavanı 40→70 (bütçe
   devri, toplam sabit). Ölü maksDD alarmı düzeltildi (Kural 10).
-- 6 aday gölge yarışta (app/services/challengers.py), rejim-2 örneklemesi.
-  S7 (Wyckoff) 2026-08-06'da yarışa girdi (tetik: S6 sınavını doldurdu).
-  S5 beklemede — tetikleyicisi docs/challengers-design.md.
+- Canlı adaylar (2026-08-13): S1, S2, S4, S7, S8 (funding sıkışma),
+  S9_GECE (takvim penceresi) — rejim-2 örneklemesi; S3/S6 emekli.
+  S5+TSM momentum ailesi RAFTA (90g backtest kenar yok; raftan çıkma
+  tetiği docs/ideas.md). Aile araştırması: docs/aile-arastirmasi-2026-08-13.md.
+  Korelasyon aleti (Faz A): /correlation, app/services/correlation.py.
 - v2 şampiyon henüz TASARLANMADI; tasarlanırsa ÖN-KAYITLA yeni aday olur.
 - S1 seçim penceresi doldu (50 küme, CI alt −0.05): KIL PAYI GEÇEMEDİ.
   2026-08-12: ön-kayıtlı DOĞRULAMA penceresi açıldı (yeni 50 küme,
