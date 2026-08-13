@@ -85,6 +85,55 @@ def test_s4_carry_sign_mapping(tmp_path):
     assert eng.on_scan("EUSDT", htf, ltf, funding=0.00001) == 0
 
 
+def _s8_ltf(last):
+    """Son 15dk kapanisi 'last', oncesi duz 100 -> fiyat teyit yonu."""
+    closes = np.full(60, 100.0)
+    closes[-1] = last
+    return fx.make_series(closes)
+
+
+def test_s8_fundsqueeze_price_confirmed_long_and_short(tmp_path):
+    eng, _ = _eng(tmp_path)
+    htf = fx.make_series(np.full(60, 100.0), interval="240")
+    # derin NEGATIF funding + fiyat YUKARI donuyor -> LONG
+    c = dict(eng._generate("AUSDT", htf, _s8_ltf(100.5), funding=-0.001))
+    assert "S8_FUNDSQUEEZE" in c
+    d, stop, tp, _ = c["S8_FUNDSQUEEZE"]
+    assert d == "LONG" and stop < 100.5 < tp
+    # derin POZITIF funding + fiyat ASAGI donuyor -> SHORT
+    c = dict(eng._generate("BUSDT", htf, _s8_ltf(99.5), funding=+0.001))
+    assert "S8_FUNDSQUEEZE" in c and c["S8_FUNDSQUEEZE"][0] == "SHORT"
+
+
+def test_s8_requires_price_confirmation(tmp_path):
+    """S4'ten AYRISMA 1: fiyat teyidi. Derin funding ama fiyat ters yonde
+    teyit vermezse S8 fire ETMEZ; S4 (teyit istemez) yine firlar."""
+    eng, _ = _eng(tmp_path)
+    htf = fx.make_series(np.full(60, 100.0), interval="240")
+    # derin negatif funding AMA fiyat ASAGI (LONG teyidi yok)
+    c = dict(eng._generate("AUSDT", htf, _s8_ltf(99.5), funding=-0.001))
+    assert "S8_FUNDSQUEEZE" not in c
+    assert "S4_CARRY" in c and c["S4_CARRY"][0] == "LONG"
+
+
+def test_s8_threshold_deeper_than_s4(tmp_path):
+    """S4'ten AYRISMA 2: daha uc esik. ann ~%44: S4 (%30) firlar ama
+    S8 (%60) firlamaz — fiyat teyidi dogru yonde olsa bile."""
+    eng, _ = _eng(tmp_path)
+    htf = fx.make_series(np.full(60, 100.0), interval="240")
+    # ann = 0.0004*1095 ~ +0.438; pozitif -> S4 SHORT; fiyat asagi (S8 short teyidi)
+    c = dict(eng._generate("AUSDT", htf, _s8_ltf(99.5), funding=+0.0004))
+    assert "S4_CARRY" in c and c["S4_CARRY"][0] == "SHORT"
+    assert "S8_FUNDSQUEEZE" not in c        # esik altinda -> S8 yok
+
+
+def test_s8_no_funding_no_signal(tmp_path):
+    eng, _ = _eng(tmp_path)
+    htf = fx.make_series(np.full(60, 100.0), interval="240")
+    c = dict(eng._generate("AUSDT", htf, _s8_ltf(100.5), funding=None))
+    assert "S8_FUNDSQUEEZE" not in c
+
+
 def test_same_candle_stop_and_tp_is_conservative_loss(tmp_path):
     eng, db = _eng(tmp_path)
     db.execute("INSERT INTO challenger_signals(strategy,pair,direction,"

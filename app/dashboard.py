@@ -896,6 +896,12 @@ const RU={
 "Годовая |funding| > 30% — против толпы",
 "funding kapısı: yıllık |funding| > %30; rejim/hacim filtresi yok":
 "ворота funding: годовая |funding| > 30%; фильтров режима/объёма нет",
+"Vadeli piyasada bir tarafa AŞIRI kalabalık binmişse (fonlama ücreti çok uçlanmışsa) VE fiyat ters yöne dönmeye başlamışsa, sıkışan tarafın zorla kapatılacağına oynar. S4 ile aynı yöne bakar ama iki farkla: S4 ücret eşiği aşılınca hemen girer; S8 hem daha uç bir eşik arar hem de önce fiyatın dönüşü teyit etmesini bekler — daha seyrek ama daha yüksek güvenli giriş.":
+"Если на фьючерсах толпа ЧРЕЗМЕРНО встала в одну сторону (ставка финансирования зашкалила) И цена начала разворачиваться в обратную сторону, ставит на принудительное закрытие зажатой стороны. Смотрит в ту же сторону, что и S4, но с двумя отличиями: S4 входит сразу при превышении порога ставки; S8 требует и более крайнего порога, и подтверждения разворота ценой — реже, но с более высокой уверенностью.",
+"Yıllıklandırılmış |funding| > %60 (S4'ten derin) VE son 15dk kapanış ters yönde teyit (negatif→yukarı dönüş LONG, pozitif→aşağı dönüş SHORT)":
+"Годовая |funding| > 60% (глубже, чем у S4) И последнее 15м-закрытие подтверждает разворот (отрицательная→разворот вверх LONG, положительная→разворот вниз SHORT)",
+"funding kapısı: yıllık |funding| > %60 + fiyat teyidi; rejim/hacim filtresi yok":
+"ворота funding: годовая |funding| > 60% + подтверждение ценой; фильтров режима/объёма нет",
 "Fiyat bilinen bir tepeyi ya da dibi iğneyle aşıp hemen geri dönerse, bunun stopları toplamak için yapılmış bir hamle olduğunu varsayar ve dönüş yönüne girer. Teyit için o mumda işlem hacminin de sıçramış olmasını ister.":
 "Если цена иглой прокалывает известную вершину или дно и сразу возвращается, считает это охотой за стопами и входит в сторону разворота. Для подтверждения требует всплеска объёма на той же свече.",
 "Fitil son 96 barın ekstremumunu aşar ama kapanış gerisinde kalır VE hacim ≥ 1.5 × SMA20":
@@ -1196,7 +1202,8 @@ function renderHeader(perf,status){
 /* ---------- Faz B: aday stratejiler sekmesi ---------- */
 const CHAL_ADI={S1_TSMOM:"S1 · Trend Takibi",S2_DONCHIAN:"S2 · Kırılım (Donchian)",
   S3_MEANREV:"S3 · Ortalamaya Dönüş",S4_CARRY:"S4 · Fonlama Taşıması",
-  S6_SWEEP:"S6 · Süpürme Dönüşü",S7_WYCKOFF:"S7 · Wyckoff Spring+Test"};
+  S6_SWEEP:"S6 · Süpürme Dönüşü",S7_WYCKOFF:"S7 · Wyckoff Spring+Test",
+  S8_FUNDSQUEEZE:"S8 · Fonlama Sıkışması"};
 let CHAL=null;   // /challengers son yaniti - detay penceresi buradan okur
 /* Durum rozeti PROGRAMATIK olarak sunucu verisinden (kume/CI/emeklilik)
    turetilir — elle yazilmis strateji-durum listesi YOK (drift yasagi).
