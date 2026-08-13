@@ -186,3 +186,28 @@ kılar ama "TSM zamanlaması mutlak değer katıyor mu" ayrı bir sorudur.
 **Bilinen zayıflıklar:** yatay piyasada whipsaw; sert dönüşte geç çıkış;
 90 gün tek rejim. **Kilit/izolasyon:** docs + tools/backtest_tsm.py;
 şampiyona/canlı DB'ye sıfır dokunuş.
+
+### TSM BACKTEST SONUCU (2026-08-13, tek atış) + S5/TSM KARŞILAŞTIRMASI
+90 gün, 150 parite, 39 denge, 78 küme, 5021 pozisyon (1949L/**3072S**).
+**Brüt R −417.4, net R −822.51, küme-CI [−0.499, +0.189], E_net −0.164.**
+İlan edilmiş kurala göre **BELİRSİZ** (üst<0 değil ama net ve alt açık ekside).
+
+**S5 vs TSM (aynı ölçüm, tek fark sinyal):**
+| | net R | E_net | küme-CI |
+|--|--|--|--|
+| S5 (göreli sıralama) | −66.54 | −0.066 | [−0.413, +0.261] |
+| TSM (mutlak işaret) | −822.51 | −0.164 | [−0.499, +0.189] |
+
+**Yorum (regime gözlemi — strateji ayarı DEĞİL):** İkisi de bu 90 günde
+kenar göstermedi; TSM belirgin daha kötü. TSM'de 3072 short vs 1949 long →
+pencerede pariteler çoğunlukla negatif 14g getiriyle short işaretledi ama
+piyasa short'ları takip etmedi → geniş whipsaw (klasik trend-takibi başarısızlığı,
+yükselen/çırpınan rejimde). Bu TEK rejimdir; literatürün pozitif momentum
+sonuçları çok-yıllı, çöküş içeren örneklemlerden gelir ("crisis alpha" —
+bu pencerede yok). Sonuç: "momentum çalışmıyor" DEĞİL, "bu rejimde çalışmadı".
+
+**Karar:** Ne S5 ne TSM canlı slota HAK ETMEDİ (ikisi de net ekside).
+Kombinasyon/vol-ayarlı/farklı-bakış varyantlarını AYNI veride aramak
+YASAK (p-hacking) — her biri ayrı ön-kayıt + gelecek/başka veri ister.
+Momentum ailesi şimdilik rafta; canlı gölge yarışın kendi ileriye dönük
+verisi bir gün trend/çöküş rejimi görürse aile yeniden değerlendirilir.
