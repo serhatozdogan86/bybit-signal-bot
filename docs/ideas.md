@@ -291,3 +291,45 @@ aynı-yön çakışma oranı. Hiçbir karar/eşik üretmez; test_report_is_measu
 bunu zorlar. Yeni aday ön-kayıtlarının şart koştuğu örtüşme ölçümlerinin
 (S8↔türevleri, V1/S-ATT1 çakışma raporları) altyapısıdır. Faz B (ağırlıklama)
 AYRI ön-kayıt ister; en erken 3 ay rapor birikince.
+
+## P1 OI-FLUSH DÖNÜŞÜ — ÖN-KAYIT (2026-08-14, Serhat onayı "Başla")
+Kaynak: docs/aile-arastirmasi-2026-08-13.md #2 (Hong-Yogo JFE 2012 çerçevesi
++ Glassnode deleveraging analizi — kripto-saatlik kurala sıçrama BÜYÜK,
+bilinçli risk). Kurallar OI VERİSİ GÖRÜLMEDEN donduruldu (rakamlar rapor +
+yayın kaynaklı; bizim veriden türetilmedi).
+
+**Hipotez:** Fiyat düşerken açık pozisyon stoku (OI, kontrat adedi) hızla
+eriyorsa satış zorunlu kapatmadır (fiyata duyarsız); akış bittiğinde baskı
+kalkar → stabilizasyon anında LONG kenarı doğar.
+
+**Dondurulmuş kurallar (v1):**
+- Tetik (her 15m kapanışta): ΔOI(24s)/OI ≤ **−%10** (KONTRAT adedi; USD
+  değil — USD kullanmak sinyali fiyatın kendisine döndürür) VE fiyat aynı
+  24s'de ≥ **2×ATR(14,4H)** düşmüş (kapanış-kapanış) VE son 15m kapanış bir
+  öncekinin ÜSTÜNDE (stabilizasyon) → LONG, girişte 15m kapanış.
+- Stop: 24s penceresinin dibi − 1×ATR(14,15m). Hedef: 2R. Zaman aşımı:
+  96×15m bar (24 saat) → EXPIRED, R=pnl/risk. Aynı mumda stop+hedef →
+  LOSS(ambiguous) — motorla aynı muhafazakâr kural.
+- Küme = yön + 4H penceresi (pariteler arası ORTAK — challenger kural
+  uzayıyla aynı). Parite başına aynı anda tek pozisyon; aynı küme aynı
+  paritede tekrar işlem açmaz.
+- Maliyet: canlı model (2×taker + LOSS'ta kayma + funding×tutuş) — sabitler
+  signal_tracker ile aynı.
+- OI verisi: Bybit v5 open-interest, 1 saatlik; arşiv derinliği API ne
+  verirse o (beklenti ~90 gün; kısaysa pencere daralır ve rapora yazılır).
+
+**Başarı ölçütü (S5/TSM ile aynı, önceden ilan):** ELENİR: küme-CI üst < 0.
+ADAY: küme-CI alt ≥ 0 VE net R > 0 VE ≥50 küme. Arası: BELİRSİZ (canlıya
+aday olabilir, "umut vaat etti" denmez). Backtest HÜKÜM DEĞİL, budama.
+
+**P4 OI-ONAYLI KIRILIM FİLTRESİ (koşullu ön-not):** P1 verisiyle aynı OI
+akışını kullanır; kırılım sinyallerinde ΔOI(24s) ≥ +%5 kohort etiketi —
+GÖLGE kohort, hiçbir motora dokunmaz. TAM ön-kaydı P1 backtest SONUCU
+görüldükten sonra, canlı OI toplama kararıyla birlikte yazılır (şimdi
+yazılmıyor ki P1 sonucuna göre ayarlanmış görünmesin).
+
+**Bilinen zayıflıklar:** aylık-emtia kanıtından saatlik-kripto kurala
+sıçrama; kaskad ortamında kâğıt-doluş iyimserliği (S6 akrabalığı — fark:
+tetik verisi OI STOKU, fiyat süpürmesi değil + stabilizasyon teyidi + sıkı
+zaman-stopu, rapor 'Tuzaklar' bölümü şartları); OI arşiv derinliği API
+kısıtına tabi.
