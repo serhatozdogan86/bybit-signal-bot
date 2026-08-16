@@ -333,3 +333,26 @@ sıçrama; kaskad ortamında kâğıt-doluş iyimserliği (S6 akrabalığı — 
 tetik verisi OI STOKU, fiyat süpürmesi değil + stabilizasyon teyidi + sıkı
 zaman-stopu, rapor 'Tuzaklar' bölümü şartları); OI arşiv derinliği API
 kısıtına tabi.
+
+### P1 OI-FLUSH BACKTEST SONUCU (2026-08-16, tek atış — ön-kayıt kuralıyla)
+OI verisi: 150 parite, 303.202 nokta, 2026-05-18 → 2026-08-16 (~90 gün, tam
+derinlik). Backtest: 105 parite işlendi (45'i OI'siz — evren kayması: kline
+arşivi 08-12 top-150'si, OI arşivi 08-16 top-150'si; dürüstçe sayıldı).
+**308 işlem (63W/194L/51E), 201 küme, brüt R −55.89, net R −77.44,
+küme-CI [−0.396, −0.093], E_net −0.251.**
+
+**HÜKÜM: ELENDİ** — ilan edilmiş EN SERT kriterle (küme-CI ÜST sınırı < 0):
+%95 güvenle gerçek kenar negatif. Kazanma oranı %24.5 (2R hedefle başabaş
+~%33 gerekirdi). P1 canlıya GİRMEZ.
+
+**Ders (rapor 'Tuzaklar' bölümünün öngörüsü gerçekleşti):** OI teyidi eklense
+bile "düşen bıçağı tutma" ailesi bu piyasada kaybediyor — S3 (−158R), S6
+(−84R) ve şimdi P1 (−77R backtest) aynı ailenin üçüncü kaybı. Stabilizasyon
+mumu + OI stoku farklılaşması yetmedi. CEPTEKİ "ortalamaya dönüş dirilişi"
+fikri için de güçlü bir karşı-kanıt olarak not edildi.
+
+**P4 kararı (ön-nottaki kapı):** P1'in ölümü P4'ü otomatik öldürmez — P4
+farklı hipotez (dönüş değil, KIRILIM teyidi). OI verisi artık diskte;
+P4 önce ucuz backtest'le sınanabilir (S2-Donchian kırılımlarını ΔOI'li/
+ΔOI'siz iki kohorta bölüp eşleştirilmiş karşılaştırma). Karar Serhat'a
+sunuldu; canlı OI toplama yatırımı ancak P4 backtest'i olumluysa düşünülür.
