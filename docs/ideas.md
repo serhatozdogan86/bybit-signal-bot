@@ -407,3 +407,30 @@ aceleye getirilmez):
   sonra canlı karar. Başarı ölçütü S5/TSM ile aynı.
 - Bilinen riskler: ters nedensellik (dikkat dünkü fiyatın sonucu olabilir),
   T+1 veri gecikmesi, büyük-coin yanlılığı, dış API bağımlılığı (fail-soft).
+
+### P4 + 52w BACKTEST SONUÇLARI (2026-08-16, tek atış — ön-kayıt kuralıyla)
+
+**P4 OI-onaylı kırılım (eşleşmiş kohort):** 105 parite, 2877 kırılım işlemi.
+| Kohort | işlem | küme | net R | E_net | küme-CI |
+|---|---|---|---|---|---|
+| OI-ARTIŞLI (ΔOI≥+%5) | 594 | 382 | **+22.32** | **+0.038** | [−0.089, +0.171] |
+| OI-ARTIŞSIZ | 2283 | 706 | **−170.88** | −0.075 | [−0.153, +0.009] |
+
+**HÜKÜM: BELİRSİZ** (ilan kuralı: UMUT için artışlı CI alt ≥ 0 gerekirdi;
+alt −0.089). AMA fark ÇARPICI ve hipotez yönünde: E_net farkı +0.113;
+filtre +22R'yi −171R'den ayırıyor. Kırılım ailemizin (şampiyon+S2) isabetini
+artırma potansiyeli ilk kez veriyle desteklendi. Sonraki adım kararı:
+canlı OI toplama + gölge-kohort ölçümü (altyapı yatırımı) Serhat'a sunuldu.
+(tetikte-OI-yok 170: OI arşivi 05-18'de, kline 05-12'de başlıyor — masum.)
+
+**52w-HIGH zirve yakınlığı:** 150 parite, 750 gün TAM derinlik (2024-07-27 →
+2026-08-15; ÇOK REJİMLİ örneklem — 90-günlük testlerin tek-rejim zaafı yok).
+93 hafta, 83 girişli, 273 işlem (120W/87L), brüt +24.57, **net +13.32**,
+küme 83 (≥50 ✓), **E_net +0.049**, küme-CI [−0.137, +0.267].
+**HÜKÜM: BELİRSİZ** — ADAY için CI alt ≥ 0 gerekirdi. Ön-kayıt gereği
+"umut vaat etti" DENMEZ; ama iki yıllık, çok-rejimli örneklemde pozitif
+beklenti + ≥50 küme ile canlıya aday OLABİLİR (kural buna izin veriyor).
+Karar Serhat'a sunuldu.
+
+**Bağlam:** Bu ikisi, S5/TSM/P1'in net-negatif sonuçlarından sonra ilk
+pozitif-yönlü budama sonuçları.
