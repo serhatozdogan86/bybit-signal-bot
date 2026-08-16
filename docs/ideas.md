@@ -356,3 +356,54 @@ farklı hipotez (dönüş değil, KIRILIM teyidi). OI verisi artık diskte;
 P4 önce ucuz backtest'le sınanabilir (S2-Donchian kırılımlarını ΔOI'li/
 ΔOI'siz iki kohorta bölüp eşleştirilmiş karşılaştırma). Karar Serhat'a
 sunuldu; canlı OI toplama yatırımı ancak P4 backtest'i olumluysa düşünülür.
+
+## P4 OI-ONAYLI KIRILIM FİLTRESİ — TAM ÖN-KAYIT (2026-08-16, Serhat onayı)
+P1 ELENDİ; P4 farklı hipotez (dönüş değil KIRILIM teyidi): "kırılımda OI
+artıyorsa hareketi yeni para taşıyor (devam olası); OI düşüyorsa eski
+pozisyon kapanışı (sahte kırılıma yatkın)". Kaynak: Hong-Yogo JFE 2012.
+Kurallar backtest KOŞULMADAN donduruldu:
+- Kırılım: S2-Donchian kuralının BİREBİR kopyası (20×4H kanal, kenar tetik,
+  stop 2×ATR-4H, hedef 6×ATR-4H, 192 bar zaman aşımı, LONG+SHORT ayna).
+- Kohort ayrımı (tek fark): tetik anında ΔOI(24s)/OI ≥ +%5 (kontrat adedi)
+  → "OI-ARTIŞLI" kohort; < +%5 → "OI-ARTIŞSIZ". OI verisi yoksa işlem
+  atlanır ve sayılır.
+- Küme = yön+4H (kohort içi). Maliyet canlı model. TEK atış.
+**Önceden ilan edilen hüküm kuralı:**
+- FİLTRE UMUT VAAT EDİYOR (canlı gölge-kohort dalgası açılabilir):
+  OI-ARTIŞLI E_net > OI-ARTIŞSIZ E_net VE OI-ARTIŞLI küme-CI alt ≥ 0.
+- FİLTRE ELENDİ: OI-ARTIŞLI E_net ≤ OI-ARTIŞSIZ E_net (teyit katkı
+  vermiyor) VEYA OI-ARTIŞLI küme-CI üst < 0.
+- Arası: BELİRSİZ. Her hâlde backtest hüküm değil, budama.
+
+## 52w-HIGH ZİRVE YAKINLIĞI — ÖN-KAYIT (2026-08-16, Serhat onayı)
+Kaynak: rapor #4 (Jia ve ark. JBF 2026; George-Hwang 2004 — listenin en
+güçlü hakemli kanıtı; rakamlar özet düzeyi). Kurallar veri İNMEDEN donduruldu:
+- Veri: GÜNLÜK kline, hedef 750 gün (API verirse; 365 gün çapa + ~55 hafta
+  test penceresi).
+- Her Pazartesi 00:00 UTC: yakınlık = son günlük kapanış / son 365 günün
+  (parite 365 günden yeniyse listing'den beri; en az 90 gün şart) en yüksek
+  GÜNLÜK kapanışı.
+- Seçim: yakınlık ≥ 0.90 VE o haftanın kesitinde en üst %10 (iki koşul
+  birden). Yalnız LONG (kripto kanıtı uzun bacakta).
+- Karar Pazartesi 00:00 UTC'de, son KAPANMIŞ günlük mumla (= Pazar
+  kapanışı); giriş o kapanış fiyatından. Stop = giriş − 2×ATR(14,günlük);
+  çıkış 7 gün sonra kapanış (zaman) veya stop (önce gelen). Hedef YOK → aynı-mum
+  belirsizliği yok. Küme = formasyon haftası (haftanın tüm girişleri TEK
+  küme — LONG-only).
+- Maliyet canlı model. Başarı ölçütü S5/TSM ile aynı (ELENDİ: CI üst<0;
+  ADAY: CI alt≥0 + net>0 + ≥50 küme; arası BELİRSİZ).
+
+## S-ATT1 WİKİPEDİA DİKKAT ŞOKU — ÖN-KAYIT (2026-08-16, Serhat onayı)
+Kaynak: rapor #5 (Hoang-Vo JBEF 2024; Maitre JBF 2025; karşı-kanıt
+Shen-Urquhart 2019 dürüstçe not). Kurallar donduruldu; İMPLEMENTASYON
+SIRADAKİ DALGA (sembol→makale eşlemesi elle + çift kontrol gerektirir,
+aceleye getirilmez):
+- Evren: perp listesinde Wikipedia makalesi olan coinler (eşleme elle,
+  çift kontrollü; eşleme tablosu depoya commit edilir).
+- Sinyal: günlük görüntülemede log-z skoru ≥ 2 (son 90 güne göre) VE 24s
+  getiri 0 ile +%25 arasında (kötü-haber ve pump-kovalama filtreleri) →
+  LONG. Stop 2×ATR(4H); 3 gün zaman-stopu; 7 gün yeniden-giriş yasağı.
+- Küme = takvim günü. Wikimedia geçmişi mevcut → önce backtest (90 gün),
+  sonra canlı karar. Başarı ölçütü S5/TSM ile aynı.
+- Bilinen riskler: ters nedensellik (dikkat dünkü fiyatın sonucu olabilir),
+  T+1 veri gecikmesi, büyük-coin yanlılığı, dış API bağımlılığı (fail-soft).

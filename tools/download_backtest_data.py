@@ -43,7 +43,8 @@ from app.config.settings import Settings                    # noqa: E402
 from app.integrations.bybit_client import BybitClient       # noqa: E402
 from app.services.universe import UniverseProvider          # noqa: E402
 
-_MS = {"15": 15 * 60_000, "240": 240 * 60_000}
+_MS = {"15": 15 * 60_000, "240": 240 * 60_000,
+       "D": 86_400_000}   # gunluk: 52w-HIGH on-kaydi (2026-08-16) icin
 _LIMIT = 200
 _TIMEOUT = (10, 30)
 _MAX_ATTEMPTS = 4
@@ -173,7 +174,7 @@ def main() -> int:
     intervals = [i.strip() for i in args.intervals.split(",") if i.strip()]
     for iv in intervals:
         if iv not in _MS:
-            print(f"HATA: desteklenmeyen interval {iv} (15, 240)")
+            print(f"HATA: desteklenmeyen interval {iv} (15, 240, D)")
             return 2
 
     now_ms = int(time.time() * 1000)
