@@ -85,3 +85,14 @@ sınavı sürerken hiçbirine dokunulmaz; tamamı v2 şampiyon tasarımının
 girdi listesine işlendi. Serbest bölgedeki temizlikler (settings çift
 default, lazy-init, ölü enum) istenirse ayrı, davranış-nötr bir bakım
 dalgasında yapılabilir — aciliyeti yok.
+
+## KARAR KAYDI (2026-08-17, Serhat onayı "tamam")
+
+**Bulgu 1 (hacim zaman uyumsuzluğu): v2'YE ERTELENDİ — şimdi düzeltme
+YOK.** Gerekçe: kusur karar-kritik değil (≤15 saatlik ortalama kayması,
+yönü iki taraflı, yalnız hacim kapısı hassasiyeti); davranış değişikliği
+KİLİT-2 sınav sayaçlarını sıfırlatırdı ve bedel kusurdan büyük. Sınav,
+motoru olduğu gibi yargılar; düzeltme v2 iskeletinin girdi listesinde
+("hacim oranı, tetik barı anındaki SMA20'ye göre"). Gölge-ölçüm ara yolu
+(kayıtlı istisna kapsamında salt-metadata) İSTENMEDİ — gerekirse ayrı
+karar olur.
