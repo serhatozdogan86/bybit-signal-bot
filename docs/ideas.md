@@ -520,3 +520,24 @@ dokunuş. Alet: app/services/exit_lab.py, rapor: /exitlab.
   Küme-CI üst sınırı < 0 → V0 üstün. Arada → belirsiz, veri birikir.
 - Parametre taraması YOK: iz mesafesi 1×R tek değerdir; başka katsayı
   denemek YENİ ön-kayıt ister.
+
+### S-ATT1 UYGULAMA EKİ — veri koşusundan ÖNCE donduruldu (2026-08-17, "başla")
+Ana kurallar 2026-08-16 ön-kaydında; burada yalnız uygulama serbestlikleri
+kapatılır (sonuç görülmeden):
+- Görüntüleme verisi: Wikimedia REST, en.wikipedia, agent=USER (bot
+  trafiği dışarıda), all-access. Eşleme tablosu: data/wiki-eslesme.csv
+  (elle kürasyon = 1. kontrol; indiricinin makale-varlık doğrulaması ve
+  404 raporu = 2. kontrol; bulunamayan makale DÜRÜSTÇE dışlanır).
+- z-skoru: x = log(1+görüntüleme); taban = önceki 90 takvim günü
+  (en az 81 gün veri şartı; popülasyon sapması; sapma 0 → sinyal yok).
+- 24s getiri: D gününün son 4H kapanışı ÷ (D−1)'in son 4H kapanışı − 1;
+  0 < getiri ≤ +0.25 şartı.
+- T+1 dürüstlüğü: giriş, D+1 gününün İLK 4H mumunun AÇILIŞI (gün D
+  verisi ancak gün bitince tamdır; aynı-gün girişi bakış-öncesi olurdu).
+- Stop: giriş − 2 × ATR(14, 4H; girişten önceki son kapanmış mumda).
+  Zaman-stopu: 18 × 4H bar (3 gün), kapanıştan. Hedef yok.
+- Yeniden-giriş yasağı: sembol başına giriş gününden itibaren 7 takvim
+  günü. Küme = SİNYAL takvim günü (aynı gün tüm semboller TEK küme —
+  dikkat şokları günler arasında değil gün içinde korelelidir).
+- Maliyet: v0 aynen (2×taker + stop çıkışında slip + funding×tutuş),
+  R paydası stop mesafesi. Hüküm merdiveni S5 ile aynı (tek atış).
