@@ -11,7 +11,7 @@ LINKUSDT,Chainlink (blockchain)
 DOTUSDT,Polkadot (blockchain platform)
 AVAXUSDT,Avalanche (blockchain platform)
 TRXUSDT,Tron (cryptocurrency)
-SHIBUSDT,Shiba Inu (cryptocurrency)
+SHIB1000USDT,Shiba Inu (cryptocurrency)
 UNIUSDT,Uniswap
 AAVEUSDT,Aave
 XLMUSDT,Stellar (payment network)
@@ -24,7 +24,7 @@ VETUSDT,VeChain
 APTUSDT,Aptos (blockchain)
 ARBUSDT,Arbitrum
 OPUSDT,Optimism (blockchain)
-PEPEUSDT,Pepe (cryptocurrency)
+1000PEPEUSDT,Pepe (cryptocurrency)
 TONUSDT,The Open Network
 SUIUSDT,Sui (blockchain)
 EOSUSDT,EOS (blockchain)
@@ -46,7 +46,7 @@ ZILUSDT,Zilliqa
 BATUSDT,Basic Attention Token
 CAKEUSDT,PancakeSwap
 SUSHIUSDT,SushiSwap
-BONKUSDT,Bonk (cryptocurrency)
+1000BONKUSDT,Bonk (cryptocurrency)
 WIFUSDT,Dogwifhat
 TRUMPUSDT,$Trump (cryptocurrency)
 FARTCOINUSDT,Fartcoin
