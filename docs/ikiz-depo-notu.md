@@ -240,3 +240,18 @@ correlation.py'nin uyarlanması + ölçüm-only anahtar testi. (S9_GECE
 stratejisi ise 3b kapsamı DIŞI — mekanizma hatası/ölçüm düzeltmesi değil,
 yeni bahis; ayrıca hisse piyasası gece kapalıyken kriptonun 21–23 UTC
 penceresi midas evreninde tanımsız.)
+
+## P4 OI-kohort aleti + S10 52w-HIGH — ikiz kontrolü (2026-08-16)
+
+**P4 (OI gölge-kohort etiketi): UYGULANAMAZ (N/A).** Open interest bir
+türev-piyasa (perp/futures) kavramıdır; midas ABD spot hisse botudur ve
+Alpaca verisinde OI yoktur (S8/S4 funding kararıyla aynı gerekçe sınıfı).
+Kontrol edildi, karşılık yok.
+
+**S10 (52-hafta zirvesi): TAŞINABİLİR — midas'ta AÇIK İŞ (güçlü aday).**
+52w-high çapası ASLEN hisse senedi anomalisidir (George-Hwang 2004, 20 yıl
+hakemli literatür) — kripto uyarlamasını biz yaptık; midas'ın kendi
+evreninde uygulanması daha da doğal. midas StrategyLab'i çoklu strateji
+işletiyor; 52w-high haftalık LONG sepeti oraya aday olarak eklenebilir.
+Bu oturumun midas'a yazma erişimi yok → midas oturumuna açık iş olarak
+kaydedildi (weekly_52w_selection saf fonksiyonu birebir taşınabilir).

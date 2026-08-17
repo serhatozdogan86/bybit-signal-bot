@@ -22,7 +22,7 @@ Olcum durustlugu:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.logging_setup import kv
 from app.services import measurement
@@ -31,13 +31,16 @@ from app.services.signal_tracker import FUNDING_8H, STOP_SLIP, TAKER_FEE
 log = logging.getLogger("challengers")
 
 STRATEGIES = ("S1_TSMOM", "S2_DONCHIAN", "S3_MEANREV", "S4_CARRY", "S6_SWEEP",
-              "S7_WYCKOFF", "S8_FUNDSQUEEZE", "S9_GECE")
+              "S7_WYCKOFF", "S8_FUNDSQUEEZE", "S9_GECE", "S10_52WHIGH")
 # S7: 2026-08-06, tetik = S6 sinavini doldurdu.
 # S8: 2026-08-13, funding sikisma teyidi (on-kayit docs/ideas.md). Momentum
 # ailesi (S5 kesitsel + TSM) 90-gun backtest'te kenar gostermedi -> rafta;
 # funding-yonu S4'te var ama S8 asiri esik + fiyat teyidiyle ayrisir.
 # S9: 2026-08-13, gece penceresi (arastirma raporu #1; on-kayit ideas.md).
 # Takvim-tetikli ILK aday: fiyat kalibina bakmaz, gunun saatine bakar.
+# S10: 2026-08-16, 52w zirve yakinligi (backtest BELIRSIZ-pozitif: 750 gunde
+# net +13.32R, E_net +0.049, CI [-0.137,+0.267]; on-kayit ideas.md).
+# Haftalik kadans - hukum yavas gelir (~1 yil), maliyeti dusuk.
 # Acik pozisyon tavani - STRATEJIYE GORE (v1.1 duzeltmesi).
 # NEDEN: tek tavan (15) yarisi adaletsiz kildi. Uzun tutan trend adaylari
 # (S1 medyan 45 bar, S4 37 bar) slotlari doldurup YENI SINYAL URETEMEZ hale
@@ -65,7 +68,10 @@ MAX_OPEN = {"S1_TSMOM": 70, "S2_DONCHIAN": 40, "S4_CARRY": 40,
             # degil: S8 yeni bir aday (S7 gibi kendi kotasiyla girer).
             "S8_FUNDSQUEEZE": 15,
             # S9: tek parite (BTCUSDT), gunde tek 2 saatlik islem -> tavan 1.
-            "S9_GECE": 1}
+            "S9_GECE": 1,
+            # S10: haftalik sepet = evrenin ust %10'u (~15); 7 gunluk tutus
+            # boyunca tek sepet acik -> tavan 15 (varsayilan sinif).
+            "S10_52WHIGH": 15}
 # Emekli adaylar: yeni sinyal uretimi DURUR; acik pozisyonlar normal
 # degerlendirilir, kapanmis kohort arsivde kalir ve stats'ta
 # retired_utc ile raporlanir (sessiz kaybolma yok).
@@ -132,6 +138,18 @@ S9_HOLD_BARS = 8         # S9: 8 kapanmis 15dk bar = 2s00-2s15dk tutus
                          #     (giris barina gore cikis fiilen 23:15-00:00 UTC)
 S9_STOP_ATR = 2.0        # S9: felaket stopu (15dk ATR kati) - R paydasi
 S9_TP_RISK = 100.0       # S9: SENTETIK erisilemez hedef (cikis zamanla)
+# S2/P4 GOLGE-KOHORT (2026-08-16): S2 kirilim kayitlarina dogumda dOI(24s)
+# etiketi dusulur (kontrat adedi). SALT OLCUM - hicbir karari degistirmez.
+# Backtest bulgusu: artisli kohort +22.32R vs artissiz -170.88R (BELIRSIZ).
+S2_OI_RISE = 0.05        # kohort esigi: dOI(24s) >= +%5 -> "artisli"
+# S10 52W-HIGH (2026-08-16, on-kayit ideas.md): zirveye yakinlik capasi.
+S10_ANCHOR_D = 365       # S10: zirve penceresi (gun)
+S10_MIN_HIST = 90        # S10: asgari gunluk gecmis
+S10_PROX = 0.90          # S10: yakinlik tabani (kapanis/zirve)
+S10_DECILE = 0.10        # S10: kesit ust dilimi
+S10_STOP_ATR = 2.0       # S10: stop (GUNLUK ATR kati) - R paydasi
+S10_TIMEOUT = 672        # S10: 7 gun x 96 bar - asil cikis ZAMANDIR
+S10_TP_RISK = 100.0      # S10: SENTETIK erisilemez hedef (S9 deseni)
 
 
 def _saat(bars: int) -> str:
@@ -298,6 +316,30 @@ STRATEGY_INFO: dict[str, dict] = {
                           "SMA20; rejim/funding filtresi yok"),
         },
     },
+    "S10_52WHIGH": {
+        "name": "52 Hafta Zirvesi",
+        "how": ("Yatırımcılar bir yılın zirvesini çapa gibi kullanır: fiyat "
+                "zirveye yakınken iyi habere eksik tepki verilir ve yükseliş "
+                "sürüklenerek devam eder. Her Pazartesi tüm evreni bir yıllık "
+                "zirvesine yakınlığa göre sıralar; hem en üst %10'da hem de "
+                "zirvesinin %90'ının üstünde olanları alır, bir hafta tutup "
+                "çıkar. Haftalık çalışır — hüküm yavaş ama masrafı düşük."),
+        "params": {
+            "giris": (f"Pazartesi 00:00 UTC kararı: yakınlık = son günlük "
+                      f"kapanış ÷ son {S10_ANCHOR_D} günün en yüksek kapanışı "
+                      f"(yeni paritede tüm geçmiş, en az {S10_MIN_HIST} gün); "
+                      f"kesit üst %{S10_DECILE * 100:g} VE yakınlık ≥ "
+                      f"{S10_PROX:g} → LONG"),
+            "stop": (f"{S10_STOP_ATR:g} × ATR(14, günlük) — "
+                     "R bu mesafeyle tanımlanır"),
+            "hedef": (f"risk × {S10_TP_RISK:g} (sentetik, erişilemez) — "
+                      "çıkış hedefle değil SÜREYLE olur"),
+            "zaman_asimi": _saat(S10_TIMEOUT),
+            "tavan": f"{MAX_OPEN['S10_52WHIGH']} açık pozisyon",
+            "filtreler": ("yön filtresi: yalnız LONG (kripto kanıtı uzun "
+                          "bacakta); rejim/hacim/funding bakılmaz"),
+        },
+    },
     "S6_SWEEP": {
         "name": "Süpürme Dönüşü",
         "how": ("Fiyat bilinen bir tepeyi ya da dibi iğneyle aşıp hemen geri "
@@ -347,6 +389,48 @@ def _atr(high: list[float], low: list[float], close: list[float],
     for t in trs[n:]:
         a = (a * (n - 1) + t) / n
     return a
+
+
+def weekly_52w_selection(daily: dict[str, list]) -> list[tuple]:
+    """S10 haftalik secimi - SAF fonksiyon (on-kayit 2026-08-16, birebir):
+    yakinlik = son KAPANMIS gunluk kapanis / son 365 gunun en yuksek kapanisi
+    (yeni paritede tum gecmis, en az 90 gun). Secim: kesit ust %10 VE
+    yakinlik >= 0.90. Donen: [(yakinlik, sembol, giris, stop, son_ts)].
+
+    daily: {sembol: [[ts,o,h,l,c], ...]} artan, yalniz kapanmis gunler.
+    """
+    # ayni-gun sepeti: karar gunu = kesitteki EN TAZE kapanmis gun; bayat
+    # (kline'i geride kalmis/duraklamis) pariteler sepete GIREMEZ - aksi
+    # halde gunler oncesinin fiyatiyla geriye donuk giris yazilir
+    fresh_ts = max((bars[-1][0] for bars in daily.values() if bars),
+                   default=None)
+    if fresh_ts is None:
+        return []
+    cross: list[tuple] = []
+    for sym, bars in daily.items():
+        if not bars or len(bars) < S10_MIN_HIST:
+            continue
+        if bars[-1][0] != fresh_ts:
+            continue                    # bayat parite: karar gunu farkli
+        closes = [b[4] for b in bars]
+        highs = [b[2] for b in bars]
+        lows = [b[3] for b in bars]
+        anchor = max(closes[-S10_ANCHOR_D:])
+        if anchor <= 0:
+            continue
+        entry = closes[-1]
+        atr_d = _atr(highs, lows, closes)
+        if atr_d is None or atr_d <= 0:
+            continue
+        stop = entry - S10_STOP_ATR * atr_d
+        if entry - stop <= 0:
+            continue
+        cross.append((entry / anchor, sym, entry, stop, bars[-1][0]))
+    if not cross:
+        return []
+    cross.sort(reverse=True)
+    k = max(1, round(S10_DECILE * len(cross)))
+    return [c for c in cross[:k] if c[0] >= S10_PROX]
 
 
 def _adx(high: list[float], low: list[float], close: list[float],
@@ -413,6 +497,13 @@ class ChallengerEngine:
                              "regime INTEGER DEFAULT 1")
         except Exception:
             pass  # kolon zaten var
+        try:
+            # P4 golge-kohort (2026-08-16): S2 kirilim kayitlarina dogumda
+            # dusulen dOI(24s) etiketi. SALT metadata - karar okumaz.
+            self._db.execute("ALTER TABLE challenger_signals ADD COLUMN "
+                             "doi_24h REAL")
+        except Exception:
+            pass  # kolon zaten var
 
     # ------------------------------------------------------- sinyal uretimi
     def on_scan(self, symbol: str, htf, ltf, funding: float | None) -> int:
@@ -453,6 +544,69 @@ class ChallengerEngine:
             "SELECT COUNT(*) n FROM challenger_signals WHERE strategy=? "
             "AND status='OPEN'", (strat,))
         return (r["n"] or 0) >= MAX_OPEN.get(strat, MAX_OPEN_DEFAULT)
+
+    # ------------------------------------------ P4 golge-kohort (salt olcum)
+    def untagged_s2(self, pair: str, max_age_sec: int = 600) -> int | None:
+        """YALNIZ bu taramada dogmus (taze), etiket bekleyen S2 kaydi.
+
+        Yas siniri sart (inceleme 2026-08-16): deploy oncesi eski kayitlar
+        veya dogum aninda OI'si alinamayanlar SONRADAN etiketlenirse kohort
+        'dogum ani dOI'si' olmaktan cikar. Yaslananlar etiketsiz kalir ve
+        durustce sayilir."""
+        cutoff = (datetime.now(timezone.utc)
+                  - timedelta(seconds=max_age_sec)).strftime(
+                      "%Y-%m-%dT%H:%M:%SZ")
+        r = self._db.query_one(
+            "SELECT id FROM challenger_signals WHERE strategy='S2_DONCHIAN' "
+            "AND pair=? AND status='OPEN' AND doi_24h IS NULL "
+            "AND created_utc >= ? ORDER BY id DESC LIMIT 1", (pair, cutoff))
+        return r["id"] if r else None
+
+    def set_doi(self, row_id: int, doi: float) -> None:
+        """dOI(24s) etiketini yaz - karar mantigi bu alani OKUMAZ."""
+        self._db.execute(
+            "UPDATE challenger_signals SET doi_24h=? WHERE id=?",
+            (round(doi, 6), row_id))
+
+    # ------------------------------------------------ S10 haftalik gecit
+    def weekly_52w_done(self, week_key: str) -> bool:
+        r = self._db.query_one(
+            "SELECT value FROM meta WHERE key='s10_last_week'")
+        return bool(r and r["value"] == week_key)
+
+    def mark_weekly_52w(self, week_key: str) -> None:
+        self._db.execute(
+            "INSERT OR REPLACE INTO meta(key,value) "
+            "VALUES('s10_last_week',?)", (week_key,))
+
+    def on_weekly_52w(self, daily: dict[str, list], week_key: str) -> int:
+        """S10 haftalik sepetini yaz (secim weekly_52w_selection'da - saf).
+
+        entry_ts = son kapanmis gunluk mumun BITISI (Pazartesi 00:00) ->
+        degerlendirme Pazartesi 15dk mumlarindan baslar. Kume = GECIDIN
+        hafta anahtari (tum sepet TEK kume; per-sembol ts'den turetmek
+        bayat paritede kumeyi bolerdi - inceleme 2026-08-16)."""
+        if "S10_52WHIGH" in RETIRED:
+            return 0
+        made = 0
+        for prox, sym, entry, stop, last_ts in weekly_52w_selection(daily):
+            entry_ts = last_ts + 86_400_000
+            cid = f"S10_52WHIGH:L{week_key}"
+            if self._dup("S10_52WHIGH", sym, cid) \
+                    or self._crowded("S10_52WHIGH"):
+                continue
+            tp = entry + S10_TP_RISK * (entry - stop)
+            self._db.execute(
+                "INSERT INTO challenger_signals(strategy,pair,direction,"
+                "created_utc,entry_ts,entry,stop,tp,timeout_bars,cluster_id,"
+                "regime) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                ("S10_52WHIGH", sym, "LONG", _now_iso(), entry_ts,
+                 round(entry, 8), round(stop, 8), round(tp, 8),
+                 S10_TIMEOUT, cid, SAMPLING_REGIME))
+            made += 1
+            log.info(kv(event="challenger_signal", strategy="S10_52WHIGH",
+                        pair=sym, direction="LONG"))
+        return made
 
     def _generate(self, symbol, htf, ltf, funding):
         """(strateji, (yon, stop, tp, timeout_bar)) ciftleri."""
@@ -735,12 +889,14 @@ class ChallengerEngine:
             wins = sum(1 for r in decided if r["outcome"] == "WIN")
             clusters: dict[str, list[float]] = {}
             gross = net = 0.0
+            net_by_id: dict[int, float] = {}     # kohort blogu yeniden kullanir
             for r in closed:
                 if r.get("r_multiple") is not None:
                     gross += r["r_multiple"]
                 n = self._net_r(r)
                 if n is not None:
                     net += n
+                    net_by_id[r["id"]] = n
                     clusters.setdefault(r["cluster_id"] or "?", []).append(n)
             boot = measurement.cluster_bootstrap(clusters)
             out["strategies"][strat] = {
@@ -761,6 +917,38 @@ class ChallengerEngine:
             }
             if strat in RETIRED:
                 out["strategies"][strat]["retired_utc"] = RETIRED[strat]
+            # --- P4 golge-kohort: S2 kirilimlarinin dOI ayrimi (salt olcum,
+            #     on-kayit 2026-08-16; hicbir karari degistirmez) ---
+            if strat == "S2_DONCHIAN":
+                labeled = [r for r in closed
+                           if r.get("doi_24h") is not None]
+                coh_out: dict[str, dict] = {}
+                for cname, cond in (
+                        ("oi_artisli", lambda d: d >= S2_OI_RISE),
+                        ("oi_artissiz", lambda d: d < S2_OI_RISE)):
+                    crows = [r for r in labeled if cond(r["doi_24h"])]
+                    ccl: dict[str, list[float]] = {}
+                    cnet = 0.0
+                    for r in crows:
+                        n = net_by_id.get(r["id"])   # ana donguyle TEK hesap
+                        if n is not None:
+                            cnet += n
+                            ccl.setdefault(
+                                r["cluster_id"] or "?", []).append(n)
+                    cboot = measurement.cluster_bootstrap(ccl)
+                    coh_out[cname] = {
+                        "closed": len(crows), "net_r": round(cnet, 2),
+                        "clusters": len(ccl),
+                        "ci": ([cboot["ci_low"], cboot["ci_high"]]
+                               if cboot and cboot.get("ci_low") is not None
+                               else None),
+                        "e_net": cboot["e_net"] if cboot else None,
+                    }
+                out["strategies"][strat]["oi_cohorts"] = {
+                    **coh_out,
+                    "unlabeled_closed": len(closed) - len(labeled),
+                    "threshold": S2_OI_RISE,
+                }
             # --- on-kayitli dogrulama penceresi muhasebesi (varsa) ---
             vstart = VALIDATION_WINDOWS.get(strat)
             if vstart:

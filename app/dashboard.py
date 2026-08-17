@@ -912,6 +912,14 @@ const RU={
 "риск × 100 (синтетическая, недостижимая) — выход не по цели, а ПО ВРЕМЕНИ",
 "yok — takvim tetikli; rejim/hacim/funding bakılmaz":
 "нет — триггер календарный; режим/объём/funding не учитываются",
+"Yatırımcılar bir yılın zirvesini çapa gibi kullanır: fiyat zirveye yakınken iyi habere eksik tepki verilir ve yükseliş sürüklenerek devam eder. Her Pazartesi tüm evreni bir yıllık zirvesine yakınlığa göre sıralar; hem en üst %10'da hem de zirvesinin %90'ının üstünde olanları alır, bir hafta tutup çıkar. Haftalık çalışır — hüküm yavaş ama masrafı düşük.":
+"Инвесторы используют годовой максимум как якорь: когда цена близка к вершине, на хорошие новости реагируют недостаточно, и рост продолжается по инерции. Каждый понедельник сортирует всю вселенную по близости к годовому максимуму; берёт те, что одновременно в верхних 10% и выше 90% своей вершины, держит неделю и выходит. Работает еженедельно — вердикт медленный, но затраты низкие.",
+"Pazartesi 00:00 UTC kararı: yakınlık = son günlük kapanış ÷ son 365 günün en yüksek kapanışı (yeni paritede tüm geçmiş, en az 90 gün); kesit üst %10 VE yakınlık ≥ 0.9 → LONG":
+"Решение в понедельник 00:00 UTC: близость = последнее дневное закрытие ÷ максимум закрытий за 365 дней (для новых пар вся история, минимум 90 дней); верхние 10% среза И близость ≥ 0.9 → LONG",
+"2 × ATR(14, günlük) — R bu mesafeyle tanımlanır":
+"2 × ATR(14, дневной) — R определяется этой дистанцией",
+"yön filtresi: yalnız LONG (kripto kanıtı uzun bacakta); rejim/hacim/funding bakılmaz":
+"фильтр направления: только LONG (крипто-доказательства на длинной ноге); режим/объём/funding не учитываются",
 "Fiyat bilinen bir tepeyi ya da dibi iğneyle aşıp hemen geri dönerse, bunun stopları toplamak için yapılmış bir hamle olduğunu varsayar ve dönüş yönüne girer. Teyit için o mumda işlem hacminin de sıçramış olmasını ister.":
 "Если цена иглой прокалывает известную вершину или дно и сразу возвращается, считает это охотой за стопами и входит в сторону разворота. Для подтверждения требует всплеска объёма на той же свече.",
 "Fitil son 96 barın ekstremumunu aşar ama kapanış gerisinde kalır VE hacim ≥ 1.5 × SMA20":
@@ -1213,7 +1221,8 @@ function renderHeader(perf,status){
 const CHAL_ADI={S1_TSMOM:"S1 · Trend Takibi",S2_DONCHIAN:"S2 · Kırılım (Donchian)",
   S3_MEANREV:"S3 · Ortalamaya Dönüş",S4_CARRY:"S4 · Fonlama Taşıması",
   S6_SWEEP:"S6 · Süpürme Dönüşü",S7_WYCKOFF:"S7 · Wyckoff Spring+Test",
-  S8_FUNDSQUEEZE:"S8 · Fonlama Sıkışması",S9_GECE:"S9 · Gece Penceresi"};
+  S8_FUNDSQUEEZE:"S8 · Fonlama Sıkışması",S9_GECE:"S9 · Gece Penceresi",
+  S10_52WHIGH:"S10 · 52 Hafta Zirvesi"};
 let CHAL=null;   // /challengers son yaniti - detay penceresi buradan okur
 /* Durum rozeti PROGRAMATIK olarak sunucu verisinden (kume/CI/emeklilik)
    turetilir — elle yazilmis strateji-durum listesi YOK (drift yasagi).

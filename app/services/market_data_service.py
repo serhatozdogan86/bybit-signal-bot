@@ -8,6 +8,7 @@ REST'ten gelen seri cache'i seed eder, sonraki WS guncellemeleri uzerine yazar.
 from __future__ import annotations
 
 import logging
+import time
 
 from app.integrations.bybit_client import BybitClient
 from app.logging_setup import kv
@@ -59,6 +60,44 @@ class MarketDataService:
     def get_all_tickers(self) -> list[dict] | None:
         """Tum semboller tek istekte (funding dahil) - aday S4 icin."""
         return self._client.get_all_tickers()
+
+    def get_oi_change_24h(self, symbol: str) -> float | None:
+        """dOI(24s)/OI - kontrat adedi (P4 golge-kohort etiketi).
+
+        25 x 1saatlik nokta ceker (tek istek); en yeni / 24s onceki - 1.
+        Veri eksik/bozuksa None (etiket bos kalir - eksik veri eksik kalir)."""
+        rows = self._client.get_open_interest_rows(symbol, limit=25)
+        if not rows or len(rows) < 25:
+            return None
+        try:
+            newest = float(rows[0]["openInterest"])
+            oldest = float(rows[-1]["openInterest"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        if oldest <= 0:
+            return None
+        return newest / oldest - 1.0
+
+    def get_daily_closed_bars(self, symbol: str,
+                              limit: int = 380) -> list[list[float]] | None:
+        """KAPANMIS gunluk mumlar, artan sirada (S10 52w-HIGH verisi).
+
+        Olusmakta olan bugunku mum ATILIR (kapanis-bazli karar kurali).
+        Donen: [[ts,o,h,l,c], ...]. Hata/yetersiz -> None."""
+        rows = self._client.get_kline_rows(symbol, "D", limit)
+        if not rows:
+            return None
+        try:
+            bars = sorted(
+                ([int(r[0]), float(r[1]), float(r[2]), float(r[3]),
+                  float(r[4])] for r in rows), key=lambda b: b[0])
+        except (IndexError, TypeError, ValueError):
+            return None
+        # yalniz KAPANMIS gunler: ts + 24s <= simdi (kosulsuz son-bar atmak
+        # yanlis - gecikmis/duraklamis paritede kapanmis gunu de atardi)
+        now_ms = int(time.time() * 1000)
+        closed = [b for b in bars if b[0] + 86_400_000 <= now_ms]
+        return closed or None
 
     def get_funding_history(self, symbol: str, start_ms: int | None = None,
                             end_ms: int | None = None) -> list[dict] | None:
