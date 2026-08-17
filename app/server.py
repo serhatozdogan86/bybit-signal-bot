@@ -287,6 +287,20 @@ def create_app(store: StateStore, scheduler: Scheduler,
         return app.response_class(json.dumps(rep, indent=2),
                                   mimetype="application/json")
 
+    @app.get("/exitlab")
+    def exitlab_view():
+        """Cikis laboratuvari: kapanmis aday sinyalleri V0 (mevcut sabit
+        cikis) ve V1 (iz suren stop) ile yeniden oynatir. Salt olcum;
+        hicbir karari degistirmez (on-kayit ideas.md 2026-08-17)."""
+        eng = getattr(scheduler, "challengers", None)
+        if eng is None:
+            return jsonify({"error": "exitlab needs challengers"}), 404
+        from app.services import exit_lab
+        from app.services.challengers import SAMPLING_REGIME
+        rep = exit_lab.build_report(eng._db, SAMPLING_REGIME)
+        return app.response_class(json.dumps(rep, indent=2),
+                                  mimetype="application/json")
+
     @app.get("/signals")
     def signals():
         if tracker is None:

@@ -32,6 +32,8 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
   S5+TSM momentum ailesi RAFTA (90g backtest kenar yok; raftan çıkma
   tetiği docs/ideas.md). Aile araştırması: docs/aile-arastirmasi-2026-08-13.md.
   Korelasyon aleti (Faz A): /correlation, app/services/correlation.py.
+  Çıkış laboratuvarı (V0 sabit / V1 iz süren; salt ölçüm): /exitlab,
+  app/services/exit_lab.py — hüküm kuralı ön-kayıtlı (ideas.md 08-17).
 - v2 şampiyon henüz TASARLANMADI; tasarlanırsa ÖN-KAYITLA yeni aday olur.
 - S1 seçim penceresi doldu (50 küme, CI alt −0.05): KIL PAYI GEÇEMEDİ.
   2026-08-12: ön-kayıtlı DOĞRULAMA penceresi açıldı (yeni 50 küme,
@@ -73,7 +75,8 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
 - Uzaktan durum: gist 7841e94325309e69812439897a0c186c
   (codeload.github.com/gist/<id>/tar.gz/HEAD; 0_performance.json,
   0_signals.json, 0_challengers.json, candles_*.csv).
-- Rotalar: /verify /alarms /measurement /challengers (DASHBOARD_TOKEN'lı).
+- Rotalar: /verify /alarms /measurement /challengers /correlation
+  /exitlab (DASHBOARD_TOKEN'lı).
 - Bybit API bazı ortamlardan coğrafi engelli; VM'den erişilir.
 
 ## ŞERİTLER (iki Claude çakışmasın)

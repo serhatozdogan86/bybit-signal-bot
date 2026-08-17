@@ -271,3 +271,15 @@ DOĞAL.** Zarattini-Aziz bulgusu zaten ABD hisse ORB'udur (gerçek açılış
 çanı var); kripto tarafındaki 00:00 UTC çapası bizim uyarlamamızdır.
 midas'ta orijinal haliyle (09:30 ET açılış aralığı + göreli hacim
 kapısı) uygulanması kripto versiyonundan daha sadıktır. Açık iş.
+
+## Çıkış laboratuvarı (V0/V1) — ikiz kontrolü (2026-08-17)
+
+**Kaynak bu kez İKİZİN KENDİSİ:** midas 2026-08-17'de V4_IZ (iz süren
+çıkış varyantı) ile çıkış laboratuvarını genişletti ve "çıkış tasarımı
+girişten belirleyici" bulgusunu raporladı. Kural 3b'nin ters yönlü
+işleyişi: ikizde doğan yeni ÖLÇÜM ALETİ burada karşılıksızdı → karşılığı
+kuruldu: app/services/exit_lab.py + /exitlab (ön-kayıt ideas.md
+2026-08-17). Varyant tanımı hizalı: V1_IZ = iz süren stop, iz mesafesi
+1 × başlangıç riski (midas V4_IZ ile aynı mekanizma sınıfı) — iki botun
+çıkış karneleri artık karşılaştırılabilir. Hüküm kuralı iki tarafta da
+kendi verisinden, bağımsız verilir.

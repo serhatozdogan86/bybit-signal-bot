@@ -490,3 +490,33 @@ zamanki gibi YALNIZ ileriye dönük veriden: ≥50 kapanmış küme + küme-CI.
 - Dürüst not: Zarattini bulgusu ABD hissesi ORB'dir; kripto uyarlaması
   (7/24 piyasada 00:00 UTC seansı) TEST EDİLMEMİŞ bir transferdir —
   canlı ölçüm tam olarak bunu sınar.
+
+## ÇIKIŞ LABORATUVARI (V0/V1) — ÖN-KAYIT (2026-08-17, Serhat onayı "başla")
+Kaynak: perakende araştırması kısa liste #3 (ATR iz-süren çıkış) + midas
+ikiz bulgusu (çıkış tasarımı girişten belirleyici; midas V4_IZ) + Kural 3b
+(ikizde yeni ölçüm aleti doğdu → karşılığı burada kurulur).
+SALT ÖLÇÜM ALETİDİR: kapanmış aday sinyalleri mum arşivinden YENİDEN
+oynatılır; hiçbir karar/kayıt değişmez; motora, kilide, sayaçlara sıfır
+dokunuş. Alet: app/services/exit_lab.py, rapor: /exitlab.
+- V0_SABIT (kıyas çizgisi): motorun mevcut değerlendirme kuralı BİREBİR —
+  stop/hedef/zaman aşımı; aynı mumda stop+hedef → LOSS (ambiguous).
+  SADAKAT ŞARTI: V0 yeniden-oynatması defterdeki kayıtlı sonucu üretmek
+  zorundadır; uyumsuzluk sayısı raporda görünür (ölçüm dürüstlüğü).
+- V1_IZ (iz süren çıkış, Chandelier tarzı): giriş ve başlangıç stopu
+  kayıttakiyle AYNI; hedef YOK (kâr koşturulur). Her kapanmış 15dk mumda
+  SIRA: (1) önce mevcut stop vurulmuş mu bakılır — vurulduysa stoptan
+  çıkılır; (2) sonra stop çekilir: LONG stop = max(önceki, mumun en
+  yükseği − iz mesafesi); SHORT ayna (min, en düşük + iz). İz mesafesi =
+  1 × başlangıç risk mesafesi (|giriş−stop|; çoğu stratejide k×ATR'ye
+  eşdeğer). Muhafazakâr sıra bilinçli: aynı mumdaki yeni tepe o mumun
+  stopunu kurtaramaz. Zaman aşımı kayıttaki timeout_bars ile AYNI
+  (kapanıştan çıkış, EXPIRED).
+- Maliyet modeli v0 AYNEN: 2×taker + STOP çıkışlarında slip (iz süren
+  stop kârda da stop-emridir, slip uygulanır) + funding × tutuş.
+- HÜKÜM KURALI (önceden ilan): sinyal başına fark d = V1_net − V0_net;
+  kümesi sinyalin kendi cluster_id'si. Bir stratejide ≥50 kapanmış küme
+  VE fark serisinin küme-CI alt sınırı > 0 → "V1 o strateji için üstün"
+  ilan edilir ve v2 TASARIM GİRDİSİ olur (motora asla doğrudan girmez).
+  Küme-CI üst sınırı < 0 → V0 üstün. Arada → belirsiz, veri birikir.
+- Parametre taraması YOK: iz mesafesi 1×R tek değerdir; başka katsayı
+  denemek YENİ ön-kayıt ister.
