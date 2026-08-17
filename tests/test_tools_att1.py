@@ -149,6 +149,50 @@ def test_mapping_table_loads_unique_nonempty():
     assert all(a.strip() for _, a in rows)     # bos makale yok
 
 
+class _FakeResp:
+    def __init__(self, status, payload=None, headers=None):
+        self.status_code = status
+        self._payload = payload or {}
+        self.headers = headers or {}
+
+    def json(self):
+        return self._payload
+
+    def raise_for_status(self):
+        pass
+
+
+class _FakeSession:
+    """Sirali cevap listesi doner - throttle senaryosu simulasyonu."""
+
+    def __init__(self, responses):
+        self._responses = list(responses)
+        self.calls = 0
+
+    def get(self, url, timeout=None, headers=None):
+        self.calls += 1
+        return self._responses.pop(0)
+
+
+def test_fetch_article_separates_404_from_throttle(monkeypatch):
+    """VM kosusu 2026-08-17 dersi: 429 (throttle) 'makale yok' DEGILDIR.
+    429 -> bekle + yeniden dene; kalici 429 -> 'fail' (dislama degil,
+    kosu tekrarlanmali); 404 -> gercekten yok."""
+    monkeypatch.setattr(dl.time, "sleep", lambda s: None)
+    okp = {"items": [{"timestamp": "2026010100", "views": 5}]}
+    # 2 x 429 sonra 200 -> "ok" (throttle asildi)
+    s = _FakeSession([_FakeResp(429), _FakeResp(429), _FakeResp(200, okp)])
+    status, views = dl.fetch_article(s, "Bitcoin", "20260101", "20260101")
+    assert status == "ok" and views == {"20260101": 5} and s.calls == 3
+    # hep 429 -> "fail" (gecici; dislanmaz, tekrar istenir)
+    s = _FakeSession([_FakeResp(429)] * dl._MAX_ATTEMPTS)
+    assert dl.fetch_article(s, "Bitcoin", "20260101", "20260101")[0] == "fail"
+    # 404 -> makale gercekten yok
+    s = _FakeSession([_FakeResp(404)])
+    assert dl.fetch_article(s, "Yokboylebirsey", "20260101",
+                            "20260101")[0] == "404"
+
+
 def test_downloader_url_and_parse_and_dates():
     url = dl.build_url("Shiba Inu (cryptocurrency)", "20260101", "20260110")
     assert "Shiba_Inu_%28cryptocurrency%29" in url

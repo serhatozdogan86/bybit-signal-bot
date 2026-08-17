@@ -33,8 +33,10 @@ _API = ("https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/"
         "en.wikipedia/all-access/user/{article}/daily/{start}/{end}")
 _UA = ("bybit-signal-bot-research/1.0 "
        "(S-ATT1 on-kayitli backtest; kisisel arastirma)")
-_MAX_ATTEMPTS = 4
+_MAX_ATTEMPTS = 6
 _TIMEOUT = (10, 30)
+_PAUSE = 1.2               # makaleler arasi nezaket araligi (VM kosusu
+                           # 2026-08-17: 0.3s'de Wikimedia 429 firlatti)
 
 
 def build_url(article: str, start: str, end: str) -> str:
@@ -67,26 +69,38 @@ def expected_dates(start: str, end: str) -> list[str]:
 
 
 def fetch_article(session: requests.Session, article: str, start: str,
-                  end: str) -> dict[str, int] | None:
-    """Bir makalenin gunluk serisi; 404 -> None (makale yok), agir hata
-    -> None. 429/5xx ustel geri cekilmeyle denenir."""
+                  end: str) -> tuple[str, dict[str, int] | None]:
+    """Bir makalenin gunluk serisi.
+
+    Donen: ("ok", seri) | ("404", None) makale gercekten yok |
+    ("fail", None) gecici hata (429/5xx/ag) denemeler bitti.
+    404 ile 429 AYRI raporlanir - VM kosusu 2026-08-17'de throttle,
+    'makale yok' gibi gorunup 20 sembolu sessizce dislamisti."""
     url = build_url(article, start, end)
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:
             resp = session.get(url, timeout=_TIMEOUT,
                                headers={"User-Agent": _UA})
             if resp.status_code == 404:
-                return None
-            if resp.status_code == 429 or resp.status_code >= 500:
+                return "404", None
+            if resp.status_code == 429:
+                # Retry-After'a uy; yoksa kademeli uzun bekleme
+                wait = int(resp.headers.get("Retry-After") or 0) or 5 * attempt
+                if attempt == _MAX_ATTEMPTS:
+                    print(f"  HATA {article}: HTTP 429 (denemeler bitti)")
+                    return "fail", None
+                time.sleep(wait)
+                continue
+            if resp.status_code >= 500:
                 raise requests.HTTPError(f"HTTP {resp.status_code}")
             resp.raise_for_status()
-            return parse_views(resp.json())
+            return "ok", parse_views(resp.json())
         except (requests.RequestException, ValueError) as exc:
             if attempt == _MAX_ATTEMPTS:
                 print(f"  HATA {article}: {exc}")
-                return None
+                return "fail", None
             time.sleep(2 ** attempt)
-    return None
+    return "fail", None
 
 
 def load_mapping(path: str) -> list[tuple[str, str]]:
@@ -127,19 +141,20 @@ def main() -> int:
 
     session = requests.Session()
     out_rows: list[tuple] = []
-    ok, missing_article, gap_total = [], [], 0
+    ok, missing_article, failed, gap_total = [], [], [], 0
     for sym, art in mapping:
-        views = fetch_article(session, art, start, end)
-        if views is None:
+        status, views = fetch_article(session, art, start, end)
+        if status == "404":
             missing_article.append(f"{sym} ({art})")
-            time.sleep(0.3)
-            continue
-        gaps = sum(1 for d in exp if d not in views)
-        gap_total += gaps
-        ok.append((sym, len(views), gaps))
-        for d in sorted(views):
-            out_rows.append((sym, art, d, views[d]))
-        time.sleep(0.3)                     # Wikimedia nezaket araligi
+        elif status == "fail" or views is None:
+            failed.append(f"{sym} ({art})")
+        else:
+            gaps = sum(1 for d in exp if d not in views)
+            gap_total += gaps
+            ok.append((sym, len(views), gaps))
+            for d in sorted(views):
+                out_rows.append((sym, art, d, views[d]))
+        time.sleep(_PAUSE)                  # Wikimedia nezaket araligi
 
     out_csv = os.path.join(args.out, "wiki_views.csv")
     with open(out_csv, "w", newline="", encoding="utf-8") as f:
@@ -152,7 +167,8 @@ def main() -> int:
             "%Y-%m-%dT%H:%M:%SZ"),
         "range": [start, end], "days": args.days,
         "mapped": len(mapping), "ok": len(ok),
-        "missing_article": missing_article,
+        "missing_article_404": missing_article,
+        "failed_transient": failed,
         "gap_days_total": gap_total,
         "rows": len(out_rows), "csv": out_csv,
     }
@@ -162,14 +178,21 @@ def main() -> int:
     print("\n=== WIKI GORUNTULEME RAPORU ===")
     print(f"aralik: {start} -> {end} ({args.days} gun)")
     print(f"esleme: {len(mapping)} sembol | veri OK: {len(ok)} | "
-          f"makale bulunamadi: {len(missing_article)}")
+          f"makale yok (404): {len(missing_article)} | gecici hata: "
+          f"{len(failed)}")
     if missing_article:
-        print("BULUNAMAYAN (dislandi):")
+        print("MAKALE YOK - 404 (eslemeden cikarilmali):")
         for m in missing_article:
+            print("  -", m)
+    if failed:
+        print("GECICI HATA (429/ag) - veri EKSIK, kosu TEKRARLANMALI:")
+        for m in failed:
             print("  -", m)
     print(f"toplam gun boslugu: {gap_total} | satir: {len(out_rows)}")
     print(f"cikti: {out_csv}")
-    return 0
+    # gecici hata varsa sifir-olmayan cikis: && zinciri backtest'i EKSIK
+    # veriyle kosturmasin (2026-08-17 dersi)
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
