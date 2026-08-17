@@ -85,6 +85,23 @@ class BybitClient:
                          {"category": _CATEGORY, "symbol": symbol, "limit": depth})
         return data.get("result") if data else None
 
+    def get_open_interest_rows(self, symbol: str,
+                               limit: int = 25) -> list[dict] | None:
+        """1 saatlik OI noktalari, yeniden eskiye (P4 golge-kohort verisi).
+
+        Donen liste: [{"openInterest": "...", "timestamp": "..."}].
+        KONTRAT adedi cinsindendir (USD degil) - P4 on-kaydi bunu sart kosar.
+        Hata -> None (etiket bosta kalir; eksik veri eksik kalir).
+        """
+        data = self._get("/v5/market/open-interest", {
+            "category": _CATEGORY, "symbol": symbol,
+            "intervalTime": "1h", "limit": limit,
+        })
+        if data is None:
+            return None
+        rows: list[dict] = data.get("result", {}).get("list", [])
+        return rows or None
+
     def get_funding_history(self, symbol: str, start_ms: int | None = None,
                             end_ms: int | None = None) -> list[dict] | None:
         """Gercek funding oranlari (v3.6: maliyet modeli v1 verisi).

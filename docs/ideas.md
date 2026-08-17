@@ -434,3 +434,21 @@ Karar Serhat'a sunuldu.
 
 **Bağlam:** Bu ikisi, S5/TSM/P1'in net-negatif sonuçlarından sonra ilk
 pozitif-yönlü budama sonuçları.
+
+## P4-CANLI + S10-CANLI UYGULAMA NOTLARI (2026-08-16, Serhat onayı "ikisini de yap")
+**P4 gölge-kohort canlıda:** v1 YALNIZ S2 kayıtları etiketlenir (şampiyon
+tablosuna dokunuş ertelendi — az sinyal, tablo riski; ayrı karar ister).
+Etiket: S2 sinyali doğduğu taramada 1 OI çağrısı (25×1h nokta) → dOI(24s)
+kaydedilir; veri yoksa etiket boş kalır ve "etiketsiz" DÜRÜSTÇE sayılır.
+Eşik +%5 (S2_OI_RISE, backtest ile aynı). /challengers → S2 → oi_cohorts
+bloğu salt ölçümdür; HİÇBİR karar okumaz. Hüküm: her iki kohortta ≥50 küme
+dolunca E_net + CI karşılaştırılır (ileriye dönük veri).
+**S10 canlı uyarlaması (backtest'ten farklar, dürüstçe):** (a) karar
+Pazartesi günkü İLK TAM TARAMANIN SONUNDA verilir (00:00 değil; bot tarama
+döngüsüne bağlı — saat kayması ~dakikalar); (b) giriş fiyatı backtest'teki
+gibi son KAPANMIŞ günlük kapanış (Pazar); değerlendirme 15dk mumlarla
+(backtest günlükle — canlı daha hassas, stop tespiti daha erken olabilir);
+(c) günlük mumlar haftada bir evren çapında çekilir (~150 istek), ana
+taramadan SONRA — şampiyon zamanlamasına dokunmaz; (d) hafta anahtarı
+ISO (YYYY-Www), meta'da; başarısız geçit işaretlenmez → sonraki tarama
+yeniden dener.

@@ -140,6 +140,14 @@ class Scheduler:
                 self.challengers.on_scan(symbol, htf, ltf,
                                          self._funding_map.get(symbol))
                 self.challengers.evaluate_open(symbol)
+                # P4 golge-kohort (on-kayit 2026-08-16): YALNIZ bu taramada
+                # S2 sinyali dogduysa 1 OI cagrisi yapilir (nadir; sampiyon
+                # zamanlamasina etkisi ~sifir). Veri yoksa etiket bos kalir.
+                sid = self.challengers.untagged_s2(symbol)
+                if sid is not None:
+                    doi = self._md.get_oi_change_24h(symbol)
+                    if doi is not None:
+                        self.challengers.set_doi(sid, doi)
             except Exception:
                 log.exception(kv(event="challenger_scan_error", symbol=symbol))
 
@@ -239,9 +247,56 @@ class Scheduler:
                 self._evaluate_alarms()
             except Exception:
                 log.exception(kv(event="outcome_audit_error"))
+        if self.challengers is not None:
+            try:
+                # S10 52w-HIGH haftalik gecidi: ana taramadan SONRA kosar,
+                # sampiyon zamanlamasina dokunmaz (on-kayit 2026-08-16).
+                self._s10_weekly_pass()
+            except Exception:
+                log.exception(kv(event="s10_weekly_error"))
         self._store.record_scan(
             datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
         return results
+
+    def _s10_weekly_pass(self, now: datetime | None = None) -> None:
+        """Pazartesi (UTC) gunune ozel, haftada TEK S10 sepeti.
+
+        Gunluk mumlar (380 gun) evren capinda cekilir (~150 istek, haftada
+        bir) ve secim challengers.weekly_52w_selection'da (saf) yapilir.
+        Hata gunu atlatmaz: meta anahtari yalniz BASARILI geciste yazilir.
+        'now' yalniz test enjeksiyonu icindir."""
+        now = now or datetime.now(timezone.utc)
+        if now.weekday() != 0:                     # 0 = Pazartesi
+            return
+        week_key = now.strftime("%G-W%V")
+        if self.challengers.weekly_52w_done(week_key):
+            return
+        syms = self.symbols()
+        daily: dict[str, list] = {}
+        consec_fail = 0
+        for sym in syms:
+            bars = self._md.get_daily_closed_bars(sym)
+            if bars:
+                daily[sym] = bars
+                consec_fail = 0
+            else:
+                consec_fail += 1
+                if consec_fail >= 10:
+                    # API kesintisi: taramayi kilitli tutmaya devam etme.
+                    # Hafta ISARETLENMEZ -> sonraki tarama yeniden dener.
+                    log.warning(kv(event="s10_weekly_abort",
+                                   reason="10 ardisik gunluk-cekim hatasi"))
+                    return
+            time.sleep(0.05)
+        if len(daily) < max(1, len(syms) // 2):
+            # kirik kesitle sepet secmek yanlis sepet yazar; hafta acik kalir
+            log.warning(kv(event="s10_weekly_skip", got=len(daily),
+                           need=max(1, len(syms) // 2)))
+            return
+        made = self.challengers.on_weekly_52w(daily, week_key)
+        self.challengers.mark_weekly_52w(week_key)
+        log.info(kv(event="s10_weekly", week=week_key, made=made,
+                    universe=len(daily)))
 
     # ---------------------------------------------------- v3.0 yardimcilar
     def _compute_market_bias(self) -> str:
