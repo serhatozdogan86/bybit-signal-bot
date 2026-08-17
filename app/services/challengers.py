@@ -31,7 +31,8 @@ from app.services.signal_tracker import FUNDING_8H, STOP_SLIP, TAKER_FEE
 log = logging.getLogger("challengers")
 
 STRATEGIES = ("S1_TSMOM", "S2_DONCHIAN", "S3_MEANREV", "S4_CARRY", "S6_SWEEP",
-              "S7_WYCKOFF", "S8_FUNDSQUEEZE", "S9_GECE", "S10_52WHIGH")
+              "S7_WYCKOFF", "S8_FUNDSQUEEZE", "S9_GECE", "S10_52WHIGH",
+              "S11_SQUEEZE", "S12_RELVOL")
 # S7: 2026-08-06, tetik = S6 sinavini doldurdu.
 # S8: 2026-08-13, funding sikisma teyidi (on-kayit docs/ideas.md). Momentum
 # ailesi (S5 kesitsel + TSM) 90-gun backtest'te kenar gostermedi -> rafta;
@@ -41,6 +42,10 @@ STRATEGIES = ("S1_TSMOM", "S2_DONCHIAN", "S3_MEANREV", "S4_CARRY", "S6_SWEEP",
 # S10: 2026-08-16, 52w zirve yakinligi (backtest BELIRSIZ-pozitif: 750 gunde
 # net +13.32R, E_net +0.049, CI [-0.137,+0.267]; on-kayit ideas.md).
 # Haftalik kadans - hukum yavas gelir (~1 yil), maliyeti dusuk.
+# S11: 2026-08-17, oynaklik-sikismasi kirilimi (perakende arastirmasi #1;
+# on-kayit ideas.md). S2'den yapisal fark: SIKISMA ONKOSULU tetikler.
+# S12: 2026-08-17, goreli-hacim kapili seans kirilimi (arastirma #2,
+# Zarattini uyarlamasi; on-kayit ideas.md). Yeni oge: hacim KAPISI.
 # Acik pozisyon tavani - STRATEJIYE GORE (v1.1 duzeltmesi).
 # NEDEN: tek tavan (15) yarisi adaletsiz kildi. Uzun tutan trend adaylari
 # (S1 medyan 45 bar, S4 37 bar) slotlari doldurup YENI SINYAL URETEMEZ hale
@@ -71,7 +76,11 @@ MAX_OPEN = {"S1_TSMOM": 70, "S2_DONCHIAN": 40, "S4_CARRY": 40,
             "S9_GECE": 1,
             # S10: haftalik sepet = evrenin ust %10'u (~15); 7 gunluk tutus
             # boyunca tek sepet acik -> tavan 15 (varsayilan sinif).
-            "S10_52WHIGH": 15}
+            "S10_52WHIGH": 15,
+            # S11/S12: kanitlanmamis yeni adaylar, varsayilan sinif (15).
+            # Yeni slot ICAT degil: her yeni aday kendi kotasiyla girer
+            # (S7/S8 emsali).
+            "S11_SQUEEZE": 15, "S12_RELVOL": 15}
 # Emekli adaylar: yeni sinyal uretimi DURUR; acik pozisyonlar normal
 # degerlendirilir, kapanmis kohort arsivde kalir ve stats'ta
 # retired_utc ile raporlanir (sessiz kaybolma yok).
@@ -150,6 +159,21 @@ S10_DECILE = 0.10        # S10: kesit ust dilimi
 S10_STOP_ATR = 2.0       # S10: stop (GUNLUK ATR kati) - R paydasi
 S10_TIMEOUT = 672        # S10: 7 gun x 96 bar - asil cikis ZAMANDIR
 S10_TP_RISK = 100.0      # S10: SENTETIK erisilemez hedef (S9 deseni)
+# S11 SQUEEZE (2026-08-17, on-kayit ideas.md): oynaklik-sikismasi kirilimi
+# (TTM/LazyBear ailesi). Sikisma = BB tamamen KC icinde; >=6 bar surup
+# COZULUNCE kirilim yonune girilir. S2'den fark: ham kanal kirilimi degil,
+# sikisma ONKOSULU tetikler (patlamayi sessizlik dogurur).
+S11_BB_N = 20            # S11: BB/KC/momentum penceresi (4H bar)
+S11_BB_K = 2.0           # S11: Bollinger sapma kati (populasyon sigma)
+S11_KC_MULT = 1.5        # S11: Keltner genisligi (SMA20(TrueRange) kati)
+S11_MIN_SQUEEZE = 6      # S11: asgari sikisma suresi (ardisik 4H bar)
+S11_TP_RISK = 2.0        # S11: hedef (risk kati)
+# S12 RELVOL (2026-08-17, on-kayit ideas.md): seans kirilimi + GORELI-HACIM
+# kapisi (Zarattini-Aziz uyarlamasi; hakemli yeni oge hacim kapisidir).
+# Acilis araligi = gunun ILK 4H mumu (00:00-04:00 UTC); cikis GUN SONU.
+S12_RELVOL_MIN = 2.0     # S12: acilis hacmi >= 2 x onceki 20 gun ortalamasi
+S12_LOOKBACK_D = 20      # S12: goreli-hacim ortalama penceresi (gun)
+S12_TP_RISK = 100.0      # S12: SENTETIK erisilemez hedef (cikis gun sonu)
 
 
 def _saat(bars: int) -> str:
@@ -340,6 +364,57 @@ STRATEGY_INFO: dict[str, dict] = {
                           "bacakta); rejim/hacim/funding bakılmaz"),
         },
     },
+    "S11_SQUEEZE": {
+        "name": "Sıkışma Kırılımı",
+        "how": ("Fiyat uzun süre dar bir bantta sıkışıp sakinleştikten "
+                "sonra genelde büyük bir hareket gelir. Bu motor sıkışmayı "
+                "sayar: oynaklık bandı (Bollinger) daha geniş kanalın "
+                "(Keltner) içine girip en az 6 tane 4 saatlik mum orada "
+                "kalırsa 'sessizlik' var demektir. Sessizlik çözülüp fiyat "
+                "sıkışma aralığının dışına taşarsa, taşma yönüne girer. "
+                "S2'den farkı: ham kırılımı değil, önce sessizlik ön "
+                "koşulunu arar — patlamayı sessizlik doğurur fikri."),
+        "params": {
+            "giris": (f"4H: BB({S11_BB_N},{S11_BB_K:g}σ) en az "
+                      f"{S11_MIN_SQUEEZE} bar KC({S11_BB_N},"
+                      f"{S11_KC_MULT:g}×TR) içinde kaldıktan sonra çözülür "
+                      "VE 4H kapanış sıkışma aralığının dışında VE momentum "
+                      "aynı yönde — giriş taramadaki 15dk kapanışından"),
+            "stop": "sıkışma aralığının karşı ucu (LONG: alt, SHORT: üst)",
+            "hedef": (f"risk × {S11_TP_RISK:g} — plan RR "
+                      f"{S11_TP_RISK:g}"),
+            "zaman_asimi": _saat(TREND_TIMEOUT),
+            "tavan": f"{MAX_OPEN['S11_SQUEEZE']} açık pozisyon",
+            "filtreler": ("sıkışma ön koşulu (oynaklık kapısı) + momentum "
+                          "yön teyidi; rejim/hacim/funding bakılmaz"),
+        },
+    },
+    "S12_RELVOL": {
+        "name": "Hacim Kapılı Kırılım",
+        "how": ("Günün ilk 4 saatlik mumunu (00:00–04:00 UTC) açılış "
+                "aralığı sayar. O mumda işlem hacmi olağandışı yüksekse — "
+                "son 20 günün açılış ortalamasının en az 2 katı — gün "
+                "içinde fiyat bu aralığın dışına çıktığında kırılım yönüne "
+                "girer ve gün sonunda çıkar. Dayandığı bulgu: kırılım "
+                "ancak olağandışı katılım (hacim) varsa devam etme "
+                "eğiliminde — asıl yenilik hacim kapısıdır."),
+        "params": {
+            "giris": (f"Açılış aralığı = günün ilk 4H mumu (00:00–04:00 "
+                      f"UTC); hacmi önceki {S12_LOOKBACK_D} günün açılış "
+                      f"ortalamasının ≥ {S12_RELVOL_MIN:g} katıysa gün "
+                      "içinde 15dk kapanış aralığın dışına çıkınca — kenar "
+                      "tetik, günde yön başına tek giriş"),
+            "stop": "açılış aralığının karşı ucu",
+            "hedef": (f"risk × {S12_TP_RISK:g} (sentetik, erişilemez) — "
+                      "çıkış hedefle değil GÜN SONUYLA olur"),
+            "zaman_asimi": ("gün sonu 00:00 UTC — kalan bar sayısı girişte "
+                            "hesaplanır"),
+            "tavan": f"{MAX_OPEN['S12_RELVOL']} açık pozisyon",
+            "filtreler": (f"hacim kapısı: açılış hacmi ≥ "
+                          f"{S12_RELVOL_MIN:g} × son {S12_LOOKBACK_D} gün "
+                          "ort.; rejim/funding bakılmaz"),
+        },
+    },
     "S6_SWEEP": {
         "name": "Süpürme Dönüşü",
         "how": ("Fiyat bilinen bir tepeyi ya da dibi iğneyle aşıp hemen geri "
@@ -433,6 +508,68 @@ def weekly_52w_selection(daily: dict[str, list]) -> list[tuple]:
     return [c for c in cross[:k] if c[0] >= S10_PROX]
 
 
+def _linreg_last(vals: list[float]) -> float:
+    """Dogrusal regresyon dogrusunun SON noktadaki degeri (S11 momentum)."""
+    n = len(vals)
+    xm = (n - 1) / 2.0
+    ym = sum(vals) / n
+    den = sum((i - xm) ** 2 for i in range(n))
+    if den <= 0:
+        return ym
+    slope = sum((i - xm) * (v - ym) for i, v in enumerate(vals)) / den
+    return ym + slope * ((n - 1) - xm)
+
+
+def squeeze_run(high: list[float], low: list[float],
+                close: list[float]) -> tuple[float, float] | None:
+    """S11: son kapanmis 4H barda ATESLEME var mi? (on-kayit 2026-08-17)
+
+    Sikisma ACIK (bar i): S11_BB_K x sigma20(kapanis) < S11_KC_MULT x
+    SMA20(TrueRange) - orta bant iki kanalda da ayni oldugundan bu,
+    'BB tamamen KC icinde' kosulunun birebir esdegeridir.
+    ATESLEME: son bar KAPALI, onceki ACIK, biten ACIK serisi >=
+    S11_MIN_SQUEEZE. Donen: (aralik_yuksek, aralik_dusuk) = ACIK serisi
+    barlarinin ekstremumlari; kosul yoksa None."""
+    n = len(close)
+    if n < 2 * S11_BB_N + 1:
+        return None
+    trs = [max(high[i] - low[i], abs(high[i] - close[i - 1]),
+               abs(low[i] - close[i - 1])) for i in range(1, n)]
+
+    def _on(i: int) -> bool:
+        w = close[i - S11_BB_N + 1:i + 1]
+        sma = sum(w) / S11_BB_N
+        sd = (sum((x - sma) ** 2 for x in w) / S11_BB_N) ** 0.5
+        atr_sma = sum(trs[i - S11_BB_N:i]) / S11_BB_N
+        return S11_BB_K * sd < S11_KC_MULT * atr_sma
+
+    last = n - 1
+    if _on(last) or not _on(last - 1):
+        return None
+    run_start = last - 1
+    while run_start - 1 >= S11_BB_N and _on(run_start - 1):
+        run_start -= 1
+    if last - run_start < S11_MIN_SQUEEZE:
+        return None
+    return (max(high[run_start:last]), min(low[run_start:last]))
+
+
+def squeeze_momentum(high: list[float], low: list[float],
+                     close: list[float]) -> float | None:
+    """S11 momentum (LazyBear birebir): d = kapanis - ort((HH20+LL20)/2,
+    SMA20(kapanis)) serisinin son 20 barina dogrusal regresyon, son nokta."""
+    n = len(close)
+    if n < 2 * S11_BB_N:
+        return None
+    deltas = []
+    for j in range(n - S11_BB_N, n):
+        hh = max(high[j - S11_BB_N + 1:j + 1])
+        ll = min(low[j - S11_BB_N + 1:j + 1])
+        sma = sum(close[j - S11_BB_N + 1:j + 1]) / S11_BB_N
+        deltas.append(close[j] - ((hh + ll) / 2 + sma) / 2)
+    return _linreg_last(deltas)
+
+
 def _adx(high: list[float], low: list[float], close: list[float],
          n: int = 14) -> float | None:
     """Wilder ADX - S3'un 'yatay rejim' kapisi (ADX < 20)."""
@@ -518,6 +655,10 @@ class ChallengerEngine:
                 continue        # emekli: hukum verildi, yeni sinyal yok
             direction, stop, tp, timeout = sig
             cid = f"{strat}:{direction[0]}{bucket}"
+            if strat == "S12_RELVOL":
+                # kume + dedup = TAKVIM GUNU (on-kayit: gunde yon basina
+                # tek giris; 4H kovasi gunu 5 parcaya bolerdi)
+                cid = f"{strat}:{direction[0]}D{last.ts // 86_400_000}"
             if self._dup(strat, symbol, cid) or self._crowded(strat):
                 continue
             self._db.execute(
@@ -648,6 +789,65 @@ class ChallengerEngine:
                 out.append(("S2_DONCHIAN",
                             ("SHORT", entry + TREND_STOP_ATR * atr_h,
                              entry - TREND_TP_ATR * atr_h, TREND_TIMEOUT)))
+
+        # S11 SQUEEZE: oynaklik sikismasi (BB icinde KC, >=6 x 4H bar)
+        # COZULUNCE kirilim yonune girer (on-kayit 2026-08-17). Yon cifte
+        # kosullu: 4H kapanis aralik disinda VE momentum ayni yonde.
+        # Stop = sikisma araliginin KARSI ucu (dogal stop).
+        if atr_h and len(h_close) >= 2 * S11_BB_N + 1:
+            sq = squeeze_run(h_high, h_low, h_close)
+            if sq is not None:
+                rng_hi, rng_lo = sq
+                mom = squeeze_momentum(h_high, h_low, h_close)
+                c4 = h_close[-1]
+                if mom is not None and mom > 0 and c4 > rng_hi \
+                        and entry - rng_lo > 0:
+                    out.append(("S11_SQUEEZE",
+                                ("LONG", rng_lo,
+                                 entry + S11_TP_RISK * (entry - rng_lo),
+                                 TREND_TIMEOUT)))
+                elif mom is not None and mom < 0 and c4 < rng_lo \
+                        and rng_hi - entry > 0:
+                    out.append(("S11_SQUEEZE",
+                                ("SHORT", rng_hi,
+                                 entry - S11_TP_RISK * (rng_hi - entry),
+                                 TREND_TIMEOUT)))
+
+        # S12 RELVOL: gunun ilk 4H mumu (00-04 UTC) = acilis araligi; hacmi
+        # onceki 20 gunun acilis ortalamasinin >= 2 kati ise gun icindeki
+        # 15dk kenar-tetik kirilimina girer; cikis GUN SONU (on-kayit
+        # 2026-08-17, Zarattini uyarlamasi - yeni oge GORELI-HACIM kapisi).
+        if h_ok and len(l_close) >= 2:
+            hc = htf.candles[:-1]              # yalniz kapanmis 4H mumlar
+            last15 = ltf.candles[-1]
+            day_start = last15.ts - (last15.ts % 86_400_000)
+            opening = next((c for c in reversed(hc) if c.ts == day_start),
+                           None)
+            if opening is not None:
+                prior = [c.volume for c in hc
+                         if c.ts % 86_400_000 == 0 and c.ts < day_start]
+                prior = prior[-S12_LOOKBACK_D:]
+                avg_v = (sum(prior) / len(prior)
+                         if len(prior) >= S12_LOOKBACK_D else 0.0)
+                # zaman asimi: kalan 15dk bar sayisi -> son cikis mumu tam
+                # gun sonunda (00:00 UTC) kapanir
+                timeout = int((day_start + 86_400_000 - last15.ts)
+                              // 900_000) - 1
+                if avg_v > 0 and opening.volume >= S12_RELVOL_MIN * avg_v \
+                        and timeout >= 1:
+                    o_hi, o_lo = opening.high, opening.low
+                    if l_close[-2] <= o_hi < l_close[-1] \
+                            and entry - o_lo > 0:
+                        out.append(("S12_RELVOL",
+                                    ("LONG", o_lo,
+                                     entry + S12_TP_RISK * (entry - o_lo),
+                                     timeout)))
+                    elif l_close[-2] >= o_lo > l_close[-1] \
+                            and o_hi - entry > 0:
+                        out.append(("S12_RELVOL",
+                                    ("SHORT", o_hi,
+                                     entry - S12_TP_RISK * (o_hi - entry),
+                                     timeout)))
 
         # S3 MEANREV: yalniz yatay rejimde sigma-sapmayi sat/al
         if atr_l and len(l_close) >= S3_SMA_N + 1:

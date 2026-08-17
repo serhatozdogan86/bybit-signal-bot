@@ -452,3 +452,41 @@ gibi son KAPANMIŞ günlük kapanış (Pazar); değerlendirme 15dk mumlarla
 taramadan SONRA — şampiyon zamanlamasına dokunmaz; (d) hafta anahtarı
 ISO (YYYY-Www), meta'da; başarısız geçit işaretlenmez → sonraki tarama
 yeniden dener.
+
+## S11 SIKIŞMA-KIRILIMI + S12 HACİM-KAPILI SEANS KIRILIMI — ÖN-KAYIT (2026-08-17, Serhat onayı "ikisiyle başla")
+Kaynak: perakende araştırması (docs/perakende-arastirmasi-2026-08-17.md,
+kısa liste #1 ve #2). Kurallar AŞAĞIDA DONDURULDU; parametre taraması yok,
+tek kurulum. İkisi de doğrudan CANLI aday (S8/S9 deseni); hüküm her
+zamanki gibi YALNIZ ileriye dönük veriden: ≥50 kapanmış küme + küme-CI.
+
+### S11_SQUEEZE — oynaklık-sıkışması kırılımı (TTM/LazyBear ailesi)
+- Veri: KAPANMIŞ 4H mumlar. BB(20, 2σ; popülasyon sapması) ve
+  KC(20, 1.5 × SMA20(TrueRange)); orta bant ikisinde de SMA20(kapanış).
+- Sıkışma AÇIK (bar i): BB tamamen KC içinde ⇔ 2σ < 1.5 × SMA20(TR).
+- ATEŞLEME: son kapanmış 4H mum sıkışma KAPALI, bir önceki AÇIK ve biten
+  AÇIK serisi ≥ 6 bar.
+- Sıkışma aralığı: AÇIK serisi barlarının min-düşük / maks-yüksek bandı.
+- Yön: 4H kapanış aralığın ÜSTÜNDE VE momentum > 0 → LONG; ALTINDA VE
+  momentum < 0 → SHORT. Momentum (LazyBear tanımı birebir): son 20 barın
+  d = kapanış − ort((HH20+LL20)/2, SMA20(kapanış)) serisine doğrusal
+  regresyon, son noktadaki değer.
+- Giriş: koşulun sağlandığı taramadaki 15dk kapanış. Stop: aralığın karşı
+  ucu. Hedef: risk × 2. Zaman aşımı: 192 × 15dk (48s). Küme: standart
+  (strateji + yön + 4H kovası). Tavan 15. S2'den yapısal fark: ham kanal
+  kırılımı değil, SIKIŞMA ÖN KOŞULU tetikler.
+
+### S12_RELVOL — göreli-hacim kapılı seans kırılımı (Zarattini uyarlaması)
+- Çapa: 00:00 UTC. Açılış aralığı = günün İLK 4H mumu (00:00–04:00);
+  mum KAPANMADAN işlem yok.
+- HACİM KAPISI (işin yeni öğesi): açılış mumu hacmi ≥ 2.0 × önceki
+  20 günün açılış-mumu hacim ortalaması (20 tam gün yoksa o gün sinyal
+  yok).
+- Giriş: gün içinde 15dk kapanış aralığın dışına çıkınca (kenar tetik:
+  önceki kapanış beride). Yön = kırılım yönü; iki yön de serbest.
+- Stop: aralığın karşı ucu. Çıkış: GÜN SONU 00:00 UTC (zaman aşımı,
+  girişte kalan 15dk bar sayısı olarak hesaplanır); hedef sentetik
+  erişilemez (risk × 100, S9 deseni). Günde yön başına TEK giriş:
+  küme = takvim günü + yön (dedup bunu zorlar). Tavan 15.
+- Dürüst not: Zarattini bulgusu ABD hissesi ORB'dir; kripto uyarlaması
+  (7/24 piyasada 00:00 UTC seansı) TEST EDİLMEMİŞ bir transferdir —
+  canlı ölçüm tam olarak bunu sınar.

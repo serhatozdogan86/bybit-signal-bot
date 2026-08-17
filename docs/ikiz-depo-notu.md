@@ -255,3 +255,19 @@ evreninde uygulanması daha da doğal. midas StrategyLab'i çoklu strateji
 işletiyor; 52w-high haftalık LONG sepeti oraya aday olarak eklenebilir.
 Bu oturumun midas'a yazma erişimi yok → midas oturumuna açık iş olarak
 kaydedildi (weekly_52w_selection saf fonksiyonu birebir taşınabilir).
+
+## S11 sıkışma-kırılımı + S12 hacim-kapılı seans kırılımı — ikiz kontrolü (2026-08-17)
+
+Not: ikisi de YENİ BAHİS (mekanizma hatası/ölçüm düzeltmesi değil), yani
+Kural 3b'nin zorunlu kapsamı dışında; kayıt gönüllü bilgilendirmedir.
+
+**S11 (sıkışma-kırılımı): TAŞINABİLİR — midas'a aday olabilir.** TTM
+Squeeze aslen hisse senedi aracıdır (John Carter); BB/KC hesabı günlük
+hisse mumlarında birebir çalışır. `squeeze_run` / `squeeze_momentum` saf
+fonksiyonları taşınabilir. midas oturumuna açık iş olarak not edildi.
+
+**S12 (göreli-hacim seans kırılımı): TAŞINABİLİR — midas'ta DAHA DA
+DOĞAL.** Zarattini-Aziz bulgusu zaten ABD hisse ORB'udur (gerçek açılış
+çanı var); kripto tarafındaki 00:00 UTC çapası bizim uyarlamamızdır.
+midas'ta orijinal haliyle (09:30 ET açılış aralığı + göreli hacim
+kapısı) uygulanması kripto versiyonundan daha sadıktır. Açık iş.

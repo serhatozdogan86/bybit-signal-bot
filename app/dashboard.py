@@ -934,6 +934,27 @@ const RU={
 "двусторонние ворота объёма: спринг ≥ 1.5×, тест ≤ 0.7× SMA20; фильтров режима/funding нет",
 "hacim kapısı: tetik mumu ≥ 1.5 × SMA20; rejim/funding filtresi yok":
 "ворота объёма: триггерная свеча ≥ 1.5 × SMA20; фильтров режима/funding нет",
+"S11 · Sıkışma Kırılımı":"S11 · Пробой сжатия",
+"S12 · Hacim Kapılı Kırılım":"S12 · Пробой с воротами объёма",
+"Fiyat uzun süre dar bir bantta sıkışıp sakinleştikten sonra genelde büyük bir hareket gelir. Bu motor sıkışmayı sayar: oynaklık bandı (Bollinger) daha geniş kanalın (Keltner) içine girip en az 6 tane 4 saatlik mum orada kalırsa 'sessizlik' var demektir. Sessizlik çözülüp fiyat sıkışma aralığının dışına taşarsa, taşma yönüne girer. S2'den farkı: ham kırılımı değil, önce sessizlik ön koşulunu arar — patlamayı sessizlik doğurur fikri.":
+"После долгого сжатия цены в узком диапазоне обычно приходит крупное движение. Этот движок считает сжатие: если полоса волатильности (Боллинджер) заходит внутрь более широкого канала (Кельтнер) и остаётся там минимум 6 четырёхчасовых свечей — это «тишина». Когда тишина разрешается и цена выходит за диапазон сжатия, входит в сторону выхода. Отличие от S2: триггер не сам пробой, а предусловие тишины — идея в том, что взрыв рождается из тишины.",
+"4H: BB(20,2σ) en az 6 bar KC(20,1.5×TR) içinde kaldıktan sonra çözülür VE 4H kapanış sıkışma aralığının dışında VE momentum aynı yönde — giriş taramadaki 15dk kapanışından":
+"4H: BB(20,2σ) минимум 6 баров внутри KC(20,1.5×TR), затем сжатие разрешается И закрытие 4H вне диапазона сжатия И моментум в ту же сторону — вход по 15м-закрытию на скане",
+"sıkışma aralığının karşı ucu (LONG: alt, SHORT: üst)":
+"противоположный край диапазона сжатия (LONG: низ, SHORT: верх)",
+"sıkışma ön koşulu (oynaklık kapısı) + momentum yön teyidi; rejim/hacim/funding bakılmaz":
+"предусловие сжатия (ворота волатильности) + подтверждение направления моментумом; режим/объём/funding не учитываются",
+"Günün ilk 4 saatlik mumunu (00:00–04:00 UTC) açılış aralığı sayar. O mumda işlem hacmi olağandışı yüksekse — son 20 günün açılış ortalamasının en az 2 katı — gün içinde fiyat bu aralığın dışına çıktığında kırılım yönüne girer ve gün sonunda çıkar. Dayandığı bulgu: kırılım ancak olağandışı katılım (hacim) varsa devam etme eğiliminde — asıl yenilik hacim kapısıdır.":
+"Первая четырёхчасовая свеча дня (00:00–04:00 UTC) считается диапазоном открытия. Если объём в этой свече необычно высок — минимум вдвое выше среднего открытия за 20 дней — то при выходе цены за этот диапазон в течение дня входит в сторону пробоя и выходит в конце дня. Опора: пробой имеет склонность к продолжению только при необычном участии (объёме) — главная новизна именно в воротах объёма.",
+"Açılış aralığı = günün ilk 4H mumu (00:00–04:00 UTC); hacmi önceki 20 günün açılış ortalamasının ≥ 2 katıysa gün içinde 15dk kapanış aralığın dışına çıkınca — kenar tetik, günde yön başına tek giriş":
+"Диапазон открытия = первая 4H-свеча дня (00:00–04:00 UTC); если её объём ≥ 2× среднего объёма открытия за предыдущие 20 дней — вход, когда 15м-закрытие выходит за диапазон в течение дня; триггер по краю, один вход на направление в день",
+"açılış aralığının karşı ucu":"противоположный край диапазона открытия",
+"risk × 100 (sentetik, erişilemez) — çıkış hedefle değil GÜN SONUYLA olur":
+"риск × 100 (синтетическая, недостижимая) — выход не по цели, а В КОНЦЕ ДНЯ",
+"gün sonu 00:00 UTC — kalan bar sayısı girişte hesaplanır":
+"конец дня 00:00 UTC — число оставшихся баров считается на входе",
+"hacim kapısı: açılış hacmi ≥ 2 × son 20 gün ort.; rejim/funding bakılmaz":
+"ворота объёма: объём открытия ≥ 2× среднего за 20 дней; режим/funding не учитываются",
 "Şimdi yenile":"Обновить сейчас","≥ 1.5× ort.":"≥ 1.5× сред.",
 "Tüm sonuçlar":"Все результаты","gölge muhasebedir":"— теневой учёт",
 ": varsayımsal giriş, kayma/komisyon yok, gerçek emir yok. Geçmiş performans garanti değildir; yatırım tavsiyesi değildir. Haber başlıkları dış kaynaktan aynen aktarılır.":
@@ -1222,7 +1243,8 @@ const CHAL_ADI={S1_TSMOM:"S1 · Trend Takibi",S2_DONCHIAN:"S2 · Kırılım (Don
   S3_MEANREV:"S3 · Ortalamaya Dönüş",S4_CARRY:"S4 · Fonlama Taşıması",
   S6_SWEEP:"S6 · Süpürme Dönüşü",S7_WYCKOFF:"S7 · Wyckoff Spring+Test",
   S8_FUNDSQUEEZE:"S8 · Fonlama Sıkışması",S9_GECE:"S9 · Gece Penceresi",
-  S10_52WHIGH:"S10 · 52 Hafta Zirvesi"};
+  S10_52WHIGH:"S10 · 52 Hafta Zirvesi",S11_SQUEEZE:"S11 · Sıkışma Kırılımı",
+  S12_RELVOL:"S12 · Hacim Kapılı Kırılım"};
 let CHAL=null;   // /challengers son yaniti - detay penceresi buradan okur
 /* Durum rozeti PROGRAMATIK olarak sunucu verisinden (kume/CI/emeklilik)
    turetilir — elle yazilmis strateji-durum listesi YOK (drift yasagi).
