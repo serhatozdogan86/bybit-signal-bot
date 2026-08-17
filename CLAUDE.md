@@ -30,7 +30,8 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
   S12 (hacim-kapılı seans kırılımı) — rejim-2 örneklemesi; S3/S6 emekli.
   Perakende araştırması: docs/perakende-arastirmasi-2026-08-17.md.
   S5+TSM momentum ailesi RAFTA (90g backtest kenar yok; raftan çıkma
-  tetiği docs/ideas.md). Aile araştırması: docs/aile-arastirmasi-2026-08-13.md.
+  tetiği docs/ideas.md). S-ATT1 (Wikipedia dikkat) backtestte ELENDİ
+  (2026-08-17: net −22R, küme-CI üst < 0 — ideas.md). Aile araştırması: docs/aile-arastirmasi-2026-08-13.md.
   Korelasyon aleti (Faz A): /correlation, app/services/correlation.py.
   Çıkış laboratuvarı (V0 sabit / V1 iz süren; salt ölçüm): /exitlab,
   app/services/exit_lab.py — hüküm kuralı ön-kayıtlı (ideas.md 08-17).

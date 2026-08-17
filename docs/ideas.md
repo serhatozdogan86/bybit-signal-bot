@@ -541,3 +541,24 @@ kapatılır (sonuç görülmeden):
   dikkat şokları günler arasında değil gün içinde korelelidir).
 - Maliyet: v0 aynen (2×taker + stop çıkışında slip + funding×tutuş),
   R paydası stop mesafesi. Hüküm merdiveni S5 ile aynı (tek atış).
+
+### S-ATT1 BACKTEST SONUCU — ELENDİ (2026-08-17, tek atış, VM koşusu)
+Evren: 60 eşlenen coinden 56'sının Wikipedia verisi indi (ARB/PEPE/SUSHI/
+ICP makale adı 2 denemede çözülemedi — dürüstçe dışlandı); fiyatla kesişen
+52 sembol, 200 gün (2026-01-29 → 2026-08-17).
+- Sinyal 51, giriş 39 (7 gün yasağı 12 sinyal atladı), veri eksiği 0.
+- 29 stop / 10 zaman-çıkışı (6'sı kârda). Brüt −19.79R, **net −22.07R**.
+- Küme 28, E_net **−0.566**, küme-CI **[−0.898, −0.074]**.
+- **HÜKÜM (ön-kayıtlı merdiven): ELENDİ — küme-CI ÜST sınırı < 0.**
+  İyimser uçta bile kenar negatif; "şans eseri kötü dönem" savunması
+  merdivende yer bulamıyor.
+- Sağlamlık notu: eksik 7 sembol tamamlanınca (49→56) sayılar HİÇ
+  değişmedi (aynı 51 sinyal / 39 giriş) — sonuç örnekleme kıyısına
+  duyarlı görünmüyor. Kalan 4 coinin tabloyu ADAY'a çevirmesi için
+  net +22R'yi aşan pozitif katkı gerekirdi; gerçekçi değil.
+- Yorum (hikâye değil, kayıt): z≥2 dikkat şoku + pozitif 24s getiri
+  kombinasyonu bu evrende/dönemde sistematik GEÇ kalıyor — şok
+  duyulduğunda hareketin sonu satın alınıyor (29/39 stop). Ön-kayıtta
+  yazılan ters-nedensellik riskinin ta kendisi.
+- Falsifikasyon maliyeti: 1 gün alet + ~10 dk VM koşusu; canlı risk 0.
+  Momentum ailesi gibi RAFA bile girmez — ELENDİ arşivine.

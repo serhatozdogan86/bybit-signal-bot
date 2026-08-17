@@ -283,3 +283,13 @@ kuruldu: app/services/exit_lab.py + /exitlab (ön-kayıt ideas.md
 1 × başlangıç riski (midas V4_IZ ile aynı mekanizma sınıfı) — iki botun
 çıkış karneleri artık karşılaştırılabilir. Hüküm kuralı iki tarafta da
 kendi verisinden, bağımsız verilir.
+
+## S-ATT1 (Wikipedia dikkat şoku) — ikiz kontrolü (2026-08-17)
+
+Kripto backtest hükmü: **ELENDİ** (net −22R, küme-CI üst < 0; ideas.md).
+İkiz için not: dikkat-anomalisi literatürünün asıl güçlü olduğu yer ABD
+HİSSE piyasasıdır (Da-Engelberg-Gao "attention" ailesi) — midas kendi
+evreninde AYRI ön-kayıtla test etmek isterse bizim hüküm ona engel
+değildir (farklı evren, farklı veri). Araç zinciri (Wikimedia indirici +
+z-skor + T+1 disiplini) birebir taşınabilir. Açık iş DEĞİL; yalnız
+bilgilendirme.
