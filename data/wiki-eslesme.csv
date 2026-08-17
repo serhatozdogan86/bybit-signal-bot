@@ -18,16 +18,16 @@ XLMUSDT,Stellar (payment network)
 ETCUSDT,Ethereum Classic
 XMRUSDT,Monero
 FILUSDT,Filecoin
-NEARUSDT,Near Protocol
+NEARUSDT,NEAR Protocol
 ALGOUSDT,Algorand
 VETUSDT,VeChain
 APTUSDT,Aptos (blockchain)
-ARBUSDT,Arbitrum
+ARBUSDT,Arbitrum (blockchain)
 OPUSDT,Optimism (blockchain)
-1000PEPEUSDT,Pepe (cryptocurrency)
+1000PEPEUSDT,Pepe (meme coin)
 TONUSDT,The Open Network
 SUIUSDT,Sui (blockchain)
-EOSUSDT,EOS (blockchain)
+EOSUSDT,EOS.IO
 XTZUSDT,Tezos
 MKRUSDT,MakerDAO
 MANAUSDT,Decentraland
@@ -37,16 +37,16 @@ WLDUSDT,Worldcoin
 CHZUSDT,Chiliz
 ENSUSDT,Ethereum Name Service
 BNBUSDT,BNB (cryptocurrency)
-POLUSDT,Polygon (blockchain platform)
-MATICUSDT,Polygon (blockchain platform)
+POLUSDT,Polygon (blockchain)
+MATICUSDT,Polygon (blockchain)
 AXSUSDT,Axie Infinity
-NEOUSDT,Neo (blockchain)
+NEOUSDT,Neo (cryptocurrency)
 IOTAUSDT,IOTA (technology)
 ZILUSDT,Zilliqa
 BATUSDT,Basic Attention Token
 CAKEUSDT,PancakeSwap
-SUSHIUSDT,SushiSwap
-1000BONKUSDT,Bonk (cryptocurrency)
+SUSHIUSDT,Sushiswap
+1000BONKUSDT,Bonk (meme coin)
 WIFUSDT,Dogwifhat
 TRUMPUSDT,$Trump (cryptocurrency)
 FARTCOINUSDT,Fartcoin
@@ -54,8 +54,8 @@ HYPEUSDT,Hyperliquid
 FLOWUSDT,Flow (blockchain)
 GRTUSDT,The Graph
 ATOMUSDT,Cosmos (blockchain)
-ICPUSDT,Internet Computer
+ICPUSDT,Internet Computer (blockchain)
 HBARUSDT,Hedera (distributed ledger)
 KASUSDT,Kaspa
-1INCHUSDT,1inch Network
+1INCHUSDT,1inch
 DYDXUSDT,DYdX
