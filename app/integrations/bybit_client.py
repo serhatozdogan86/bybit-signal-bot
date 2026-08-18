@@ -20,6 +20,18 @@ _KLINE_LIMIT = 200
 _MAX_ATTEMPTS = 3
 _TIMEOUT = (10, 15)  # (connect, read) saniye
 
+# --- Saglayici tavanlari (VM'den olculdu 2026-08-18; ikiz notu 3b) --------
+# Bybit tavani ASARSA hata vermez: retCode=0 doner ve fazlasini SESSIZCE
+# kirpar. Olcum: kline limit=1500 -> 1000 satir; funding 200 gun -> 66.3 gun.
+# Kirpilan uc ESKI uctur. Bu, midas'ta v4.40 ile kapatilan Finnhub
+# kusurunun ayni sinifidir - orada da HTTP 200 ile eksik veri geliyordu.
+_KLINE_CAP = 1000            # /v5/market/kline azami satir
+_FUNDING_CAP = 200           # /v5/market/funding/history azami satir
+# Funding araligi paritye gore 1s/4s/8s olabilir; 200 kayit sirasiyla
+# 8.3 / 33.3 / 66.7 gun kapsar. 4 saatlik grup evrenin yarisidir (408/824),
+# yani 33 gunden uzun her islem tek istekte EKSIK olculurdu.
+_FUNDING_MAX_PAGES = 25      # emniyet freni: 25 x 200 = 5000 kayit
+
 
 class BybitClient:
     def __init__(self, base_url: str) -> None:
@@ -53,6 +65,13 @@ class BybitClient:
     def get_kline_rows(self, symbol: str, interval: str,
                        limit: int = _KLINE_LIMIT) -> list[list[str]] | None:
         """Ham kline satirlari (Bybit sirasi: yeniden eskiye). Hata -> None."""
+        if limit > _KLINE_CAP:
+            # Tavan ustu istek SESSIZCE kirpilir (retCode=0, 1000 satir).
+            # Istegi tavana cekip durumu bildiriyoruz: "istedigim kadar
+            # geldi" yanilsamasi ust katmana tasinmasin.
+            log.warning(kv(event="bybit_limit_capped", path="/v5/market/kline",
+                           symbol=symbol, requested=limit, cap=_KLINE_CAP))
+            limit = _KLINE_CAP
         data = self._get("/v5/market/kline", {
             "category": _CATEGORY, "symbol": symbol,
             "interval": interval, "limit": limit,
@@ -106,15 +125,51 @@ class BybitClient:
                             end_ms: int | None = None) -> list[dict] | None:
         """Gercek funding oranlari (v3.6: maliyet modeli v1 verisi).
 
-        Donen liste: [{"fundingRate": "...", "fundingRateTimestamp": "..."}].
-        Hata -> None (cagiran taraf sonraki turda tekrar dener).
+        Donen liste: [{"fundingRate": "...", "fundingRateTimestamp": "..."}],
+        ESKIDEN YENIYE sirali. Hata -> None (cagiran sonraki turda dener).
+
+        SAYFALAMA (2026-08-18, ikiz notu 3b): uc tek istekte en cok 200
+        kayit ve YALNIZ en yeni uctan verir; startTime ne kadar geriye
+        verilirse verilsin eskiler SESSIZCE duser (retCode=0). Tavana
+        dayanan her sayfadan sonra endTime en eski kaydin bir oncesine
+        cekilerek aralik tamamlanir.
+
+        Yarim veri DONDURULMEZ: sayfalar arasinda hata olursa None doner.
+        Eksik funding, maliyeti oldugundan KUCUK gosterip net-R'yi sisirir;
+        fail-soft burada sessiz muhasebe hatasi demektir (fail-close 2.2).
         """
-        params: dict = {"category": _CATEGORY, "symbol": symbol, "limit": 200}
-        if start_ms is not None:
-            params["startTime"] = int(start_ms)
-        if end_ms is not None:
-            params["endTime"] = int(end_ms)
-        data = self._get("/v5/market/funding/history", params)
-        if data is None:
-            return None
-        return data.get("result", {}).get("list") or []
+        toplam: dict[str, dict] = {}
+        imlec_end = end_ms
+        for _ in range(_FUNDING_MAX_PAGES):
+            params: dict = {"category": _CATEGORY, "symbol": symbol,
+                            "limit": _FUNDING_CAP}
+            if start_ms is not None:
+                params["startTime"] = int(start_ms)
+            if imlec_end is not None:
+                params["endTime"] = int(imlec_end)
+            data = self._get("/v5/market/funding/history", params)
+            if data is None:
+                return None                    # yarim veri yerine acik hata
+            rows: list[dict] = data.get("result", {}).get("list") or []
+            if not rows:
+                break
+            onceki = len(toplam)
+            for r in rows:
+                ts = r.get("fundingRateTimestamp")
+                if ts is not None:
+                    toplam[str(ts)] = r
+            if len(rows) < _FUNDING_CAP:
+                break                          # tavana dayanmadi -> aralik bitti
+            if len(toplam) == onceki:
+                break                          # ilerleme yok -> sonsuz dongu freni
+            try:
+                en_eski = min(int(r["fundingRateTimestamp"]) for r in rows)
+            except (KeyError, TypeError, ValueError):
+                break
+            if start_ms is not None and en_eski <= int(start_ms):
+                break                          # aralik basina ulasildi
+            imlec_end = en_eski - 1
+        else:
+            log.warning(kv(event="bybit_funding_pages_exhausted", symbol=symbol,
+                           pages=_FUNDING_MAX_PAGES, rows=len(toplam)))
+        return [toplam[k] for k in sorted(toplam, key=int)]

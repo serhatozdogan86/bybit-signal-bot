@@ -284,6 +284,86 @@ kuruldu: app/services/exit_lab.py + /exitlab (ön-kayıt ideas.md
 çıkış karneleri artık karşılaştırılabilir. Hüküm kuralı iki tarafta da
 kendi verisinden, bağımsız verilir.
 
+## Sağlayıcı sessiz kırpması — ikiz kontrolü (2026-08-18) · **BULUNDU**
+
+**Kaynak: midas v4.40.** Finnhub bilanço takvimi ucu ~1500 satırda
+**sessizce** kırpıyordu: HTTP 200, `retCode` yok, hata yok — eksik veri tam
+sanıldı. Düşen uç **eski** uçtu. midas düzeltmesi: pencereyi 3 günlük
+dilimlere böl + 1400 satırlık kırpma kanaryası (`cap_suspect`, denetim
+kırmızı yakar).
+
+Kural 3b gereği bybit'te karşılığı arandı. **Kalıp bulundu** — üç uç
+VM'den canlı ölçüldü (2026-08-18):
+
+| Uç | İstendi | Geldi | Hata verdi mi? |
+|---|---|---|---|
+| `/v5/market/kline` | limit=1500 | **1000 satır** | hayır, `retCode=0` |
+| `/v5/market/funding/history` | 200 gün | **66.3 gün** (200 satır) | hayır, `retCode=0` |
+| `/v5/market/tickers` | tümü | 829 sembol, cursor yok | — (kırpma yok) |
+
+`instruments-info` tek sayfada 824 sembol döndü (cursor YOK), tickers'ta
+eksik yok — **enstrüman listesinde kırpma yok**. Sayfalama gerekmedi ama
+sınır yakın (829/1000): evren büyürse cursor gerekecek.
+
+### Asıl bulgu: funding geçmişi bir MUHASEBE hatası
+
+`signal_tracker._backfill_funding` kapanmış her işlem için gerçek funding
+maliyetini toplayıp `funding_r_real` olarak deftere yazıyor. Uç tek istekte
+en çok 200 kayıt ve **yalnız en yeni uçtan** veriyor; `startTime` ne kadar
+geriye verilirse verilsin eskiler sessizce düşüyor. Sonuç zinciri:
+
+> eksik funding → maliyet olduğundan **küçük** → net-R olduğundan **iyi**
+> → küme-CI olduğundan **yüksek** → **go-live kapısı yanlış yönde açılır**
+
+Kırpma eşiği pariteye göre değişiyor (824 paritede ölçüldü):
+
+| Funding aralığı | Parite | 200 kayıt kaç günü kapsar |
+|---|---|---|
+| 8 saat | 374 | 66,7 gün |
+| **4 saat** | **408** | **33,3 gün** |
+| 1 saat | 2 | 8,3 gün |
+
+Yani evrenin **yarısından fazlası** 33 günlük pencereyle sınırlıydı.
+
+### Fiilen zarar verdi mi? — HAYIR (ölçüldü)
+
+Canlı defterdeki 305 kapanmış işlem (WIN/LOSS, dolmuş) tarandı:
+en uzun işlem **5,79 gün** (VVVUSDT), ortanca 0,14 gün. En dar kırpma
+eşiği 8,3 gün. **Hiçbir kayıt etkilenmemiş** — `funding_r_real` sayıları
+sağlam, defter yeniden hesaplanmayı gerektirmiyor.
+
+Bu bir **mayın**: motor bugünkü time-stop'uyla eşiğe değmiyor, ama S10
+(haftalık 52w sepeti) gibi uzun tutuşlu bir aday veya time-stop'un
+gevşetilmesi eşiği aşar ve hata sessizce deftere girer.
+
+### Yapılan
+
+- `tests/test_invariants.py`: sınıfı kapatan üç değişmezlik testi
+  (`test_funding_history_completes_range_despite_provider_cap`,
+  `test_funding_history_single_page_makes_one_call`,
+  `test_kline_request_never_exceeds_provider_cap`). Sahte uç, gerçek
+  davranışı taklit ediyor: tavan kadar satır, **en yeni uçtan**.
+  Düzeltmesiz kodda ikisi KIRMIZI (200/270 kayıt; `_KLINE_CAP` yok).
+- `bybit_client.get_funding_history`: sayfalama — tavana dayanan her
+  sayfadan sonra `endTime` en eski kaydın bir öncesine çekilir, aralık
+  tamamlanır. Sayfalar arası hata olursa **None** döner (yarım veri
+  döndürmek sessiz muhasebe hatasıdır; fail-close 2.2).
+- `bybit_client.get_kline_rows`: tavan üstü limit isteği `_KLINE_CAP`'e
+  çekilir ve `bybit_limit_capped` uyarısı loglanır.
+
+**Gerçek uçta doğrulandı** (VM, düzeltilmiş istemci): BTCUSDT 200 gün →
+**600 kayıt / 199,7 gün** (önce 200 kayıt / 66,3 gün), ETHUSDT 120 gün →
+360 kayıt / 119,7 gün; sıralı, mükerrersiz. kline limit=1500 → uyarı
+basıldı, 1000'e çekildi.
+
+### Ters yön: midas'a taşınabilir mi?
+
+midas kendi kırpmasını v4.40'ta kapattı, ama oradaki çözüm **takvim ucuna
+özel** (dilimleme + kanarya). Buradaki genel ders — *"sağlayıcı tavanına
+dayanan yanıt tam sayılamaz"* — midas'ın **diğer** uçları için
+kontrol edilmedi: Alpaca bar sayfalaması, `/v2/stocks/bars` limit'i ve
+fundamentals uçları aynı sınıfa açık. midas oturumuna **açık iş**.
+
 ## S-ATT1 (Wikipedia dikkat şoku) — ikiz kontrolü (2026-08-17)
 
 Kripto backtest hükmü: **ELENDİ** (net −22R, küme-CI üst < 0; ideas.md).

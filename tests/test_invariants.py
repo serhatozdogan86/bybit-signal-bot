@@ -350,3 +350,135 @@ def test_maxdd_metric_matches_declared_scope(tmp_path):
     st = tr.stats()["measurement"]
     assert st["max_drawdown_r"] == kohort
     assert st["max_drawdown_r_all"] == tumu
+
+
+# ------------------------------------ saglayici SESSIZ kirpmasi (ikiz 3b)
+# Kaynak: midas-signal-bot v4.40 (2026-08-18). Finnhub takvim ucu ~1500
+# satirda SESSIZCE kirpiyordu: HTTP 200, hata yok, eksik veri TAM sanildi.
+# Kirpilan uc ESKI uctu - yani "en eski veri sessizce dusuyor".
+#
+# Ikiz kontrolu (VM'den canli olcum, 2026-08-18):
+#   /v5/market/kline           limit=1500 istendi -> retCode=0, 1000 satir
+#   /v5/market/funding/history 200 gun istendi    -> retCode=0, 66.3 gun
+# Ikisinde de retCode=0. Saglayici "eksik verdim" DEMIYOR.
+#
+# Funding tavani parite basina degisir (824 paritede olculdu):
+#   8 saatlik funding (374 parite) -> 200 kayit =  66.7 gun
+#   4 saatlik funding (408 parite) -> 200 kayit =  33.3 gun
+#   1 saatlik funding (  2 parite) -> 200 kayit =   8.3 gun
+# Yani evrenin YARISINDAN fazlasi 33 gunluk pencereyle sinirli.
+#
+# Bu bir MUHASEBE hatasidir (Kural 3b/2): _backfill_funding eksik topladigi
+# funding'i `funding_r_real` olarak deftere yazar; maliyet oldugundan KUCUK,
+# net-R oldugundan IYI gorunur - ve go-live kapisi (kume-CI) o sayilardan
+# hesaplanir. Sessiz eksiklik, kapiyi yanlis yonde acar.
+#
+# Degismezlik: saglayici tavanina DAYANAN yanit TAM sayilamaz. Ya sayfalanip
+# tamamlanir ya da acikca eksik bildirilir; sessizce kabul EDILEMEZ.
+
+
+class _FakeResp:
+    status_code = 200
+
+    def __init__(self, payload: dict) -> None:
+        self._p = payload
+
+    def raise_for_status(self) -> None:
+        pass
+
+    def json(self) -> dict:
+        return self._p
+
+
+class _CappedFundingSession:
+    """Bybit'i taklit eder: her istekte EN COK 200 kayit, EN YENI uctan.
+
+    Gercek uc de boyle davranir (olculdu): startTime cok geriye verilse
+    bile yalniz son 200 kayit doner, eskiler SESSIZCE dusurulur.
+    """
+
+    CAP = 200
+
+    def __init__(self, all_rows: list[dict]) -> None:
+        self._all = all_rows
+        self.calls: list[dict] = []
+
+    def get(self, url, params=None, timeout=None):  # noqa: ANN001
+        self.calls.append(dict(params or {}))
+        start = int((params or {}).get("startTime", 0))
+        end = int((params or {}).get("endTime", 10 ** 18))
+        sel = [r for r in self._all
+               if start <= int(r["fundingRateTimestamp"]) <= end]
+        sel.sort(key=lambda r: int(r["fundingRateTimestamp"]))
+        sel = sel[-self.CAP:]          # tavan: eski uc sessizce duser
+        sel.reverse()                  # Bybit sirasi: yeniden eskiye
+        return _FakeResp({"retCode": 0, "result": {"list": sel}})
+
+
+def _funding_rows(n: int, t0: int, step_ms: int) -> list[dict]:
+    return [{"fundingRate": "0.0001",
+             "fundingRateTimestamp": str(t0 + i * step_ms)} for i in range(n)]
+
+
+def test_funding_history_completes_range_despite_provider_cap():
+    """HATA SINIFI: saglayici tavanina dayanan yaniti TAM sanmak.
+
+    4 saatlik funding'li bir paritede 45 gunluk bir islem 270 kayit eder;
+    tavan 200'dur. Tek istek en yeni 200'u getirir, ilk 70 kayit SESSIZCE
+    duser -> funding maliyeti eksik toplanir. Istemci araligi tamamlamali.
+    """
+    from app.integrations.bybit_client import BybitClient
+    step = 4 * 3600 * 1000                     # 4 saat: evrenin yarisi
+    n = 270                                    # tavanin (200) UZERINDE
+    t0 = 1_700_000_000_000
+    rows = _funding_rows(n, t0, step)
+    c = BybitClient("https://ornek")
+    c._session = _CappedFundingSession(rows)
+    got = c.get_funding_history("BTCUSDT", t0, t0 + (n - 1) * step)
+    assert got is not None, "hata yok, None donmemeli"
+    assert len(got) == n, (
+        f"aralik tamamlanmadi: {len(got)}/{n} kayit. Saglayici tavani "
+        f"sessizce kabul edildi - funding maliyeti eksik toplanir.")
+    ts = [int(r["fundingRateTimestamp"]) for r in got]
+    assert ts == sorted(ts), "kayitlar zaman sirasinda olmali"
+    assert len(set(ts)) == n, "sayfalama mukerrer kayit uretmemeli"
+    assert ts[0] == t0, "EN ESKI kayit dusmus - kirpilan uc tam da bu"
+
+
+def test_funding_history_single_page_makes_one_call():
+    """Sayfalama, tavana DAYANMAYAN yaniti bosuna tekrar cekmemeli."""
+    from app.integrations.bybit_client import BybitClient
+    step = 8 * 3600 * 1000
+    t0 = 1_700_000_000_000
+    rows = _funding_rows(12, t0, step)         # tavanin cok altinda
+    c = BybitClient("https://ornek")
+    sess = _CappedFundingSession(rows)
+    c._session = sess
+    got = c.get_funding_history("BTCUSDT", t0, t0 + 11 * step)
+    assert got is not None and len(got) == 12
+    assert len(sess.calls) == 1, (
+        f"gereksiz sayfalama: {len(sess.calls)} istek atildi")
+
+
+def test_kline_request_never_exceeds_provider_cap():
+    """HATA SINIFI: saglayicinin sessizce kirptigi limiti istemek.
+
+    Olculdu: limit=1500 -> retCode=0, 1000 satir. Hata YOK. Tavanin
+    uzerinde limit istemek, 'istedigim kadar geldi' yanilsamasi uretir.
+    """
+    from app.integrations import bybit_client as bc
+    gonderilen: dict = {}
+
+    class _S:
+        def get(self, url, params=None, timeout=None):  # noqa: ANN001
+            gonderilen.update(params or {})
+            n = int((params or {}).get("limit", 0))
+            return _FakeResp({"retCode": 0,
+                              "result": {"list": [["0"] * 7] * min(n, 1000)}})
+
+    c = bc.BybitClient("https://ornek")
+    c._session = _S()
+    c.get_kline_rows("BTCUSDT", "D", limit=1500)
+    assert gonderilen["limit"] <= bc._KLINE_CAP, (
+        f"tavan ustu limit istendi: {gonderilen['limit']} > "
+        f"{bc._KLINE_CAP} - saglayici sessizce kirpar")
