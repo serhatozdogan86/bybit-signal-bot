@@ -290,3 +290,45 @@ henüz BOŞTU → doğrulama kohortu tamamen tavan-70 altında toplanır; seçim
 kohortu (tavan-40) arşivde ayrı durur. Dünkü "tavan büyütülmedi" ilanı
 bu kararla AYNI GÜN, kohort boşken değiştirildi — sonuç-bağımlı örnekleme
 oluşmadı; çelişki bu notla kapatıldı.
+
+# ============================================================
+# 2026-08-18 KARAR TOPLANTISI (Serhat onayı: "ikisine de tamam")
+# ============================================================
+
+## Madde 1 — S4_CARRY ve S7_WYCKOFF EMEKLİ (CHALLENGER_DEAD)
+Botun kendi alarm sayfası (2026-08-18T19:50Z kontrolü), önceden ilan
+edilmiş kenar-ölümü koşulunun (küme-CI üst sınırı < 0, ≥20 küme) İKİ
+aday için gerçekleştiğini raporladı:
+- S4_CARRY: küme-CI üst −0.018 < 0 (126 küme)
+- S7_WYCKOFF: küme-CI üst −0.199 < 0 (108 küme)
+Karar: ikisi de RETIRED (2026-08-18). Yeni sinyal durur; açık pozisyonlar
+normal değerlendirilir; kohort arşivde retired_utc ile kalır; alarmları
+susar (hüküm verildi). S7 kararı, S4 ile AYNI ilan koşulunun
+uygulamasıdır ve Serhat'a açıkça raporlanmıştır (pano ekranında S7
+satırı görünmüyordu; alarm yakaladı — alarm altyapısının değeri).
+SLOT DEVRİ YOK (2026-08-12'den fark): S1'in doğrulama penceresi "aynı
+kurallar" sözüyle açıldı; pencere ortasında tavan değiştirmek kohortu
+kirletirdi. Efektif toplam bütçe BİLEREK küçüldü. Not: ham funding
+sinyali (S4) öldü; rafine türevi S8 (daha derin eşik + fiyat teyidi)
+ayrı aday olarak ölçülmeye devam ediyor — aile hükmü S8'in kendi
+kohortundan gelecek.
+
+## Madde 2 — KİLİT-2 DURUM NOTU: HENÜZ HÜKÜM YOK (düzeltme kaydı)
+Claude'un pano ölçüm kartından yaptığı "72 küme; örneklem doldu, sınav
+geçilemedi" okuması YANLIŞTI ve burada düzeltiliyor. Ön-kayıtlı hüküm
+kanalı (FAZ1_GATE_MET / FAZ1_SAMPLE_FULL alarmları; clusters_since_lock
+= LOCK2 penceresi) 2026-08-18T19:50Z kontrolünde SESSİZ → kilit
+kohortunda küme < 50, SINAV SÜRÜYOR. Ara görünüm (E_net −0.07R,
+küme-CI [−0.43, +0.32], isabet başabaşın altında, LONG −49.3R /
+SHORT +31.5R) negatif eğilimli AMA hüküm değildir. Hüküm, kilit-1
+usulünce botun kendi alarmıyla ilan edilecek. DERS (kayda): hüküm
+YALNIZ ilan edilmiş kanaldan okunur; pano kartları ara göstergedir.
+
+## Madde 3 — V2 TASARIM SÜRECİ AÇILDI
+docs/v2-tasarim.md girdi dosyası oluşturuldu (yön asimetrisi, çıkış
+laboratuvarı, P4 OI kapısı, dış denetim düzeltme listesi, perakende
+araştırması, ölü aile mezarlığı). v2 tasarımı KİLİT-2 hükmünü BEKLEMEZ
+ama onu ETKİLEMEZ: app/strategies/ donmuş kalır; v2 tasarlanınca
+ideas.md'ye ÖN-KAYITLA yeni aday olarak girer ve sıfırdan sınava tabi
+olur. Şampiyon durdurulMAZ (gerçek para yok; ürettiği veri ölçüm
+aletlerini besliyor).

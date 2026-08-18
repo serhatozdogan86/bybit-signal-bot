@@ -73,16 +73,19 @@ def test_s6_sweep_short_generation(tmp_path):
 
 
 def test_s4_carry_sign_mapping(tmp_path):
+    """S4 emekli (2026-08-18, CHALLENGER_DEAD) ama uretim MEKANIZMASI
+    arsiv dogrulugu icin test edilir; on_scan deftere YAZMAZ (S6 emsali)."""
     eng, db = _eng(tmp_path)
     htf = fx.make_series(np.full(60, 100.0), interval="240")
     ltf = fx.make_series(np.full(60, 100.0))
-    eng.on_scan("CUSDT", htf, ltf, funding=+0.002)   # yillik ~%219 pozitif
-    eng.on_scan("DUSDT", htf, ltf, funding=-0.002)
-    a = db.query_one("SELECT direction FROM challenger_signals WHERE pair='CUSDT'")
-    b = db.query_one("SELECT direction FROM challenger_signals WHERE pair='DUSDT'")
-    assert a["direction"] == "SHORT" and b["direction"] == "LONG"
+    a = dict(eng._generate("CUSDT", htf, ltf, +0.002))   # yillik ~%219
+    b = dict(eng._generate("DUSDT", htf, ltf, -0.002))
+    assert a["S4_CARRY"][0] == "SHORT" and b["S4_CARRY"][0] == "LONG"
     # notr funding sinyal uretmez
-    assert eng.on_scan("EUSDT", htf, ltf, funding=0.00001) == 0
+    assert "S4_CARRY" not in dict(eng._generate("EUSDT", htf, ltf, 0.00001))
+    # emeklilik filtresi: deftere kayit dusmez
+    assert eng.on_scan("CUSDT", htf, ltf, funding=+0.002) == 0
+    assert db.query_one("SELECT COUNT(*) n FROM challenger_signals")["n"] == 0
 
 
 def _s8_ltf(last):
@@ -361,33 +364,39 @@ def _s7_series(spring_vol=2000.0, test_vol=500.0, test_low=99.05,
 
 def test_s7_spring_then_low_volume_test_generates_long(tmp_path):
     """Tasarim: spring (yuksek hacim + geri donus) -> 1-6 bar icinde dusuk
-    hacimli test -> giris test kapanisinda, stop spring dibinin altinda."""
+    hacimli test -> giris test kapanisinda, stop spring dibinin altinda.
+    S7 emekli (2026-08-18): mekanizma _generate ile arsiv dogrulugu icin
+    test edilir; on_scan deftere YAZMAZ (S6 emsali)."""
     eng, db = _eng(tmp_path)
-    assert eng.on_scan("W1USDT", None, _s7_series(), None) == 1
-    row = db.query_one(
-        "SELECT * FROM challenger_signals WHERE strategy='S7_WYCKOFF'")
-    assert row is not None and row["direction"] == "LONG"
-    assert row["entry"] == 100.0                 # test mumunun kapanisi
-    assert row["stop"] < 98.8                    # spring_low - 0.25xATR
-    risk = row["entry"] - row["stop"]
-    assert abs(row["tp"] - (row["entry"] + 2 * risk)) < 1e-6   # TP 2R
-    assert row["timeout_bars"] == 96
+    c = dict(eng._generate("W1USDT", None, _s7_series(), None))
+    assert "S7_WYCKOFF" in c
+    d, stop, tp, timeout = c["S7_WYCKOFF"]
+    assert d == "LONG"
+    assert stop < 98.8                           # spring_low - 0.25xATR
+    risk = 100.0 - stop                          # giris = test kapanisi 100
+    assert abs(tp - (100.0 + 2 * risk)) < 1e-6   # TP 2R
+    assert timeout == 96
+    # emeklilik filtresi: deftere kayit dusmez
+    assert eng.on_scan("W1USDT", None, _s7_series(), None) == 0
+    assert db.query_one("SELECT COUNT(*) n FROM challenger_signals")["n"] == 0
 
 
 def test_s7_high_volume_test_rejected(tmp_path):
     """TERS HACIM FILTRESI - S7'nin varlik nedeni: test mumunda hacim
     kurumamissa (>0.7xSMA20) kurulum YOK. (S6 tam tersini ister.)"""
     eng, _ = _eng(tmp_path)
-    assert eng.on_scan("W2USDT", None, _s7_series(test_vol=2000.0), None) == 0
+    c = dict(eng._generate("W2USDT", None, _s7_series(test_vol=2000.0), None))
+    assert "S7_WYCKOFF" not in c
 
 
 def test_s7_break_below_spring_low_invalidates(tmp_path):
     """Gecersizlik: spring ile test arasinda low <= spring_low -> iptal."""
     eng, _ = _eng(tmp_path)
-    assert eng.on_scan("W3USDT", None, _s7_series(mid_low=98.7), None) == 0
+    assert "S7_WYCKOFF" not in dict(
+        eng._generate("W3USDT", None, _s7_series(mid_low=98.7), None))
     # test mumunun kendisi spring dibinin ALTINA sarkarsa da kurulum yok
-    eng2, _ = _eng(tmp_path / "b")
-    assert eng2.on_scan("W3BUSDT", None, _s7_series(test_low=98.7), None) == 0
+    assert "S7_WYCKOFF" not in dict(
+        eng._generate("W3BUSDT", None, _s7_series(test_low=98.7), None))
 
 
 def test_s7_test_window_is_six_bars(tmp_path):
@@ -400,7 +409,7 @@ def test_s7_test_window_is_six_bars(tmp_path):
     sp.low, sp.close, sp.volume = 98.8, 100.0, 2000.0
     t = ltf.candles[-1]
     t.low, t.close, t.volume = 99.05, 100.0, 500.0
-    assert eng.on_scan("W4USDT", None, ltf, None) == 0
+    assert "S7_WYCKOFF" not in dict(eng._generate("W4USDT", None, ltf, None))
 
 
 def test_s7_short_mirror_upthrust(tmp_path):
@@ -414,20 +423,20 @@ def test_s7_short_mirror_upthrust(tmp_path):
     ltf.candles[-2].high = 100.5
     t = ltf.candles[-1]
     t.high, t.close, t.volume = 100.96, 100.0, 500.0
-    assert eng.on_scan("W5USDT", None, ltf, None) == 1
-    row = db.query_one(
-        "SELECT * FROM challenger_signals WHERE strategy='S7_WYCKOFF'")
-    assert row["direction"] == "SHORT"
-    assert row["stop"] > 101.2                    # upthrust tepesi + tampon
-    risk = row["stop"] - row["entry"]
-    assert abs(row["tp"] - (row["entry"] - 2 * risk)) < 1e-6
+    c = dict(eng._generate("W5USDT", None, ltf, None))
+    assert "S7_WYCKOFF" in c
+    d, stop, tp, _ = c["S7_WYCKOFF"]
+    assert d == "SHORT"
+    assert stop > 101.2                           # upthrust tepesi + tampon
+    risk = stop - 100.0                           # giris = test kapanisi 100
+    assert abs(tp - (100.0 - 2 * risk)) < 1e-6
 
 
 def test_s7_no_spring_no_signal(tmp_path):
     """Duz seri (spring yok) hicbir S7 sinyali uretmez."""
     eng, _ = _eng(tmp_path)
     ltf = fx.make_series(np.full(110, 100.0), volumes=np.full(110, 1000.0))
-    assert eng.on_scan("W6USDT", None, ltf, None) == 0
+    assert "S7_WYCKOFF" not in dict(eng._generate("W6USDT", None, ltf, None))
 
 
 # -------- S11 Sikisma Kirilimi (on-kayit ideas.md 2026-08-17, BIREBIR) -------
@@ -704,13 +713,17 @@ def test_retired_strategies_stop_generating_keep_evaluating(tmp_path):
     Bosalan slot butcesi (15+15) tavana bogulan S1'e devredilir: toplam
     efektif butce SABIT kalir (turetme, icat degil)."""
     from app.services.challengers import RETIRED, MAX_OPEN
-    assert set(RETIRED) == {"S3_MEANREV", "S6_SWEEP"}
-    # butce devri: S1 40+30=70; efektif toplam degismedi
+    assert set(RETIRED) == {"S3_MEANREV", "S6_SWEEP",
+                            "S4_CARRY", "S7_WYCKOFF"}
+    assert RETIRED["S4_CARRY"] == "2026-08-18"      # ilan kosulu tarihli
+    assert RETIRED["S7_WYCKOFF"] == "2026-08-18"
+    # 2026-08-12 butce devri (S3/S6 -> S1: 40+30=70) KORUNUR; 2026-08-18
+    # emekliliklerinde (S4/S7) slot DEVRI YOK - S1 dogrulama penceresi
+    # "ayni kurallar" sozuyle acildi, tavanlar OYNAMAZ. Efektif butce
+    # bilerek kuculdu.
     assert MAX_OPEN["S1_TSMOM"] == 70
-    aktif = [s for s in ("S1_TSMOM", "S2_DONCHIAN", "S4_CARRY",
-                         "S6_SWEEP", "S3_MEANREV", "S7_WYCKOFF")
-             if s not in RETIRED]
-    assert sum(MAX_OPEN[s] for s in aktif) == 165   # emeklilik oncesi butce
+    assert MAX_OPEN["S2_DONCHIAN"] == 40
+    assert MAX_OPEN["S4_CARRY"] == 40               # arsiv kaydi, kullanilmaz
     # S6'nin kusursuz uretim senaryosu artik SIFIR sinyal uretmeli
     eng, db = _eng(tmp_path)
     closes = np.full(120, 100.0)

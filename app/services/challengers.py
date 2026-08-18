@@ -84,7 +84,14 @@ MAX_OPEN = {"S1_TSMOM": 70, "S2_DONCHIAN": 40, "S4_CARRY": 40,
 # Emekli adaylar: yeni sinyal uretimi DURUR; acik pozisyonlar normal
 # degerlendirilir, kapanmis kohort arsivde kalir ve stats'ta
 # retired_utc ile raporlanir (sessiz kaybolma yok).
-RETIRED = {"S3_MEANREV": "2026-08-12", "S6_SWEEP": "2026-08-12"}
+# 2026-08-18 (Serhat onayi): S4 ve S7 CHALLENGER_DEAD ilan kosuluyla
+# emekli - S4 kume-CI ust siniri -0.018 (126 kume), S7 ust -0.199
+# (108 kume); alarm kaydi config-lock.md 2026-08-18 tutanagi. Bosalan
+# slotlar DEVREDILMEDI: S1 dogrulama penceresi "ayni kurallar" sozuyle
+# acildi, ortasinda tavan degistirmek kohortu kirletirdi. Efektif
+# butce BILEREK kuculdu (turetme yok, devir yok).
+RETIRED = {"S3_MEANREV": "2026-08-12", "S6_SWEEP": "2026-08-12",
+           "S4_CARRY": "2026-08-18", "S7_WYCKOFF": "2026-08-18"}
 MAX_OPEN_DEFAULT = 15
 # Ornekleme rejimi damgasi: tavan degisimi oncesi/sonrasi kohortlar
 # BIRLESTIRILEMEZ (farkli kisitla toplandilar). Istatistikler yalniz

@@ -25,9 +25,12 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
   sayaçlar 2026-08-13'ten SIFIRDAN — config-lock.md sonu.
 - S3/S6 kenar ölümüyle EMEKLİ (2026-08-12); S1 tavanı 40→70 (bütçe
   devri, toplam sabit). Ölü maksDD alarmı düzeltildi (Kural 10).
-- Canlı adaylar (2026-08-17): S1, S2, S4, S7, S8 (funding sıkışma),
-  S9_GECE (takvim), S10 (52w zirve, haftalık), S11 (sıkışma-kırılımı),
-  S12 (hacim-kapılı seans kırılımı) — rejim-2 örneklemesi; S3/S6 emekli.
+- Canlı adaylar (2026-08-18): S1, S2, S8 (funding sıkışma), S9_GECE
+  (takvim), S10 (52w zirve, haftalık), S11 (sıkışma-kırılımı), S12
+  (hacim-kapılı seans kırılımı) — rejim-2 örneklemesi. EMEKLİ: S3/S6
+  (08-12) + S4/S7 (08-18, CHALLENGER_DEAD; slot devri YOK — config-lock
+  08-18 tutanağı). KİLİT-2 hükmü HENÜZ YOK (FAZ1 alarmı sessiz; ara
+  görünüm negatif eğilimli). v2 tasarım süreci AÇIK: docs/v2-tasarim.md.
   Perakende araştırması: docs/perakende-arastirmasi-2026-08-17.md.
   S5+TSM momentum ailesi RAFTA (90g backtest kenar yok; raftan çıkma
   tetiği docs/ideas.md). S-ATT1 (Wikipedia dikkat) backtestte ELENDİ
