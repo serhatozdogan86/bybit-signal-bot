@@ -510,14 +510,55 @@ DASHBOARD_HTML = r"""<!doctype html>
     .kpis{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
     .scroll{max-height:50vh}
   }
+  /* ========== v2.9: hareket sistemi (yalniz ILK boyama) ========== */
+  /* Giris animasyonlari body.boot varken calisir; ilk boyamadan ~1sn sonra
+     sinif dusurulur -> 60sn'lik veri yenilemeleri animasyonu TETIKLEMEZ.
+     prefers-reduced-motion:reduce'ta hicbiri calismaz (medya sarti). */
+  @media (prefers-reduced-motion:no-preference){
+    @keyframes rise{from{opacity:0;transform:translate3d(0,10px,0)}
+                    to{opacity:1;transform:none}}
+    body.boot .card{animation:rise .55s cubic-bezier(.22,.61,.36,1) backwards}
+    body.boot .col .card:nth-child(2){animation-delay:.06s}
+    body.boot .col .card:nth-child(3){animation-delay:.12s}
+    body.boot .col .card:nth-child(4){animation-delay:.18s}
+    body.boot .kpi{animation:rise .5s cubic-bezier(.22,.61,.36,1) backwards}
+    body.boot .kpi:nth-child(2){animation-delay:.05s}
+    body.boot .kpi:nth-child(3){animation-delay:.1s}
+    body.boot .kpi:nth-child(4){animation-delay:.15s}
+    body.boot .kpi:nth-child(5){animation-delay:.2s}
+    /* bar/serit dolumlari: akiskan genislik (ilk boyamada 0 -> hedef) */
+    .drow .track div,.step .g div,.psummary .bar div{
+      transition:width .6s cubic-bezier(.22,.61,.36,1)}
+    /* SVG fallback egrisi kendini cizer (stroke-dash yontemi) */
+    .curve svg path.eqline{transition:stroke-dashoffset 1s cubic-bezier(.3,.6,.3,1)}
+  }
+  /* ========== v2.9: katlanabilir kenar cubugu (yalniz masaustu) ==========
+     Mimari: grid kolonu akiskan genislik gecisiyle kapanir (tek kolon layout
+     maliyeti); icerik GPU-hizli transform+opacity ile kayar (compositor).
+     Mobil (<=760px) sekme cubugu kullanir, bu blok onu ETKILEMEZ. */
+  #navBtn{display:none}
+  @media (min-width:761px){
+    #navBtn{display:inline-block}
+    .cols{transition:grid-template-columns .38s cubic-bezier(.22,.61,.36,1)}
+    .col[data-tab="ozet"]{will-change:transform;
+      transition:transform .38s cubic-bezier(.22,.61,.36,1),opacity .26s ease}
+    body.nav-min .cols{grid-template-columns:0px minmax(0,1fr) 300px}
+    body.nav-min .col[data-tab="ozet"]{transform:translate3d(-18px,0,0);
+      opacity:0;pointer-events:none;overflow:hidden;min-width:0}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .cols,.col[data-tab="ozet"]{transition:none!important}
+  }
 </style>
 </head>
-<body class="notranslate">
+<body class="notranslate boot">
 <div class="app">
   <header class="hdr">
     <div class="logo"><span class="dot" id="dot"></span>signal<b>-engine</b></div>
     <div class="hsum"><span class="t" id="updated">--:--:--</span><span id="hsum">yükleniyor…</span></div>
     <div class="hctl">
+      <button id="navBtn" class="icon" title="Kenar çubuğu (daralt/genişlet)"
+              aria-pressed="false">◧</button>
       <select id="fs" title="yazı boyutu">
         <option value="1">Yazı: Normal</option>
         <option value="1.15">Büyük</option>
@@ -956,6 +997,7 @@ const RU={
 "hacim kapısı: açılış hacmi ≥ 2 × son 20 gün ort.; rejim/funding bakılmaz":
 "ворота объёма: объём открытия ≥ 2× среднего за 20 дней; режим/funding не учитываются",
 "Şimdi yenile":"Обновить сейчас","≥ 1.5× ort.":"≥ 1.5× сред.",
+"Kenar çubuğu (daralt/genişlet)":"Боковая панель (свернуть/развернуть)",
 "Tüm sonuçlar":"Все результаты","gölge muhasebedir":"— теневой учёт",
 ": varsayımsal giriş, kayma/komisyon yok, gerçek emir yok. Geçmiş performans garanti değildir; yatırım tavsiyesi değildir. Haber başlıkları dış kaynaktan aynen aktarılır.":
  ": гипотетический вход, без проскальзывания и комиссий, без реальных ордеров. Прошлые результаты не гарантия; не инвестиционная рекомендация. Заголовки новостей передаются из внешнего источника без изменений.",
@@ -1118,6 +1160,49 @@ function arrow(key,val){
   return val>p?'<span class="tr pos">▲</span>':'<span class="tr neg">▼</span>';
 }
 let LAST_STATUS=null;
+
+/* ---------- v2.9 hareket sistemi: yalniz ILK boyamada calisir ----------
+   MOTION_OK  : kullanici azaltilmis-hareket istemiyorsa true.
+   FIRSTPAINT : ilk refresh tamamlanana kadar true; giris animasyonlari
+                (sayac, cizgi cizimi, bar dolumu) yalniz bu turda kosar.
+                Sonraki 60sn yenilemeleri SESSIZ veri degisimidir. */
+const MOTION_OK=window.matchMedia("(prefers-reduced-motion: no-preference)").matches;
+let FIRSTPAINT=true;
+function endBoot(){
+  FIRSTPAINT=false;
+  setTimeout(()=>document.body.classList.remove("boot"),900);
+}
+function countUp(el,dur=750){
+  /* KPI buyuk rakami 0'dan hedefe sayar; metindeki ilk sayi disinda
+     hicbir seye dokunmaz (on ek/yuzde/birim korunur). */
+  const t=el.textContent,m=t.match(/-?\d[\d.]*/);
+  if(!m)return;
+  const target=parseFloat(m[0]);
+  if(!isFinite(target))return;
+  const dec=(m[0].split(".")[1]||"").length,t0=performance.now();
+  const step=now=>{
+    const p=Math.min(1,(now-t0)/dur),e=1-Math.pow(1-p,3);
+    el.textContent=t.replace(m[0],(target*e).toFixed(dec));
+    if(p<1)requestAnimationFrame(step);else el.textContent=t;
+  };
+  requestAnimationFrame(step);
+}
+function growBars(){
+  /* Ilk boyamada tum oran cubuklari 0'dan hedefe akar (CSS transition
+     genisligi tasir; burada yalniz baslangic degeri kurulur). */
+  document.querySelectorAll(".drow .track div,.step .g div,.psummary .bar div")
+    .forEach(b=>{const w=b.style.width;if(!w)return;
+      b.style.width="0%";void b.offsetWidth;b.style.width=w;});
+}
+/* ---------- v2.9 katlanabilir kenar cubugu (masaustu) ---------- */
+function applyNav(min){
+  document.body.classList.toggle("nav-min",min);
+  const b=$("navBtn");
+  if(b){b.setAttribute("aria-pressed",String(min));b.textContent=min?"◨":"◧";}
+  try{localStorage.setItem("ui_nav",min?"min":"open");}catch(e){}
+  /* grafik yeni genislige otursun (gecis bitince tek resize) */
+  if(typeof eqChart!=="undefined"&&eqChart)setTimeout(()=>eqChart.resize(),420);
+}
 
 /* ---------- modal ---------- */
 function openModal(title,html){
@@ -1464,6 +1549,9 @@ function renderCurve(signals){
   if(st)st.innerHTML=`PF <b class="num">${pf==null?"∞":num(pf,2)}</b> · beklenti <b class="num">${(exp>0?"+":"")+num(exp,2)}R</b>/${LANG==="ru"?"сделку":"işlem"}${hasNet?" (net)":""} · maksDD <b class="num neg">−${num(maxDD,2)}R</b>${grossTxt}`;
   const labels=done.map((s,i)=>i+1);
   const ptCol=done.map(s=>OUT(s)==="WIN"?"#16A34A":"#DC2626");
+  /* CVD erisilebilirligi: WIN/LOSS kimligi renk-TEK-basina tasinmaz
+     (yesil-kirmizi deutan ayrimi dusuk); bicim de kodlar: daire / elmas. */
+  const ptStyle=done.map(s=>OUT(s)==="WIN"?"circle":"rectRot");
   const tips=done.map((s,i)=>{
     const rn=(hasNet&&s.r_net!=null)?s.r_net:null;
     const base=`${s.pair} ${s.direction} ${OUT(s)} ${(rOf(s)>0?"+":"")+num(rOf(s))}R`;
@@ -1480,7 +1568,7 @@ function renderCurve(signals){
     const sets=[
         {data:series,borderColor:"#2563EB",borderWidth:2.5,fill:true,
          backgroundColor:grad,tension:.35,
-         pointRadius:4,pointHoverRadius:6,
+         pointRadius:4,pointHoverRadius:6,pointStyle:ptStyle,
          pointBackgroundColor:ptCol,pointBorderColor:"#FFFEFA",
          pointBorderWidth:2}];
     if(hasNet)sets.push(
@@ -1489,9 +1577,24 @@ function renderCurve(signals){
     sets.push(
         {data:labels.map(()=>0),borderColor:"#B7AE9A",borderWidth:1,
          borderDash:[4,4],pointRadius:0,fill:false});
+    /* v2.9 giris animasyonu: cizgi soldan saga KENDINI CIZER (ilerleyen
+       nokta paterni). Yalniz ILK boyamada ve azaltilmis-hareket kapaliyken;
+       veri yenilemeleri update("none") ile SESSIZ kalir (asagida). */
+    const perPt=Math.min(40,900/Math.max(series.length,1));
+    const anim=(MOTION_OK&&FIRSTPAINT&&!eqChart)?{
+      x:{type:"number",easing:"linear",duration:perPt,from:NaN,
+         delay(c2){if(c2.type!=="data"||c2.xStarted)return 0;
+           c2.xStarted=true;return c2.index*perPt;}},
+      y:{type:"number",easing:"linear",duration:perPt,
+         from:c2=>c2.index===0?c2.chart.scales.y.getPixelForValue(0)
+           :c2.chart.getDatasetMeta(c2.datasetIndex).data[c2.index-1]
+              .getProps(["y"],true).y,
+         delay(c2){if(c2.type!=="data"||c2.yStarted)return 0;
+           c2.yStarted=true;return c2.index*perPt;}}
+    }:false;
     const cfg={type:"line",
       data:{labels,datasets:sets},
-      options:{responsive:true,maintainAspectRatio:false,animation:false,
+      options:{responsive:true,maintainAspectRatio:false,animation:anim,
         plugins:{legend:{display:false},
           tooltip:{callbacks:{label:i=>i.datasetIndex===0?tips[i.dataIndex]+
             " · küm "+(series[i.dataIndex]>0?"+":"")+num(series[i.dataIndex])+"R"
@@ -1523,7 +1626,14 @@ function renderCurve(signals){
   wrap.innerHTML=`<svg viewBox="0 0 ${W} ${H2}" preserveAspectRatio="none">
     <defs><filter id="ds"><feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#2563EB" flood-opacity=".3"/></filter></defs>
     <line x1="${P}" y1="${Y(0)}" x2="${W-8}" y2="${Y(0)}" stroke="#B7AE9A" stroke-dasharray="4 4"/>
-    ${pathG}<path d="${path}" fill="none" stroke="#2563EB" stroke-width="2.5" filter="url(#ds)"/>${dots}</svg>`;
+    ${pathG}<path class="eqline" d="${path}" fill="none" stroke="#2563EB" stroke-width="2.5" filter="url(#ds)"/>${dots}</svg>`;
+  /* v2.9: fallback egrisi de ilk boyamada kendini cizer */
+  if(MOTION_OK&&FIRSTPAINT){
+    const p=wrap.querySelector("path.eqline");
+    if(p&&p.getTotalLength){const L=p.getTotalLength();
+      p.style.strokeDasharray=L;p.style.strokeDashoffset=L;
+      void p.getBoundingClientRect();p.style.strokeDashoffset="0";}
+  }
 }
 
 /* ---------- yon bilancosu (tiklanabilir yon filtresi) ---------- */
@@ -2211,6 +2321,14 @@ async function refresh(){
   renderFooter(backup,!!status,fetchMs,perf);
   $("updated").textContent=new Date().toLocaleTimeString(LANG==="ru"?"ru-RU":"tr-TR");
   translateNode(document.body);
+  /* v2.9: giris animasyonlari YALNIZ ilk boyamada; sonra boot biter */
+  if(FIRSTPAINT){
+    if(MOTION_OK){
+      $("kpis").querySelectorAll(".kpi .val").forEach(v=>countUp(v));
+      growBars();
+    }
+    endBoot();
+  }
 }
 let timer=null;
 function schedule(){
@@ -2233,6 +2351,10 @@ $("fs").addEventListener("change",()=>{
 pfLoad();
 ["pfCap","pfRisk","pfSlots","pfLev"].forEach(id=>$(id).addEventListener("input",()=>{
   pfSave();renderPortfolio(SIGNALS);}));
+/* v2.9 kenar cubugu: durum cihazda saklanir; dugme + klavye erisilebilir */
+$("navBtn").addEventListener("click",
+  ()=>applyNav(!document.body.classList.contains("nav-min")));
+try{applyNav(localStorage.getItem("ui_nav")==="min");}catch(e){}
 refresh();schedule();
 </script>
 </body>
