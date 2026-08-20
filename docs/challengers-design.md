@@ -162,3 +162,10 @@ S1'e devredildi (tavan 40→70, efektif toplam bütçe sabit). Yukarıdaki
 kohortu henüz BOŞ olduğundan pencere tek tip (tavan-70) kısıtla toplanır;
 sonuç-bağımlı örnekleme oluşmadı. Seçim kohortu (tavan-40) arşivde ayrıdır.
 Ayrıntı ve gerekçe: config-lock.md → KİLİT-2 İLANI, Madde 4.
+
+## S1 DOĞRULAMA PENCERESİ HÜKMÜ (2026-08-20, Serhat onayı)
+2026-08-12'de açılan ön-kayıtlı doğrulama penceresi doldu: 90 kapanmış
+küme (hedef 50), net −24.36R, küme-CI [−0.25, +0.113] → **GEÇEMEDİ**
+(kural: CI alt > 0 gerekirdi). İki pencere hakkı tükendi; üçüncü pencere
+ilan edilmez. S1 kenar-ölümü koşulu oluşmadığından emekli edilmez;
+ölçüm/kıyas için koşar. Tam tutanak: config-lock.md 2026-08-20.

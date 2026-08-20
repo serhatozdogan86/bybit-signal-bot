@@ -29,8 +29,12 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
   (takvim), S10 (52w zirve, haftalık), S11 (sıkışma-kırılımı), S12
   (hacim-kapılı seans kırılımı) — rejim-2 örneklemesi. EMEKLİ: S3/S6
   (08-12) + S4/S7 (08-18, CHALLENGER_DEAD; slot devri YOK — config-lock
-  08-18 tutanağı). KİLİT-2 hükmü HENÜZ YOK (FAZ1 alarmı sessiz; ara
-  görünüm negatif eğilimli). v2 tasarım süreci AÇIK: docs/v2-tasarim.md.
+  08-18 tutanağı). KİLİT-2 HÜKMÜ (2026-08-20): GEÇEMEDİ — yanlışlama #2
+  (kilit penceresi maksDD 20.15R > 20R; tutanak config-lock.md). Üçüncü
+  kilit YOK; şampiyon VERİ KAYNAĞI statüsünde koşar. v2 tasarımı ana
+  gündem: docs/v2-tasarim.md (~2 hafta; çıkış-lab + S2 CI seyri girdi).
+  Umut sıralaması (08-20): S2 (+47R, CI alt −0.055 — Faz-1'e en yakın),
+  S11, S8/S12.
   Perakende araştırması: docs/perakende-arastirmasi-2026-08-17.md.
   S5+TSM momentum ailesi RAFTA (90g backtest kenar yok; raftan çıkma
   tetiği docs/ideas.md). S-ATT1 (Wikipedia dikkat) backtestte ELENDİ
@@ -39,9 +43,9 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
   Çıkış laboratuvarı (V0 sabit / V1 iz süren; salt ölçüm): /exitlab,
   app/services/exit_lab.py — hüküm kuralı ön-kayıtlı (ideas.md 08-17).
 - v2 şampiyon henüz TASARLANMADI; tasarlanırsa ÖN-KAYITLA yeni aday olur.
-- S1 seçim penceresi doldu (50 küme, CI alt −0.05): KIL PAYI GEÇEMEDİ.
-  2026-08-12: ön-kayıtlı DOĞRULAMA penceresi açıldı (yeni 50 küme,
-  aynı kurallar) — challengers-design.md sonu.
+- S1: seçim penceresi kıl payı geçemedi (CI alt −0.05); DOĞRULAMA
+  penceresi de doldu ve GEÇEMEDİ (2026-08-20: 90 küme, net −24.4R,
+  CI alt −0.25). Üçüncü pencere YOK; S1 emekli değil, ölçüm için koşar.
 
 ## DEĞİŞTİRİLEMEZ KURALLAR
 1. `app/strategies/` DONMUŞTUR (KİLİT-2, 2026-08-12: retest düzeltmesi

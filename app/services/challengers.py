@@ -107,6 +107,10 @@ FAZ1_TARGET = 50                # sampiyonla ayni sinav esigi
 # kurallari, tavan ve maliyet modeli AYNEN kalir (rejim degismez).
 # S1: secim penceresi 50 kumede doldu, CI alt siniri -0.053 -> kil payi
 # gecemedi; dogrulama penceresi 2026-08-12'de ilan edildi (Serhat onayi).
+# HUKUM (2026-08-20): dogrulama kohortu doldu (90 kume >= 50), net
+# -24.36R, CI [-0.25, +0.113] -> GECEMEDI. UCUNCU PENCERE ILAN EDILMEZ;
+# S1 emekli degil (kenar-olumu kosulu olusmadi), olcum icin kosar.
+# Kayit arsiv raporlamasi icin kalir (config-lock.md 2026-08-20 tutanagi).
 VALIDATION_WINDOWS = {"S1_TSMOM": "2026-08-12T00:00:00Z"}
 
 # ---- strateji parametre sabitleri: TEK KAYNAK (v1.2, suruklenme yasagi) ----

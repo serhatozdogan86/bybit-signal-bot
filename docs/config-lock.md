@@ -332,3 +332,41 @@ ama onu ETKİLEMEZ: app/strategies/ donmuş kalır; v2 tasarlanınca
 ideas.md'ye ÖN-KAYITLA yeni aday olarak girer ve sıfırdan sınava tabi
 olur. Şampiyon durdurulMAZ (gerçek para yok; ürettiği veri ölçüm
 aletlerini besliyor).
+
+# ============================================================
+# KİLİT-2 HÜKMÜ — 2026-08-20 (Serhat onayı: "önerilerini kabul ediyorum")
+# ============================================================
+
+## HÜKÜM: GEÇEMEDİ — YANLIŞLAMA #2 (maksDD tavanı)
+Kilit penceresi (2026-08-13'ten itibaren) maksimum düşüşü **20.15R**,
+önceden ilan edilmiş tavan **20R** (kilit-1'den AYNEN devralınan
+yanlışlama kriteri #2). Değer botun KENDİ ölçümünden okunmuştur
+(0_performance.json → measurement.max_drawdown_r, since_lock=True;
+yedek tazeliği 2026-08-20T19:35Z). Alarm eşiği MAX_DD_LIMIT_R=20.0 →
+MAX_DD kanalı kod gereği aktif. İhlal anında küme sayacı 46/50 idi ve
+kilit kohortu CI görünümü [−0.307, +0.353] — geçiş koşulundan uzak;
+hüküm sayaç dolmadan, yanlışlama kuralıyla verilmiştir (kilit-1'de
+yanlışlama-#2'nin pencereyi kapattığı emsalle aynı usul).
+İnce not (dürüstlük): ihlal kıl payıdır (20.15) ve ralli sonrası
+toparlanma sürerken gerçekleşmiştir — kural sonuç-bağımlı esnetilmez;
+esneme hakkı isteyen, kuralı VERİDEN ÖNCE yazmalıydı.
+
+SONUÇ:
+- v1 şampiyonu (breakout_retest + sweep) iki kilit penceresinde de
+  kanıt üretemedi. Hüküm nihaidir; üçüncü kilit penceresi İLAN EDİLMEZ.
+- Şampiyon DURDURULMAZ: gerçek para yok; ürettiği karar/mum arşivi
+  ölçüm aletlerini (çıkış lab, korelasyon, karşı-olgu kohortları)
+  beslemeye devam eder. Statüsü: VERİ KAYNAĞI.
+- app/strategies/ donmuş kalır (artık sınav bütünlüğü için değil,
+  arşiv tutarlılığı için: değişen motor eski verinin anlamını bozar).
+- Ana gündem: v2 tasarımı (docs/v2-tasarim.md; takvim: çıkış-lab ilk
+  hükümleri + S2 CI seyri ile birlikte, hedef ~2 hafta).
+
+## S1_TSMOM DOĞRULAMA HÜKMÜ: GEÇEMEDİ (aynı tutanak)
+Ön-kayıt (2026-08-12, challengers-design.md sonu): yeni ≥50 kapanmış
+küme + küme-CI alt > 0. Gerçekleşen (2026-08-20): **90 küme**, net
+**−24.36R**, CI **[−0.25, +0.113]** → GEÇEMEDİ. Seçim penceresi kıl
+payıydı (−0.053); doğrulama değil. ÜÇÜNCÜ PENCERE İLAN EDİLMEZ.
+S1 emekli DEĞİLDİR (kenar-ölümü koşulu — CI üst < 0 — oluşmadı):
+ölçüm/kıyas değeri için koşmaya devam eder, umut statüsü düşmüştür.
+VALIDATION_WINDOWS kaydı arşiv raporlaması için kodda kalır.

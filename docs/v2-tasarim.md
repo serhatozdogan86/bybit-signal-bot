@@ -5,12 +5,18 @@ v2 tasarımı bittiğinde kurallar docs/ideas.md'ye ÖN-KAYITLA girer ve v2,
 sıfırdan sınava tabi YENİ ADAY olur. app/strategies/ (v1) donmuş kalır;
 KİLİT-2 sınavı bu dosyadan etkilenmez.
 
-## Neden v2? (durum, 2026-08-18)
-- v1 şampiyonu kilit-1'i geçemedi; kilit-2 ara görünümü negatif eğilimli
-  (E_net −0.07R, CI [−0.43,+0.32]; hüküm HENÜZ yok — bot ilan edecek).
-- Aday mezarlığı büyüdü: S3 (ort. dönüş), S6 (süpürme), S4 (ham funding),
+## Neden v2? (güncelleme 2026-08-20 — HÜKÜMLER KESİNLEŞTİ)
+- v1 şampiyonu KİLİT-1'İ ve KİLİT-2'Yİ geçemedi (kilit-2: yanlışlama #2,
+  maksDD 20.15R > 20R, 2026-08-20 tutanağı). Üçüncü kilit YOK; v1 artık
+  VERİ KAYNAĞI. v2 tek yol.
+- S1 doğrulaması da geçemedi (90 küme, net −24.4R) — trend bileşeni v2'ye
+  "kanıtlı" değil "denenmiş-belirsiz" statüsüyle girer (aşağıdaki madde 4
+  buna göre okunmalı).
+- Aday mezarlığı: S3 (ort. dönüş), S6 (süpürme), S4 (ham funding),
   S7 (Wyckoff) — hepsi ilan edilmiş koşulla, canlı veriyle.
-- Elde ilk pozitif-yönlü bulgular birikti (aşağıda). Tasarımın zamanı.
+- Rallide öne çıkan (2026-08-20): S2 +47.3R (CI alt −0.055, Faz-1'e en
+  yakın aday), S11 +12R (erken), S12 +6.2R (erken). Kırılım ailesi v2
+  iskeletinin bir numaralı adayı hâline geldi.
 
 ## ÖLÇÜLMÜŞ girdiler (v2 bunları merkeze alır)
 1. **Yön/rejim asimetrisi (v1'in en net dersi):** kilit-2 ara verisi
