@@ -103,3 +103,34 @@ def test_sidebar_title_has_ru_translation():
 def test_base_grid_untouched():
     """Temel kolon sozlesmesi degismedi (mevcut testlerin korudugu deger)."""
     assert "grid-template-columns:220px minmax(0,1fr) 300px" in DASHBOARD_HTML
+
+
+# ---------------------------------------------------------- v3.0 tema
+def test_dark_theme_variables_and_toggle():
+    """Gece Mavisi (Serhat secimi 2026-08-20): body.dark tum paleti cevirir;
+    dugme + kalicilik + parlama onleyici erken script."""
+    assert "body.dark{" in DASHBOARD_HTML
+    for hexv in ("#0E131A", "#151C26", "#64A1FF", "#3DCB8C", "#F5766B"):
+        assert hexv in DASHBOARD_HTML
+    assert 'id="themeBtn"' in DASHBOARD_HTML
+    assert 'localStorage.setItem("ui_theme"' in DASHBOARD_HTML
+    # erken no-flash script: body acilir acilmaz sinif takilir
+    assert 'localStorage.getItem("ui_theme")==="dark"' in DASHBOARD_HTML
+
+
+def test_chart_colors_come_from_theme():
+    """Canvas/SVG CSS degiskeni okuyamaz: grafik renkleri chartTheme()'den
+    gelir ve tema degisince grafik temiz yeniden cizilir."""
+    assert "function chartTheme()" in DASHBOARD_HTML
+    assert "const T=chartTheme();" in DASHBOARD_HTML
+    assert "borderColor:T.line" in DASHBOARD_HTML
+    assert "pointBorderColor:T.ring" in DASHBOARD_HTML
+    assert "grid:{color:T.grid}" in DASHBOARD_HTML
+    assert "eqChart.destroy();eqChart=null;" in DASHBOARD_HTML
+    # WIN/LOSS nokta renkleri de temadan (koyu zeminde acik tonlar)
+    assert 'OUT(s)==="WIN"?T.win:T.loss' in DASHBOARD_HTML
+
+
+def test_theme_title_has_ru():
+    assert '"Koyu/Açık tema"' in DASHBOARD_HTML
+    assert "Тёмная/светлая тема" in DASHBOARD_HTML

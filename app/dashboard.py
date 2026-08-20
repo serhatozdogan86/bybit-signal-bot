@@ -510,6 +510,27 @@ DASHBOARD_HTML = r"""<!doctype html>
     .kpis{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
     .scroll{max-height:50vh}
   }
+  /* ========== v3.0: TEMA — Keten (açık) / Gece Mavisi (koyu) ========== */
+  /* Açık tema (:root) varsayılan "Keten"dir; body.dark tüm değişkenleri
+     Gece Mavisi'ne çevirir (Serhat seçimi 2026-08-20; koyu kart üzerinde
+     4 durum rengi de kontrast ≥3:1 ile doğrulayıcıdan geçti). Grafik iç
+     renkleri (canvas/SVG) JS chartTheme()'den okur — CSS'e erişemezler. */
+  body.dark{
+    --bg:#0E131A; --card:#151C26; --card2:#1B2431; --line:#2A3547;
+    --text:#E4EAF3; --muted:#8C99AC; --head:#BAC7DB;
+    --green:#3DCB8C; --green-bg:#123326; --green-ink:#A6ECCB;
+    --red:#F5766B;   --red-bg:#3D1B1B;   --red-ink:#FFC4BC;
+    --amber:#E9A83F; --amber-bg:#37290F; --amber-ink:#F5DCA4;
+    --blue:#64A1FF;  --blue-bg:#1B2B47;  --blue-ink:#BED6FF;
+    --grey:#7F8B9D;  --grey-bg:#222C3A;
+    --shadow:0 1px 2px rgba(0,0,0,.45),0 5px 14px rgba(0,0,0,.35);
+    --shadow-hi:0 2px 4px rgba(0,0,0,.55),0 10px 24px rgba(0,0,0,.5);
+  }
+  body.dark tbody tr:nth-child(even) td{background:rgba(255,255,255,.025)}
+  body.dark .tabbar{background:rgba(21,28,38,.96)}
+  body.dark .statusbar{background:rgba(14,19,26,.94)}
+  body.dark .b-NOT_FILLED,body.dark .b-EXPIRED,body.dark .vd-out,
+  body.dark .conf.LOW{color:var(--muted)}
   /* ========== v2.9: hareket sistemi (yalniz ILK boyama) ========== */
   /* Giris animasyonlari body.boot varken calisir; ilk boyamadan ~1sn sonra
      sinif dusurulur -> 60sn'lik veri yenilemeleri animasyonu TETIKLEMEZ.
@@ -552,6 +573,9 @@ DASHBOARD_HTML = r"""<!doctype html>
 </style>
 </head>
 <body class="notranslate boot">
+<script>/* tema parlamasi onleme: sinif ILK boyamadan once takilir */
+try{if(localStorage.getItem("ui_theme")==="dark")
+  document.body.classList.add("dark");}catch(e){}</script>
 <div class="app">
   <header class="hdr">
     <div class="logo"><span class="dot" id="dot"></span>signal<b>-engine</b></div>
@@ -570,6 +594,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <option value="300000">5 dk</option>
       </select>
       <button id="refresh" class="icon" title="Şimdi yenile">⟳</button>
+      <button id="themeBtn" class="icon" title="Koyu/Açık tema">🌙</button>
       <button id="langBtn" class="icon" title="Dil / Язык" data-noi18n>TR</button>
       <a id="bookBtn" class="icon" href="/kitap"
          title="Ders Kitabı: stratejinin tam anlatımı">📗</a>
@@ -998,6 +1023,7 @@ const RU={
 "ворота объёма: объём открытия ≥ 2× среднего за 20 дней; режим/funding не учитываются",
 "Şimdi yenile":"Обновить сейчас","≥ 1.5× ort.":"≥ 1.5× сред.",
 "Kenar çubuğu (daralt/genişlet)":"Боковая панель (свернуть/развернуть)",
+"Koyu/Açık tema":"Тёмная/светлая тема",
 "Tüm sonuçlar":"Все результаты","gölge muhasebedir":"— теневой учёт",
 ": varsayımsal giriş, kayma/komisyon yok, gerçek emir yok. Geçmiş performans garanti değildir; yatırım tavsiyesi değildir. Haber başlıkları dış kaynaktan aynen aktarılır.":
  ": гипотетический вход, без проскальзывания и комиссий, без реальных ордеров. Прошлые результаты не гарантия; не инвестиционная рекомендация. Заголовки новостей передаются из внешнего источника без изменений.",
@@ -1194,6 +1220,30 @@ function growBars(){
     .forEach(b=>{const w=b.style.width;if(!w)return;
       b.style.width="0%";void b.offsetWidth;b.style.width=w;});
 }
+/* ---------- v3.0 tema: Keten (acik) / Gece Mavisi (koyu) ---------- */
+function chartTheme(){
+  /* canvas/SVG grafikleri CSS degiskeni okuyamaz; renkler buradan gelir.
+     Koyu set = Gece Mavisi (dogrulayicidan gecen degerler). */
+  return document.body.classList.contains("dark")?{
+    line:"#64A1FF",lineRGB:"100,161,255",gross:"#5A6B82",
+    grid:"#232E3D",tick:"#8C99AC",ring:"#151C26",
+    shadow:"rgba(100,161,255,.35)",win:"#3DCB8C",loss:"#F5766B"}
+  :{line:"#2563EB",lineRGB:"37,99,235",gross:"#B7AE9A",
+    grid:"#F0EAD9",tick:"#8A7F6C",ring:"#FFFEFA",
+    shadow:"rgba(37,99,235,.30)",win:"#16A34A",loss:"#DC2626"};
+}
+function applyTheme(dark){
+  document.body.classList.toggle("dark",dark);
+  const b=$("themeBtn");
+  if(b){b.textContent=dark?"☀":"🌙";b.setAttribute("aria-pressed",String(dark));}
+  const mt=document.querySelector('meta[name="theme-color"]');
+  if(mt)mt.setAttribute("content",dark?"#0E131A":"#6D28D9");
+  try{localStorage.setItem("ui_theme",dark?"dark":"light");}catch(e){}
+  /* grafik ic renkleri canvas'ta yasar: temayla temiz yeniden cizim */
+  if(typeof eqChart!=="undefined"&&eqChart){eqChart.destroy();eqChart=null;}
+  if(typeof SIGNALS!=="undefined"&&SIGNALS&&SIGNALS.length)renderCurve(SIGNALS);
+}
+
 /* ---------- v2.9 katlanabilir kenar cubugu (masaustu) ---------- */
 function applyNav(min){
   document.body.classList.toggle("nav-min",min);
@@ -1522,7 +1572,7 @@ const shadowPlugin={id:"lineShadow",
   beforeDatasetDraw(c,args){
     if(args.index!==0)return;
     const x=c.ctx;x.save();
-    x.shadowColor="rgba(37,99,235,.30)";x.shadowBlur=10;x.shadowOffsetY=5;},
+    x.shadowColor=chartTheme().shadow;x.shadowBlur=10;x.shadowOffsetY=5;},
   afterDatasetDraw(c,args){if(args.index===0)c.ctx.restore();}};
 function renderCurve(signals){
   const done=(signals||[]).filter(s=>["WIN","LOSS"].includes(OUT(s)))
@@ -1548,7 +1598,8 @@ function renderCurve(signals){
   const grossTxt=hasNet?` · brüt <b class="num">${(data[data.length-1]>0?"+":"")+num(data[data.length-1],2)}R</b>`:"";
   if(st)st.innerHTML=`PF <b class="num">${pf==null?"∞":num(pf,2)}</b> · beklenti <b class="num">${(exp>0?"+":"")+num(exp,2)}R</b>/${LANG==="ru"?"сделку":"işlem"}${hasNet?" (net)":""} · maksDD <b class="num neg">−${num(maxDD,2)}R</b>${grossTxt}`;
   const labels=done.map((s,i)=>i+1);
-  const ptCol=done.map(s=>OUT(s)==="WIN"?"#16A34A":"#DC2626");
+  const T=chartTheme();          // v3.0: renkler temadan
+  const ptCol=done.map(s=>OUT(s)==="WIN"?T.win:T.loss);
   /* CVD erisilebilirligi: WIN/LOSS kimligi renk-TEK-basina tasinmaz
      (yesil-kirmizi deutan ayrimi dusuk); bicim de kodlar: daire / elmas. */
   const ptStyle=done.map(s=>OUT(s)==="WIN"?"circle":"rectRot");
@@ -1561,21 +1612,21 @@ function renderCurve(signals){
     const ctx=$("eqChart").getContext("2d");
     const H=wrap.clientHeight||240;
     const grad=ctx.createLinearGradient(0,0,0,H);
-    grad.addColorStop(0,"rgba(37,99,235,.26)");
-    grad.addColorStop(.55,"rgba(37,99,235,.10)");
-    grad.addColorStop(1,"rgba(37,99,235,0)");
+    grad.addColorStop(0,`rgba(${T.lineRGB},.26)`);
+    grad.addColorStop(.55,`rgba(${T.lineRGB},.10)`);
+    grad.addColorStop(1,`rgba(${T.lineRGB},0)`);
     // v3.6: ana cizgi NET, ikinci ince cizgi BRUT -> makas = maliyet birikimi
     const sets=[
-        {data:series,borderColor:"#2563EB",borderWidth:2.5,fill:true,
+        {data:series,borderColor:T.line,borderWidth:2.5,fill:true,
          backgroundColor:grad,tension:.35,
          pointRadius:4,pointHoverRadius:6,pointStyle:ptStyle,
-         pointBackgroundColor:ptCol,pointBorderColor:"#FFFEFA",
+         pointBackgroundColor:ptCol,pointBorderColor:T.ring,
          pointBorderWidth:2}];
     if(hasNet)sets.push(
-        {data,borderColor:"#B7AE9A",borderWidth:1.4,borderDash:[5,4],
+        {data,borderColor:T.gross,borderWidth:1.4,borderDash:[5,4],
          pointRadius:0,fill:false,tension:.35});
     sets.push(
-        {data:labels.map(()=>0),borderColor:"#B7AE9A",borderWidth:1,
+        {data:labels.map(()=>0),borderColor:T.gross,borderWidth:1,
          borderDash:[4,4],pointRadius:0,fill:false});
     /* v2.9 giris animasyonu: cizgi soldan saga KENDINI CIZER (ilerleyen
        nokta paterni). Yalniz ILK boyamada ve azaltilmis-hareket kapaliyken;
@@ -1600,8 +1651,8 @@ function renderCurve(signals){
             " · küm "+(series[i.dataIndex]>0?"+":"")+num(series[i.dataIndex])+"R"
             :(hasNet&&i.datasetIndex===1?"brüt "+(data[i.dataIndex]>0?"+":"")+num(data[i.dataIndex])+"R":"")}}},
         scales:{x:{display:false},
-          y:{grid:{color:"#F0EAD9"},border:{display:false},
-             ticks:{font:{size:10},color:"#8A7F6C",
+          y:{grid:{color:T.grid},border:{display:false},
+             ticks:{font:{size:10},color:T.tick,
              callback:v=>(v>0?"+":"")+v+"R"}}}},
       plugins:[shadowPlugin]};
     /* v3.7: options da tazelenir - tooltip callback'i eski render'in
@@ -1621,12 +1672,12 @@ function renderCurve(signals){
   const Y=v=>10+(H2-24)*(1-(v-ymin)/yr);
   const mk=a=>a.map((p,i)=>(i?"L":"M")+X(p[0]).toFixed(1)+" "+Y(p[1]).toFixed(1)).join(" ");
   const path=mk(pts);
-  const pathG=hasNet?`<path d="${mk(ptsG)}" fill="none" stroke="#B7AE9A" stroke-width="1.4" stroke-dasharray="5 4"/>`:"";
-  const dots=done.map((s,i)=>`<circle cx="${X(i+1)}" cy="${Y(series[i])}" r="4" fill="${ptCol[i]}" stroke="#FFFEFA" stroke-width="2"><title>${tips[i]}</title></circle>`).join("");
+  const pathG=hasNet?`<path d="${mk(ptsG)}" fill="none" stroke="${T.gross}" stroke-width="1.4" stroke-dasharray="5 4"/>`:"";
+  const dots=done.map((s,i)=>`<circle cx="${X(i+1)}" cy="${Y(series[i])}" r="4" fill="${ptCol[i]}" stroke="${T.ring}" stroke-width="2"><title>${tips[i]}</title></circle>`).join("");
   wrap.innerHTML=`<svg viewBox="0 0 ${W} ${H2}" preserveAspectRatio="none">
-    <defs><filter id="ds"><feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#2563EB" flood-opacity=".3"/></filter></defs>
-    <line x1="${P}" y1="${Y(0)}" x2="${W-8}" y2="${Y(0)}" stroke="#B7AE9A" stroke-dasharray="4 4"/>
-    ${pathG}<path class="eqline" d="${path}" fill="none" stroke="#2563EB" stroke-width="2.5" filter="url(#ds)"/>${dots}</svg>`;
+    <defs><filter id="ds"><feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="${T.line}" flood-opacity=".3"/></filter></defs>
+    <line x1="${P}" y1="${Y(0)}" x2="${W-8}" y2="${Y(0)}" stroke="${T.gross}" stroke-dasharray="4 4"/>
+    ${pathG}<path class="eqline" d="${path}" fill="none" stroke="${T.line}" stroke-width="2.5" filter="url(#ds)"/>${dots}</svg>`;
   /* v2.9: fallback egrisi de ilk boyamada kendini cizer */
   if(MOTION_OK&&FIRSTPAINT){
     const p=wrap.querySelector("path.eqline");
@@ -2355,6 +2406,10 @@ pfLoad();
 $("navBtn").addEventListener("click",
   ()=>applyNav(!document.body.classList.contains("nav-min")));
 try{applyNav(localStorage.getItem("ui_nav")==="min");}catch(e){}
+/* v3.0 tema: erken script sinifi takti; burada dugme/meta/grafik esitlenir */
+$("themeBtn").addEventListener("click",
+  ()=>applyTheme(!document.body.classList.contains("dark")));
+applyTheme(document.body.classList.contains("dark"));
 refresh();schedule();
 </script>
 </body>
