@@ -373,3 +373,140 @@ evreninde AYRI ön-kayıtla test etmek isterse bizim hüküm ona engel
 değildir (farklı evren, farklı veri). Araç zinciri (Wikimedia indirici +
 z-skor + T+1 disiplini) birebir taşınabilir. Açık iş DEĞİL; yalnız
 bilgilendirme.
+
+## Gap dolumu ve R paydası — ikiz kontrolü (2026-08-21)
+
+**Sonuç: G1 bybit'te BULUNMADI (yapısal olarak bağışık). G2 ters yönde
+BULUNDU — midas'ın 2 Ağustos düzeltmesi bybit'e hiç taşınmamış.**
+
+Tetikleyen bulgu: midas kilit-2 kohortunda JNJ **+7,91R**. Dolum bölgenin
+altında (256,00 · bölge 258,02–259,03) oluştuğu için R paydası tasarım
+riski 4,00 yerine **1,475**'e düştü. Aynı çıkışla bölge içi dolumda
++2,29R, bölgenin kötü ucunda +1,92R olurdu.
+
+### Kural farkı
+
+```python
+# midas  signal_tracker._evaluate_signal
+touched    = c["low"] <= sig["entry_min"]        # TETİK: bölgenin DİBİ (tam katetme)
+fill_price = sig["entry_max"]                    # FİYAT: bölgenin tepesi
+if is_long and c["open"] < sig["entry_min"]:     # GAP DALI
+    fill_price = c["open"]                       #   → dolum açılıştan
+
+# bybit  signal_tracker._evaluate_signal
+touched    = c["low"] <= sig["entry_max"]        # TETİK: bölgenin TEPESİ (tek tık)
+fill_price = sig["entry_max"]                    # FİYAT: her zaman kenar — GAP DALI YOK
+```
+
+İki bağımsız fark var ve **zıt yönlere** çalışıyorlar: midas tetikte
+katı ama fiyatta gap'e açık; bybit tetikte gevşek ama fiyatta sabit.
+
+---
+
+### G1 — Gap dalı: bybit'te YOK, defter temiz
+
+Ölçüm (bybit canlı defteri, kapanmış ve dolmuş 1337 kayıt):
+
+| Kontrol | Sonuç |
+|---|---|
+| Dolum fiyatı tam bölge kenarında | **1337 / 1337** |
+| Bölge dışı dolum | **0** |
+| Tasarım riski / fiili risk oranı | min 0,75 · ortanca 0,853 · **maks 1,00** |
+| Oranı 1,10'un üstünde olan kayıt | **0** |
+
+Oran hiçbir kayıtta 1,00'ı aşmıyor: bybit'te fiili risk **her zaman**
+tasarım riskinden büyük ya da eşit. R paydası kısalamıyor, dolayısıyla
+şişme mekanizması burada doğamaz.
+
+**Karşı-olgusal — midas kuralı bu deftere uygulansaydı** (aynı 1337
+kayıt, arşivlenmiş 15 dk mumlarla yeniden oynatıldı):
+
+| | n | gerçek R | midas kuralıyla | fark |
+|---|---:|---:|---:|---:|
+| LOSS | 125 | −125,00 | −111,00 | +14,00 |
+| WIN | 48 | +129,03 | **+461,89** | +332,86 |
+| **toplam** | **173** (%12,9) | **+4,03** | **+350,89** | **+346,86** |
+
+Beklenti 0,023 R/işlem → **2,028 R/işlem**. Kazananlarda ortalama
+2,69R → 9,62R (**3,6 kat**); payda ortalama **3,39 kat** küçülüyor.
+Uç örnekler: MRVLUSDT 2,85R → 77,36R · CAPUSDT 4,80R → 64,76R ·
+UBUSDT 2,32R → 37,76R.
+
+**Asimetri — asıl mesele bu.** Zarar tanımı gereği stop'a kadardır, yani
+dolum nereye kayarsa kaysın ≈ −1R'ye çapalıdır (tabloda 125 zarar
+−125,00 → −111,00, neredeyse sabit). Kazanç ise payda küçüldükçe
+serbestçe büyür. Kural beklentiyi **yalnızca yukarı** itebilir; gap yoğun
+bir kohortta defter yapısal olarak iyimserdir.
+
+**Karşı-olgusalın sınırı (dürüst kayıt):** çıkış fiyatları bybit'in kendi
+dolumuyla oluştu. Gerçekte dolum stop'a yaklaşsaydı **daha çok işlem
+stop'a çarpardı** ve kazananların bir kısmı hiç hayatta kalmazdı. Yani
++350,89R bir tahmin değil, **üst sınırdır**. Mekanizmanın yönü ve
+asimetrisi kesin; büyüklüğü abartılıdır.
+
+**midas tarafı:** bu, M3'ün (dolum kuralı her işleme peşin zarar yazıyor)
+**ters bacağıdır**. Aynı kural normal durumda kötümser (bölgenin kötü
+ucundan doldurur), gap durumunda iyimser (stop'un dibinden doldurur).
+İki bacağın net etkisi ölçülmedi. Kilit-2 kohortunda gap dolumlu tek
+kazanan JNJ; o +2,29R olsaydı kohort NET'i −3,43R yerine ≈ −9,05R,
+maksimum düşüş 8,90R yerine ≈ 9,05R olurdu (yani 8R aşımı JNJ'ye bağlı
+değil, JNJ olmadan **daha derin**).
+
+---
+
+### G2 — Ters yön: tetik kuralı. bybit'te AÇIK MADDE
+
+midas 2 Ağustos'ta (konsey 5/5, "%100 dolum iyimserliği") tetiği bölgenin
+dibine çekti: *bölgenin yakın ucuna bir tık dokunmak dolum saymaz;
+emirler elle giriliyor, 30–60 sn gecikme var.* **Bu düzeltme bybit'e hiç
+taşınmadı** — bybit hâlâ tek tık dokunuşta dolum yazıyor.
+
+Ölçüm (bybit defteri, 1338 kapanmış dolum — G1 koşusundan sonra bir
+işlem daha kapandığı için sayı bir fazla):
+
+| | n | toplam R |
+|---|---:|---:|
+| midas tetiğiyle **dolmayacak** kayıt | **149** (%11,1) | **+178,87** |
+| — WIN | 92 | +217,02 |
+| — LOSS | 49 | −49,00 |
+| — EXPIRED | 8 | +10,85 |
+
+Bu alt küme çıkarılsaydı defter **+6,96R → −171,91R**, beklenti
++0,005 → **−0,145 R/işlem**. Yalnız temiz kohortta (blocked=0): 340 işlem
++64,36R, bunun +66,86R'si bu 45 kayıttan — yani temiz kohort da
+**eksiye** düşerdi (≈ −2,50R).
+
+Başka bir deyişle: **bybit defterinin artıda görünmesinin tamamı, midas'ın
+üç hafta önce iyimser bulup terk ettiği tetik kuralından geliyor.**
+
+Bu bir hüküm değil, bir soru: bölgeye asılı **duran limit emri** varsa tek
+tık dokunuş gerçekten doldurur (borsa emri sırayla eşler). Elle, sinyal
+geldikten sonra giriliyorsa doldurmaz. midas'ın konseyi ikincisine karar
+vermişti. İki bot da elle giriliyor. **Karar toplantısına.**
+
+---
+
+### Yapılan (kod DEĞİŞTİRİLMEDİ)
+
+- `midas/tests/test_ikiz_gap_dolum.py` — 4 test, davranışı sabitler:
+  gap dalının tetiklendiği, paydanın 2,50'den 1,00'a düştüğü, aynı
+  çıkışta R'nin 1,00R yerine 5,00R yazıldığı, ve **zarar kolunda iki
+  kuralın da tam −1R verdiği** (asimetri kanıtı).
+  Kırmızı kanıtı: gap dalı kapatılmış kopyada 2 test KIRILDI
+  (`assert 4.0 < 0.01` — R 5,00 yerine 1,00).
+- `bybit/tests/test_invariants.py::test_gap_acilisinda_bile_dolum_bolge_kenarindan`
+  — dolumun bölge kenarına bağlı kalmasını zorunlu kılar; gap dalının
+  sonradan buraya taşınmasını engeller.
+  Kırmızı kanıtı: midas gap dalı eklenmiş kopyada test KIRILDI
+  (dolum 99,0 geldi, 101,0 bekleniyordu).
+- G2 için **test yazılmadı**: orada bir kusur değil, iki meşru kural
+  arasında bir **seçim** var. Karar verilmeden değişmezlik yazmak, kararı
+  test dosyasına gizlice gömmek olur.
+
+### Açık iş
+
+1. **bybit:** G2 kararı — tetik bölgenin dibine mi çekilecek? Defterin
+   tamamının işaretini değiştirdiği için kilit süreci konusudur.
+2. **midas:** M3 + G1 birlikte ölçülmeli. Dolum kuralının iki bacağının
+   net etkisi bilinmiyor; `alpaca_mirror` tam da bunu ayırt etmek için
+   yazılmıştı (13 çift, kademe 1).

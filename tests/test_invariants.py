@@ -482,3 +482,60 @@ def test_kline_request_never_exceeds_provider_cap():
     assert gonderilen["limit"] <= bc._KLINE_CAP, (
         f"tavan ustu limit istendi: {gonderilen['limit']} > "
         f"{bc._KLINE_CAP} - saglayici sessizce kirpar")
+
+
+# --------------------------------------------------------- ikiz: gap dolumu
+# IKIZ TARAMASI (2026-08-21). Kaynak: midas kilit-2 kohortunda JNJ +7.91R.
+# midas'in `_evaluate_signal` bloğunda bir GAP DALI var: LONG'da mumun
+# ACILISI entry_min'in altindaysa dolum acilistan yazilir. Dolum stop'a
+# yaklastigi icin R paydasi kuculur ve R sisir. Olculdu (midas): tasarim
+# riski 4.00 -> fiili 1.475, R +2.29 yerine +7.91.
+#
+# Bu depoda o dal YOK: dolum her zaman bolgenin ilk degen kenarindan
+# (LONG entry_max, SHORT entry_min). Bybit defterinde 1337 kapanmis dolum
+# olculdu, 1337'sinin de dolum fiyati TAM kenarda.
+#
+# Karsi-olgusal olcum (midas kurali bu deftere uygulansaydi): 1337
+# kaydin 173'u (%12.9) gap dalini tetiklerdi, payda ortalama 3.39 kat
+# kucuk olurdu, o alt kumenin toplami +4.03R yerine +350.89R cikardi.
+#
+# Asagidaki test o dalin buraya SONRADAN tasinmasini engeller.
+# Ayrinti: docs/ikiz-depo-notu.md, madde G1.
+
+def test_gap_acilisinda_bile_dolum_bolge_kenarindan(tmp_path):
+    """HATA SINIFI: dolum fiyatini mumun acilisina baglamak.
+
+    Acilis bolgenin otesine gap yaptiginda 'daha iyi fiyattan dolduk'
+    demek defteri kotumser degil IYIMSER yapar: dolum stop'a yaklasir,
+    R paydasi kuculur, kazananlar sisir. Zarar tarafi -1R'ye capali
+    oldugu icin etki TEK YONLUDUR (beklentiyi yukari iter).
+
+    Bu test dolumun bolge kenarina bagli kalmasini zorunlu kilar.
+    """
+    tracker, db = _make_tracker(tmp_path)
+    d = _signal()                       # LONG, bolge 100-101, stop 98, tp1 106
+    ltf = fx.make_series(np.full(70, 101.5))
+    ltf.candles[-1].ts = 1_000_000
+    assert tracker.maybe_track(d, ltf) is True
+
+    # Mum 1: acilis 99.0 -> bolgenin (100.0) ALTINDA gap. Bolge yine de
+    #        katediliyor (high 101.2 >= entry_max 101).
+    # Mum 2: tp1 106 gorulur.
+    db.executemany(
+        "INSERT OR IGNORE INTO candles(symbol,interval,ts,open,high,low,"
+        "close,volume) VALUES(?,?,?,?,?,?,?,?)",
+        [("TESTUSDT", "15", 1_000_000, 99.0, 101.2, 98.5, 100.5, 1000.0),
+         ("TESTUSDT", "15", 1_900_000, 102.0, 106.5, 101.5, 106.2, 1000.0)])
+    tracker.evaluate_open("TESTUSDT")
+
+    row = db.query_one("SELECT * FROM signals")
+    assert row["fill_price"] == 101.0, (
+        f"dolum {row['fill_price']} - bolge kenari 101.0 olmali. Acilisa "
+        "(99.0) baglanmis olabilir: midas'in gap dali buraya tasinmis.")
+    risk = row["fill_price"] - row["stop_loss"]
+    assert abs(risk - 3.0) < 1e-9, f"R paydasi kaydi: {risk} (beklenen 3.0)"
+    assert row["outcome"] == "WIN"
+    # kenar dolumu: (106-101)/3 = 1.67R | gap dali olsaydi (106-99)/1 = 7.0R
+    assert abs(row["r_multiple"] - 1.67) < 0.02, (
+        f"R {row['r_multiple']} - gap dali tasinmis olabilir (7.0R'ye yakinsa)")
+    assert row["r_multiple"] < 2.0, "R sismis - payda kucultulmus"
