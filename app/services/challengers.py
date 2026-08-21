@@ -111,7 +111,19 @@ FAZ1_TARGET = 50                # sampiyonla ayni sinav esigi
 # -24.36R, CI [-0.25, +0.113] -> GECEMEDI. UCUNCU PENCERE ILAN EDILMEZ;
 # S1 emekli degil (kenar-olumu kosulu olusmadi), olcum icin kosar.
 # Kayit arsiv raporlamasi icin kalir (config-lock.md 2026-08-20 tutanagi).
-VALIDATION_WINDOWS = {"S1_TSMOM": "2026-08-12T00:00:00Z"}
+# S2 (2026-08-21, Serhat onayi): SECIM sinavini GECTI - PROJEDE ILK
+# (165 kume, net +95.77R, kume-CI [+0.027, +0.432]). Coklu karsilastirma
+# kurali geregi hukum, ilan ANINDAN SONRA toplanan yeni kohorttan verilir;
+# pencere baslangici ilan aninin ILERISINE yuvarlandi (ilan-oncesi veri
+# kohorta SIZAMAZ). Hukum ani artik insana birakilmaz: dogrulama kohortu
+# 50. kumesini doldurdugunda VALIDATION_* alarmi ilan eder (S1 dersi).
+VALIDATION_WINDOWS = {"S1_TSMOM": "2026-08-12T00:00:00Z",
+                      "S2_DONCHIAN": "2026-08-21T20:00:00Z"}
+# Muhurlenmis dogrulama hukumleri: stats() dogrulama bloguna yazilir ve
+# VALIDATION_* alarmi bunlar icin SUSAR (hukum verildi, gurultu olmaz).
+# S1 muhru SABITTIR: muhur sonrasi kohortun ralliyle artiya donmesi hukmu
+# ACMAZ - sonuc-bagimli yeniden acma p-hacking'dir (2026-08-21 tutanagi).
+VALIDATION_VERDICTS = {"S1_TSMOM": "GECEMEDI (2026-08-20)"}
 
 # ---- strateji parametre sabitleri: TEK KAYNAK (v1.2, suruklenme yasagi) ----
 # Hem _generate() hem STRATEGY_INFO (pano detay penceresi) BU sabitleri okur;
@@ -1178,6 +1190,7 @@ class ChallengerEngine:
                 vboot = measurement.cluster_bootstrap(vclusters)
                 out["strategies"][strat]["validation"] = {
                     "start_utc": vstart,
+                    "verdict": VALIDATION_VERDICTS.get(strat),
                     "decided": len(vdecided),
                     "net_r": round(vnet, 2),
                     "clusters": len(vclusters),

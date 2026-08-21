@@ -370,3 +370,31 @@ payıydı (−0.053); doğrulama değil. ÜÇÜNCÜ PENCERE İLAN EDİLMEZ.
 S1 emekli DEĞİLDİR (kenar-ölümü koşulu — CI üst < 0 — oluşmadı):
 ölçüm/kıyas değeri için koşmaya devam eder, umut statüsü düşmüştür.
 VALIDATION_WINDOWS kaydı arşiv raporlaması için kodda kalır.
+
+# ============================================================
+# 2026-08-21 — S2 SEÇİM SINAVINI GEÇTİ (PROJEDE İLK) + DOĞRULAMA İLANI
+# ============================================================
+
+## S2_DONCHIAN: Faz-1 seçim koşulu SAĞLANDI
+2026-08-21 defteri (rejim-2 kohortu): 165 kapanmış küme (hedef 50),
+net +95.77R, küme-CI **[+0.027, +0.432]**, E_net +0.221. İki yıllık
+disiplinde "≥50 küme VE küme-CI alt sınırı > 0" koşulunu sağlayan İLK
+aday. Bağlam dürüstlüğü: alt sınır sıfırın üstüne hızlı-yükseliş
+haftasında çıktı — tam da bu yüzden hüküm SEÇİMLE VERİLMEZ.
+
+## DOĞRULAMA PENCERESİ İLANI (Serhat onayı "tamam")
+Çoklu karşılaştırma kuralı (challengers-design.md) gereği: hüküm, ilan
+ANINDAN SONRA toplanan yeni kohorttan verilir. Pencere başlangıcı:
+**2026-08-21T20:00:00Z** (ilan anının İLERİSİNE yuvarlandı; ilan-öncesi
+veri kohorta sızamaz). Koşul aynen: yeni kohortta ≥50 kapanmış küme VE
+küme-CI alt sınırı > 0. Kurallar/tavan/maliyet DEĞİŞMEZ.
+
+## HÜKÜM ANI KURALI (S1 dersi; süreç düzeltmesi — ön-kayıt)
+S1 hükmü 90. kümede elle okunmuştu; mühürden SONRA kohort ralliyle
+artıya döndü (+35.15R, 95 küme). HÜKÜM SABİTTİR — sonuç-bağımlı yeniden
+açma p-hacking'dir; S1 statüsü değişmez. Alınan ders kurallaştırıldı:
+bundan böyle doğrulama hükmünün ANI insana bırakılmaz — kohort 50.
+kümesini doldurduğunda botun önceden-ilanlı alarmı hükmü ilan eder:
+CI alt > 0 → VALIDATION_GATE_MET; değilse VALIDATION_SAMPLE_FULL.
+Mühürlü hükümler (VALIDATION_VERDICTS) için alarm susar. Kırmızı-önce
+testli (test_alarms_announce_validation_verdict_moment).

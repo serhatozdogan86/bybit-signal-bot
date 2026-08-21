@@ -137,6 +137,30 @@ def evaluate(stats: dict, diagnostics: dict | None = None,
                     INFO, "CHALLENGER_DEAD",
                     f"{name}: kume-CI ust siniri {ci[1]} < 0 "
                     f"({s.get('clusters')} kume) - aday eleniyor."))
+            # dogrulama penceresi hukum ANI (on-kayit 2026-08-21, S1 dersi:
+            # hukum insana birakilmaz, 50. kumede bot ilan eder). Muhurlu
+            # hukum (verdict dolu) icin susar - hukum verildi, gurultu yok.
+            va = s.get("validation")
+            if va and not va.get("verdict") and (
+                    va.get("clusters") or 0) >= (
+                    va.get("target_clusters") or 50):
+                vci = va.get("ci") or [None, None]
+                if vci[0] is not None and vci[0] > 0:
+                    out.append(_alarm(
+                        WARNING, "VALIDATION_GATE_MET",
+                        f"{name}: dogrulama kohortu doldu "
+                        f"({va.get('clusters')} kume) VE kume-CI alt siniri "
+                        f"{vci[0]} > 0 - dogrulama GECILDI. Karar "
+                        "toplantisi gerekiyor.",
+                        "challengers-design.md dogrulama"))
+                else:
+                    out.append(_alarm(
+                        WARNING, "VALIDATION_SAMPLE_FULL",
+                        f"{name}: dogrulama kohortu doldu "
+                        f"({va.get('clusters')} kume) ama CI kosulu "
+                        f"saglanmadi (alt {vci[0]}) - hukum: gecemedi. "
+                        "Karar toplantisi gerekiyor.",
+                        "challengers-design.md dogrulama"))
 
     return {
         "checked_utc": datetime.now(timezone.utc).strftime(

@@ -795,7 +795,8 @@ def test_s1_validation_window_measured_separately(tmp_path):
     assert v["clusters"] == 2
     assert v["target_clusters"] == 50
     # pencere ilani olmayan stratejide validation alani yok
-    assert "validation" not in eng.stats()["strategies"]["S2_DONCHIAN"]
+    # (S2 2026-08-21'de pencere aldi; ornek artik S8)
+    assert "validation" not in eng.stats()["strategies"]["S8_FUNDSQUEEZE"]
 
 
 def test_strategy_info_texts_have_ru_entries():
@@ -816,3 +817,55 @@ def test_strategy_info_texts_have_ru_entries():
             if f'"{txt}"' not in DASHBOARD_HTML:
                 missing.append(f"{strat}: {txt[:50]}…")
     assert not missing, f"RU sozlugunde eksik metin: {missing}"
+
+
+def test_s2_validation_window_declared_and_s1_verdict_sealed():
+    """2026-08-21: S2 SECIM sinavini GECTI (projede ilk) -> dogrulama
+    penceresi ilan edildi. S1'in dogrulama hukmu MUHURLU: pencere kaydi
+    arsiv icin durur, verdict alani hukmu tasir (sonuc-bagimli yeniden
+    acma yasak)."""
+    from app.services.challengers import (VALIDATION_VERDICTS,
+                                          VALIDATION_WINDOWS)
+    assert "S2_DONCHIAN" in VALIDATION_WINDOWS
+    assert VALIDATION_WINDOWS["S2_DONCHIAN"].startswith("2026-08-21")
+    assert VALIDATION_VERDICTS["S1_TSMOM"].startswith("GECEMEDI")
+    # stats() verdict'i dogrulama bloguna tasir
+    eng, db = _eng_v()
+    db.execute("INSERT INTO challenger_signals(strategy,pair,direction,"
+               "created_utc,entry_ts,entry,stop,tp,timeout_bars,cluster_id,"
+               "status,outcome,r_multiple,hold_bars,regime) VALUES("
+               "'S1_TSMOM','AUSDT','LONG','2026-09-01T00:00:00Z',1,100,98,"
+               "106,192,'S1:L1','CLOSED','WIN',3.0,20,2)")
+    v = eng.stats()["strategies"]["S1_TSMOM"]["validation"]
+    assert v["verdict"].startswith("GECEMEDI")
+    v2 = eng.stats()["strategies"]["S2_DONCHIAN"].get("validation")
+    assert v2 is not None and v2.get("verdict") is None
+
+
+def _eng_v():
+    from app.services.database import Database
+    db = Database(":memory:")
+    return ChallengerEngine(db, "15"), db
+
+
+def test_alarms_announce_validation_verdict_moment():
+    """ON-KAYIT (2026-08-21, S1 dersi): dogrulama hukmunun ANI insana
+    birakilmaz - kohort 50. kumesini doldurdugunda botun alarmi ilan eder:
+    CI alt > 0 -> VALIDATION_GATE_MET; degilse VALIDATION_SAMPLE_FULL.
+    Muhurlu hukum (verdict dolu) icin alarm SUSAR."""
+    from app.services import alarms
+    def ch(clusters, ci, verdict=None):
+        return {"max_open": {}, "strategies": {"S2_DONCHIAN": {
+            "open": 0, "clusters": 200, "ci": [0.1, 0.4],
+            "validation": {"clusters": clusters, "target_clusters": 50,
+                           "ci": ci, "net_r": 10.0, "decided": 60,
+                           "verdict": verdict,
+                           "start_utc": "2026-08-21T20:00:00Z"}}}}
+    codes = lambda c: [a["code"] for a in alarms.evaluate({}, None, c)["alarms"]]
+    assert not [x for x in codes(ch(30, [0.1, 0.4])) if "VALIDATION" in x]
+    assert "VALIDATION_GATE_MET" in codes(ch(50, [0.05, 0.4]))
+    assert "VALIDATION_SAMPLE_FULL" in codes(ch(55, [-0.1, 0.3]))
+    assert "VALIDATION_SAMPLE_FULL" in codes(ch(55, None))   # CI yoksa da dolu
+    # muhurlu hukum: sessiz
+    assert not [x for x in codes(ch(90, [0.2, 0.5], "GECEMEDI (2026-08-20)"))
+                if "VALIDATION" in x]

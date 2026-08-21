@@ -33,8 +33,10 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
   (kilit penceresi maksDD 20.15R > 20R; tutanak config-lock.md). Üçüncü
   kilit YOK; şampiyon VERİ KAYNAĞI statüsünde koşar. v2 tasarımı ana
   gündem: docs/v2-tasarim.md (~2 hafta; çıkış-lab + S2 CI seyri girdi).
-  Umut sıralaması (08-20): S2 (+47R, CI alt −0.055 — Faz-1'e en yakın),
-  S11, S8/S12.
+  Umut sıralaması (08-21): **S2 SEÇİM SINAVINI GEÇTİ — projede ilk**
+  (165 küme, net +95.8R, CI [+0.03,+0.43]); doğrulama penceresi
+  2026-08-21T20:00Z'de açıldı (hüküm: yeni 50 küme + CI alt > 0; hüküm
+  anını VALIDATION_* alarmı ilan eder — S1 dersi). Sonra S11, S8/S12.
   Perakende araştırması: docs/perakende-arastirmasi-2026-08-17.md.
   S5+TSM momentum ailesi RAFTA (90g backtest kenar yok; raftan çıkma
   tetiği docs/ideas.md). S-ATT1 (Wikipedia dikkat) backtestte ELENDİ
