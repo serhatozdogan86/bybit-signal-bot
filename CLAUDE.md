@@ -44,6 +44,10 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
   Korelasyon aleti (Faz A): /correlation, app/services/correlation.py.
   Çıkış laboratuvarı (V0 sabit / V1 iz süren; salt ölçüm): /exitlab,
   app/services/exit_lab.py — hüküm kuralı ön-kayıtlı (ideas.md 08-17).
+  MALİYET DAYANIKLILIĞI (08-27, ölçüldü + ön-kayıt): ölen motorların
+  çoğu HAM olarak artıdaydı; net'i maliyet öldürdü (dar stop → büyük
+  pozisyon → büyük komisyon). v2 kısıtı: maliyet/işlem ≤ 0.05R, dar
+  stop yasak — v2-tasarim.md "GİRDİ 0". Maliyet modeli v0 GEVŞETİLMEZ.
 - v2 şampiyon henüz TASARLANMADI; tasarlanırsa ÖN-KAYITLA yeni aday olur.
 - S1: seçim penceresi kıl payı geçemedi (CI alt −0.05); DOĞRULAMA
   penceresi de doldu ve GEÇEMEDİ (2026-08-20: 90 küme, net −24.4R,

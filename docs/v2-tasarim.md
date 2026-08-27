@@ -28,12 +28,82 @@ KİLİT-2 sınavı bu dosyadan etkilenmez.
 3. **Çıkış laboratuvarı (V0 sabit / V1 iz süren):** hüküm kuralı
    ön-kayıtlı, veri birikiyor. v2'nin çıkış tasarımı bu hükümle seçilir
    ("çıkış girişten belirleyici" — midas ikiz bulgusuyla uyumlu).
-4. **S1 gözlemi:** tek net-pozitif veteran (+11.8R, CI alt −0.10).
-   Trend/TSMOM bileşeni v2'de giriş ailesi adayı; doğrulama penceresi
-   sürüyor, hükmü beklenir.
+4. **S1 gözlemi (GÜNCEL 2026-08-27):** doğrulama penceresi 2026-08-20'de
+   GEÇEMEDİ hükmüyle mühürlendi. Rakamı sonradan şişti (+89.9R) ama
+   küme-CI alt sınırı hiçbir gün sıfırı geçmedi (bugün −0.045) — trend
+   bileşeni v2'ye "kanıtlı" değil, "denenmiş-belirsiz" girer.
 5. **S11/S12 erken verisi:** sıkışma önkoşulu ve göreli-hacim kapısı
    (perakende araştırması kısa listesi) canlıda; küme dolunca v2 girişine
    aday öğe olurlar.
+
+## ⭐ GİRDİ 0 — MALİYET DAYANIKLILIĞI (ölçüldü 2026-08-27, Serhat onayı)
+
+**Bu, v2'nin BİRİNCİ tasarım kısıtıdır.** Diğer girdiler "hangi giriş?"
+sorusuna cevap arar; bu girdi "giriş ne olursa olsun hayatta kalır mı?"
+sorusunu cevaplar.
+
+### Bulgu: ölenlerin çoğunu kötü giriş değil, MALİYET öldürdü
+Canlı defterden (2026-08-27) ham (maliyetsiz) ve net R yan yana:
+
+| Motor | Ham R | Net R | Maliyet/işlem | Durum |
+|---|---|---|---|---|
+| Şampiyon | **+52.66** | −33.55 | **0.216R** | kilit-1 ve -2 GEÇEMEDİ |
+| S7 Wyckoff | **+30.11** | −246.52 | **0.359R** | EMEKLİ (CI üst < 0) |
+| S3 Ort.Dönüş | **+38.70** | −217.27 | **0.261R** | EMEKLİ |
+| S6 Süpürme | −4.40 | −102.64 | 0.208R | EMEKLİ |
+| S1 TSMOM | +143.36 | +111.72 | 0.040R | yaşıyor |
+| S2 Donchian | +88.90 | +65.42 | 0.043R | yaşıyor |
+| S12 RelVol | +22.12 | +15.16 | 0.037R | yaşıyor |
+| S11 Squeeze | +17.41 | +16.47 | **0.027R** | yaşıyor |
+| S8 FundSqueeze | +6.80 | +4.92 | 0.017R | yaşıyor |
+
+Şampiyon, S7 ve S3'ün girişleri HAM olarak ARTIDA. Net'i eksiye çeviren
+maliyet: şampiyonda 86R, S7'de 277R, S3'te 256R. Yaşayan adayların
+maliyet yükü 5–13 KAT daha düşük.
+
+### Mekanizma: aritmetik, gizem yok (DOĞRUDAN ÖLÇÜLDÜ)
+Maliyet modeli v0'da komisyonun R cinsinden yükü
+`2 × taker / stop_frac`; yani **R paydası (stop mesafesi) küçüldükçe
+maliyet büyür**. Gerçek ekonomi: aynı $ riski için dar stop = büyük
+pozisyon = büyük komisyon. Defterdeki son 200 kayıttan ölçülen medyan
+stop genişlikleri ve bunun ima ettiği komisyon yükü:
+
+| Motor | Medyan stop (fiyatın %'si) | Teorik komisyon/işlem |
+|---|---|---|
+| S8 | 15.12% | 0.007R |
+| S11 | 11.18% | 0.010R |
+| S1 | 8.91% | 0.012R |
+| S2 | 8.68% | 0.013R |
+| S12 | 6.30% | 0.017R |
+| S9 GECE | **0.62%** | **0.178R** |
+
+Emekli motorlar için stop genişliği doğrudan ölçülemedi (yeni kayıt
+üretmiyorlar); gözlenen maliyetten geri-çözüldüğünde ~%0.4–0.8 bandına
+düşüyor — hepsi 15dk-ATR veya yapısal (dar) stop kullanıyordu. NOT:
+gözlenen ortalama maliyet, medyan stoptan hesaplanandan yüksektir
+(1/stop_frac dışbükeydir; dar stoplu uçlar ortalamayı yukarı çeker) —
+bu yüzden iki tablo birebir eşleşmez, büyüklük sınıfı eşleşir.
+
+### v2 için tasarım sonucu (ön-kayıt: docs/ideas.md 2026-08-27)
+1. **Maliyet bütçesi ZORUNLU:** v2'nin stop mesafesi, maliyet modeli
+   v0'a göre hesaplanan maliyet/işlem ≤ **0.05R** olacak şekilde
+   seçilir. Bu, veriden türetilmiş bir eşik DEĞİL, tasarım anında
+   formülden hesaplanabilen bir kısıttır (kanıt gerektirmez, aritmetik).
+2. **Dar stop yasağı:** 15dk-ATR veya "fitilin hemen ötesi" tipi stoplar
+   v2'ye giremez — bu ailenin dört mezarı var.
+3. **Çıkış tasarımı buna bağlıdır:** maliyet işlem başına ~sabit
+   olduğundan, ortalama kazancı büyütmek (iz süren çıkış) maliyet
+   oranını doğrudan düşürür. Çıkış laboratuvarı hükmü bu girdiyle
+   BİRLİKTE okunacak.
+4. **Az ve güçlü işlem:** 800 işlemde 0.14R, 100 işlemde 0.5R'den çok
+   daha kırılgandır (maliyet her işlemde tekrar alınır).
+
+### YASAK (kayda geçer)
+Bu bulgu, maliyet modelini yumuşatmak için KULLANILAMAZ. "Maliyet
+modeli v0 gevşetilse şampiyon artıya geçer" akıl yürütmesi, sonuca
+bakıp kural değiştirmektir (Kural 4/5 ihlali) ve projenin tüm
+hükümlerini geçersiz kılar. Maliyet gerçektir; motor maliyete
+DAYANACAK şekilde tasarlanır.
 
 ## Dış denetim v2 düzeltme listesi (dis-denetim-2026-08-17.md)
 - B1: hacim oranı, tetik barı ANINDAKİ SMA20'ye göre hesaplanmalı

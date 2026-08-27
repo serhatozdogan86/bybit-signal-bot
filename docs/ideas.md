@@ -562,3 +562,28 @@ ICP makale adı 2 denemede çözülemedi — dürüstçe dışlandı); fiyatla k
   yazılan ters-nedensellik riskinin ta kendisi.
 - Falsifikasyon maliyeti: 1 gün alet + ~10 dk VM koşusu; canlı risk 0.
   Momentum ailesi gibi RAFA bile girmez — ELENDİ arşivine.
+
+## MALİYET DAYANIKLILIĞI — v2 TASARIM ÖN-KAYDI (2026-08-27, Serhat onayı)
+Kaynak: canlı defter maliyet analizi (docs/v2-tasarim.md "GİRDİ 0";
+ham vs net R + doğrudan ölçülmüş medyan stop genişlikleri).
+GÖZLEM (geçmişe dönük, hüküm DEĞİL): ölen motorların çoğunun girişi ham
+olarak artıdaydı (şampiyon +52.66R, S7 +30.11R, S3 +38.70R); net'i
+eksiye çeviren, işlem başına 0.21–0.36R'lik maliyet yüküydü. Yaşayan
+adaylarda bu yük 0.017–0.043R. Mekanizma aritmetik: maliyet modeli
+v0'da komisyonun R yükü = 2 × taker / stop_frac.
+
+ÖN-KAYIT (v2 tasarlanmadan ÖNCE donduruldu; gelecek veride sınanacak):
+- v2, maliyet modeli v0'a göre hesaplanan maliyet/işlem ≤ 0.05R
+  kısıtıyla tasarlanır. Bu eşik VERİDEN TÜRETİLMİŞ bir karar kuralı
+  değildir: tasarım anında formülden hesaplanır (stop_frac ≥ ~%3 demek);
+  hiçbir geçmiş sonuca bakılarak ayarlanmayacaktır.
+- 15dk-ATR / fitil-ötesi tipi DAR stoplar v2'ye giremez.
+- v2 adaylığı yine standart sınavla ölçülür (≥50 küme + küme-CI alt > 0);
+  maliyet kısıtı sınavı KOLAYLAŞTIRMAZ, yalnız tasarımı sınırlar.
+- YASAK: bu bulgu maliyet modeli v0'ı gevşetmek için kullanılamaz;
+  gevşetme sonuca-bakarak-kural-değiştirmedir ve tüm hükümleri geçersiz
+  kılar. Maliyet sabiti değişmez.
+BEKLENEN YANLIŞLAMA: geniş stoplu tasarım da sınavı geçemezse, hipotez
+("maliyet yükü ana kısıttır") ZAYIFLAR ve kayda geçer — S1/S2/S11/S12
+zaten geniş stoplu ve hiçbiri henüz kapı açmadı; bu, hipotezin tek
+başına yeterli olmadığının ŞİMDİDEN bilinen sınırıdır.
