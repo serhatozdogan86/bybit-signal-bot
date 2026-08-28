@@ -486,6 +486,10 @@ DASHBOARD_HTML = r"""<!doctype html>
         grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px;
         padding-top:8px;border-top:1px dashed var(--line)}
     .sigwrap td.c-id{display:none}
+    /* aday tablosu 8 sutunla mobilde tasardi (.app overflow-x:hidden ->
+       kirpilir, kaydirilamaz): maliyet sutunu gizlenir, bilgi DETAY
+       penceresinde tam olarak durur */
+    .c-cost{display:none}
     /* alt sekme cubugu */
     .tabbar{display:grid;grid-template-columns:repeat(5,1fr);
         position:fixed;left:0;right:0;bottom:0;z-index:50;
@@ -1023,6 +1027,9 @@ const RU={
 "ворота объёма: объём открытия ≥ 2× среднего за 20 дней; режим/funding не учитываются",
 "Şimdi yenile":"Обновить сейчас","≥ 1.5× ort.":"≥ 1.5× сред.",
 "Kenar çubuğu (daralt/genişlet)":"Боковая панель (свернуть/развернуть)",
+"maliyet/işl.":"издержки/сделку","Maliyet / işlem":"Издержки на сделку",
+"İşlem başına maliyet: brüt R ile net R farkının ortalaması (komisyon + stop kayması + fonlama). Dar stop = büyük pozisyon = büyük maliyet. v2 tasarım bütçesi ≤0.05R; sarı 0.05 üstü, kırmızı 0.15 üstü — bu yalnız uyarıdır, hükmü rozet verir.":
+"Издержки на сделку: средняя разница между валовым и чистым R (комиссия + проскальзывание на стопе + фондирование). Узкий стоп = крупная позиция = большие издержки. Бюджет проекта v2 ≤0.05R; жёлтый — выше 0.05, красный — выше 0.15; это лишь предупреждение, вердикт даёт бейдж.",
 "Koyu/Açık tema":"Тёмная/светлая тема",
 "Tüm sonuçlar":"Все результаты","gölge muhasebedir":"— теневой учёт",
 ": varsayımsal giriş, kayma/komisyon yok, gerçek emir yok. Geçmiş performans garanti değildir; yatırım tavsiyesi değildir. Haber başlıkları dış kaynaktan aynen aktarılır.":
@@ -1386,6 +1393,11 @@ let CHAL=null;   // /challengers son yaniti - detay penceresi buradan okur
    Kurallar (on-ilanli): ELENDİ = emekli VEYA kume>=20 ve CI ustu<0;
    kume>=50 -> SINAV BİTTİ (CI alti>0 ise GEÇTİ, degilse GEÇEMEDİ);
    digerleri YARIŞIYOR. */
+/* MALIYET/ISLEM (v2 GIRDI 0): brut-net farkinin islem basina ortalamasi.
+   Renk esigi ON-KAYITLI v2 butcesinden gelir (<=0.05R; ideas.md 08-27) -
+   yalniz GORSEL isarettir, hicbir HUKMU degistirmez (rozet chalVerdict'te). */
+function costTxt(c){return c==null?"—":num(c,3);}
+function costCls(c){return c==null?"":(c>0.15?"neg":c>0.05?"amb":"");}
 function chalVerdict(s){
   if(!s)return null;
   const cl=s.clusters||0, ci=Array.isArray(s.ci)?s.ci:null;
@@ -1400,7 +1412,13 @@ function renderChallengers(ch){
   CHAL=ch;
   const sgn=v=>v==null?"—":(v>0?"+":"")+num(v,2);
   let h='<table class="sig"><thead><tr><th>strateji</th><th>açık</th>'+
-    '<th>sonuç</th><th>WR</th><th>net R</th><th>küme</th><th>CI</th></tr></thead><tbody>';
+    '<th>sonuç</th><th>WR</th><th>net R</th>'+
+    '<th class="r c-cost" title="İşlem başına maliyet: brüt R ile net R '+
+    'farkının ortalaması (komisyon + stop kayması + fonlama). Dar stop = '+
+    'büyük pozisyon = büyük maliyet. v2 tasarım bütçesi ≤0.05R; sarı 0.05 '+
+    'üstü, kırmızı 0.15 üstü — bu yalnız uyarıdır, hükmü rozet verir.'+
+    '">maliyet/işl.</th>'+
+    '<th>küme</th><th>CI</th></tr></thead><tbody>';
   let nRow=0;
   for(const k of Object.keys(CHAL_ADI)){
     const s=ch.strategies[k];if(!s)continue;
@@ -1414,6 +1432,7 @@ function renderChallengers(ch){
        `<td class="num">${s.decided}${s.expired?` <span class="muted">(+${s.expired}e)</span>`:""}</td>`+
        `<td class="num">${wr}</td>`+
        `<td class="num ${s.net_r>0?"pos":s.net_r<0?"neg":""}">${sgn(s.net_r)}</td>`+
+       `<td class="num c-cost ${costCls(s.cost_per_trade)}">${costTxt(s.cost_per_trade)}</td>`+
        `<td class="num">${s.clusters}/${ch.faz1_target||50}</td>`+
        `<td class="num ${ciCls}">${ci}</td></tr>`;
   }
@@ -1448,6 +1467,7 @@ function chalDetail(k){
     g("Kazanma oranı",wr)+
     g("Brüt R",sgn(s.gross_r),s.gross_r>0?"pos":s.gross_r<0?"neg":"")+
     g("Net R",sgn(s.net_r),s.net_r>0?"pos":s.net_r<0?"neg":"")+
+    g("Maliyet / işlem",costTxt(s.cost_per_trade),costCls(s.cost_per_trade))+
     g("Süresi dolan",s.expired||0)+
     g("Açık / tavan",`${s.open} / ${cap==null?"—":cap}`)+
     g("Küme",`${s.clusters}/${CHAL.faz1_target||50}`)+

@@ -1113,6 +1113,11 @@ class ChallengerEngine:
             clusters: dict[str, list[float]] = {}
             gross = net = 0.0
             net_by_id: dict[int, float] = {}     # kohort blogu yeniden kullanir
+            # MALIYET/ISLEM (2026-08-27, v2 GIRDI 0): brut-net farkinin islem
+            # basina ortalamasi. YALNIZ iki degeri de olan kayitlar sayilir
+            # (aksi halde payda ile pay farkli kohortlardan gelirdi).
+            cost_sum = 0.0
+            cost_n = 0
             for r in closed:
                 if r.get("r_multiple") is not None:
                     gross += r["r_multiple"]
@@ -1121,6 +1126,9 @@ class ChallengerEngine:
                     net += n
                     net_by_id[r["id"]] = n
                     clusters.setdefault(r["cluster_id"] or "?", []).append(n)
+                    if r.get("r_multiple") is not None:
+                        cost_sum += r["r_multiple"] - n
+                        cost_n += 1
             boot = measurement.cluster_bootstrap(clusters)
             out["strategies"][strat] = {
                 "open": sum(1 for r in mine if r["status"] == "OPEN"),
@@ -1128,6 +1136,10 @@ class ChallengerEngine:
                 "win_rate": round(wins / len(decided), 3) if decided else None,
                 "expired": sum(1 for r in closed if r["outcome"] == "EXPIRED"),
                 "gross_r": round(gross, 2), "net_r": round(net, 2),
+                # dar stop -> buyuk pozisyon -> buyuk komisyon; bu sutun yeni
+                # adayin PAHALI dogup dogmadigini ilk gunden gosterir
+                "cost_per_trade": (round(cost_sum / cost_n, 3)
+                                   if cost_n else None),
                 "clusters": len(clusters),
                 "ci": ([boot["ci_low"], boot["ci_high"]]
                        if boot and boot.get("ci_low") is not None else None),

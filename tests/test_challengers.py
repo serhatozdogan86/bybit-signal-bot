@@ -869,3 +869,45 @@ def test_alarms_announce_validation_verdict_moment():
     # muhurlu hukum: sessiz
     assert not [x for x in codes(ch(90, [0.2, 0.5], "GECEMEDI (2026-08-20)"))
                 if "VALIDATION" in x]
+
+
+def test_stats_reports_cost_per_trade(tmp_path):
+    """MALIYET/ISLEM olcumu (2026-08-27, v2 GIRDI 0): brut-net farkinin
+    islem basina ortalamasi. Dar stop -> buyuk maliyet; bu sutun yeni
+    adayin pahali dogup dogmadigini ILK GUNDEN gosterir."""
+    eng, db = _eng(tmp_path)
+    ins = ("INSERT INTO challenger_signals(strategy,pair,direction,"
+           "created_utc,entry_ts,entry,stop,tp,timeout_bars,cluster_id,"
+           "status,outcome,r_multiple,hold_bars,regime) VALUES(?,?,'LONG',"
+           "'x',1,100,?,106,192,?,'CLOSED',?,?,20,2)")
+    # GENIS stop (%10): maliyet kucuk
+    db.execute(ins, ("S1_TSMOM", "AUSDT", 90.0, "S1:L1", "WIN", 3.0))
+    db.execute(ins, ("S1_TSMOM", "BUSDT", 90.0, "S1:L2", "LOSS", -1.0))
+    # DAR stop (%0.5): ayni sonuclar, maliyet ~20 kat
+    db.execute(ins, ("S11_SQUEEZE", "CUSDT", 99.5, "S11:L1", "WIN", 3.0))
+    db.execute(ins, ("S11_SQUEEZE", "DUSDT", 99.5, "S11:L2", "LOSS", -1.0))
+    st = eng.stats()["strategies"]
+    genis = st["S1_TSMOM"]["cost_per_trade"]
+    dar = st["S11_SQUEEZE"]["cost_per_trade"]
+    assert genis is not None and dar is not None
+    # brut-net farki = maliyet; islem basina ortalama
+    s1 = st["S1_TSMOM"]
+    assert abs(genis - (s1["gross_r"] - s1["net_r"]) / 2) < 0.01
+    # mekanizma: maliyet 1/stop_frac ile olcekli -> dar stop cok daha pahali
+    assert dar > genis * 10
+    # kapanmamis strateji icin None (uydurma sayi yok)
+    assert st["S12_RELVOL"]["cost_per_trade"] is None
+
+
+def test_dashboard_shows_cost_column():
+    """Sutun panoda: masaustu tablosunda + detay penceresinde; mobilde
+    tablodan gizlenir (yatay tasma yasagi), detayda gorunur."""
+    from app.dashboard import DASHBOARD_HTML
+    assert "cost_per_trade" in DASHBOARD_HTML
+    assert "c-cost" in DASHBOARD_HTML
+    assert "Maliyet / işlem" in DASHBOARD_HTML
+    # mobilde tablo sutunu gizli (detayda kalir)
+    import re
+    mob = re.search(r"@media \(max-width:760px\)\{(.*?)\n  \}",
+                    DASHBOARD_HTML, re.S)
+    assert mob and ".c-cost{display:none}" in mob.group(1)
