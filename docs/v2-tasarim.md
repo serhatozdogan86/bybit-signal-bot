@@ -14,17 +14,28 @@ KİLİT-2 sınavı bu dosyadan etkilenmez.
   buna göre okunmalı).
 - Aday mezarlığı: S3 (ort. dönüş), S6 (süpürme), S4 (ham funding),
   S7 (Wyckoff) — hepsi ilan edilmiş koşulla, canlı veriyle.
-- Rallide öne çıkan (2026-08-20): S2 +47.3R (CI alt −0.055, Faz-1'e en
-  yakın aday), S11 +12R (erken), S12 +6.2R (erken). Kırılım ailesi v2
-  iskeletinin bir numaralı adayı hâline geldi.
+- **S2 (2026-08-30 GÜNCEL):** seçim sınavını 08-21'de GEÇTİ (projede ilk)
+  ama DOĞRULAMA penceresinde GEÇEMEDİ (54 küme, net −77.3R, CI üst sınırı
+  bile eksi). Kırılım ailesi v2 iskeletinin "kanıtlı" adayı DEĞİLDİR;
+  seçim geçişi ralli eseriydi. Üçüncü pencere yok.
+- **Ayakta kalan tek umut (2026-08-30):** S11 (sıkışma, 26 küme, +18.6R,
+  maliyet 0.024R) ve S12 (hacim kapısı, 26 küme, +9.4R). İkisi de genç;
+  hüküm için küme birikmesi gerekiyor.
+- **UYARI (kayda geçer):** ≥50 kümeye ulaşan HER motor sınavı geçemedi.
+  v2, "daha iyi bir giriş kalıbı" arayışıyla değil, GİRDİ 0 (maliyet) +
+  çıkış tasarımı ekseninde kurulmalıdır — giriş kalıbı arayışının bu
+  evrende getirisi ölçülmüş biçimde düşüktür.
 
 ## ÖLÇÜLMÜŞ girdiler (v2 bunları merkeze alır)
 1. **Yön/rejim asimetrisi (v1'in en net dersi):** kilit-2 ara verisi
    LONG −49.3R / SHORT +31.5R (net). v1 rejime rağmen iki yöne de aynı
    iştahla bakıyor. v2'de rejim uyumu süs değil, İSKELET olmalı.
-2. **P4 OI-kohort bulgusu:** kırılımda dOI(24s) ≥ +%5 filtresi backtestte
-   +22R'yi −171R'den ayırdı (BELİRSİZ ama çarpıcı). Canlı gölge-kohort
-   sürüyor; v2 kırılım girişine "katılım kapısı" adayı.
+2. **~~P4 OI-kohort bulgusu~~ → ELENDİ (2026-08-29, canlı):** backtest
+   artışlıyı +22R, artışsızı −171R göstermişti; canlı ileriye dönük veri
+   TERSİNİ verdi (artışlı E_net −0.078 ≤ artışsız +0.078, ön-kayıtlı
+   merdiven → ELENDİ). **OI katılım kapısı v2'den DÜŞTÜ.** Ders: backtest
+   farkı çarpıcıydı ve yanlıştı — ön-kayıt disiplini bu taşı temele
+   koymamızı engelledi. Katılım fikrinin HACİM ayağı (S12) yaşıyor.
 3. **Çıkış laboratuvarı (V0 sabit / V1 iz süren):** hüküm kuralı
    ön-kayıtlı, veri birikiyor. v2'nin çıkış tasarımı bu hükümle seçilir
    ("çıkış girişten belirleyici" — midas ikiz bulgusuyla uyumlu).
@@ -119,13 +130,16 @@ Ortalamaya dönüş (S3 −217R), likidite süpürme dönüşü (S6 −103R),
 ham funding taşıması (S4 −35R, CI üst<0), Wyckoff spring+test (S7,
 CI üst<0), OI-boşaltma dip alımı (P1, backtest), kesitsel momentum +
 TSM sepeti (90g backtest), Wikipedia dikkat şoku (S-ATT1, backtest
-net −22R, CI üst<0). Grid/martingale ve kara-kutu ML zaten kapı dışı
-(perakende raporu tuzak listesi).
+net −22R, CI üst<0), **OI-onaylı kırılım filtresi (P4, canlı kohort
+2026-08-29: artışlı E_net ≤ artışsız — backtest'in tersi)**.
+Grid/martingale ve kara-kutu ML zaten kapı dışı (perakende raporu
+tuzak listesi).
 
-## Süreç (sıra)
-1. Çıkış laboratuvarı + S1 doğrulama + P4 kohort hükümlerini bekle/topla
-   (veri kendiliğinden birikiyor; acele karar yok).
-2. Tasarım taslağı: rejim iskeleti + giriş ailesi (kanıtlı öğelerden) +
-   çıkış (lab hükmüyle) + katılım kapıları (hacim/OI).
+## Süreç (sıra) — GÜNCEL 2026-08-30
+1. Bekleyen tek hüküm: **çıkış laboratuvarı** (V0/V1). S1, S2 ve P4
+   hükümleri MÜHÜRLENDİ; S11/S12 küme biriktiriyor.
+2. Tasarım taslağı: GİRDİ 0 (maliyet bütçesi) + rejim iskeleti + çıkış
+   (lab hükmüyle) + katılım kapısı YALNIZ hacim (OI ayağı elendi).
+   Giriş kalıbı arayışı ARTIK ANA EKSEN DEĞİL (yukarıdaki uyarı).
 3. ideas.md ÖN-KAYIT (kurallar donmuş, tek kurulum, tarama yasak).
 4. Aday olarak sıfırdan sınav (Faz-1: ≥50 küme + küme-CI alt > 0).

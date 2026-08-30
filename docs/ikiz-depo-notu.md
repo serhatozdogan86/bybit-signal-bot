@@ -510,3 +510,15 @@ vermişti. İki bot da elle giriliyor. **Karar toplantısına.**
 2. **midas:** M3 + G1 birlikte ölçülmeli. Dolum kuralının iki bacağının
    net etkisi bilinmiyor; `alpaca_mirror` tam da bunu ayırt etmek için
    yazılmıştı (13 çift, kademe 1).
+
+## P4 hükmü — ikize METODOLOJİK not (2026-08-30)
+
+Kural 3b kapsamı DIŞI (mekanizma hatası/ölçüm aleti değil, bir hipotezin
+hükmü) — bilgilendirme olarak kaydedilir. Önceki P4 girdisi "midas'ta
+UYGULANAMAZ (OI türev kavramı)" diyordu; bu değişmedi.
+TAŞINABİLİR OLAN DERS: P4 backtest'i 2877 işlemde çarpıcı bir fark
+göstermişti (artışlı +22R vs artışsız −171R, E_net farkı +0.113) ve
+"hipotez yönünde" diye kaydedilmişti. Canlı ileriye dönük kohort
+(2026-08-29, 56 ve 80 küme) farkı TERSİNE çevirdi (−0.156). midas'ta
+backtest'e dayanarak canlıya alınan/alınacak her öğe için aynı uyarı
+geçerlidir: backtest budamadır, hüküm ileriye dönük veriden gelir.

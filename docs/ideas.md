@@ -587,3 +587,16 @@ BEKLENEN YANLIŞLAMA: geniş stoplu tasarım da sınavı geçemezse, hipotez
 ("maliyet yükü ana kısıttır") ZAYIFLAR ve kayda geçer — S1/S2/S11/S12
 zaten geniş stoplu ve hiçbiri henüz kapı açmadı; bu, hipotezin tek
 başına yeterli olmadığının ŞİMDİDEN bilinen sınırıdır.
+
+### P4 CANLI HÜKÜM — ELENDİ (2026-08-29 ölçüm / 2026-08-30 mühür)
+Ön-kayıtlı koşul ("her iki kohortta ≥50 küme") 2026-08-29'da sağlandı.
+| Kohort | Küme | E_net | küme-CI |
+|---|---|---|---|
+| OI-ARTIŞLI (ΔOI ≥ +%5) | 56 | **−0.078** | [−0.377, +0.298] |
+| OI-ARTIŞSIZ | 80 | **+0.078** | [−0.246, +0.442] |
+Merdiven (bu dosyada 08-16'da yazıldı): "artışlı E_net ≤ artışsız E_net
+→ ELENDİ". −0.078 ≤ +0.078 → **ELENDİ**; işaret backtest'in TERSİ.
+Backtest artışlıyı +22R, artışsızı −171R göstermişti — canlı veri bunu
+doğrulamadı. Etiketleme sürer (ölçüm durmaz); hüküm oi_cohorts.verdict
+alanında görünür. v2'nin "OI katılım kapısı" girdisi DÜŞTÜ; hacim ayağı
+(S12) ayrı aday olarak yaşamaya devam eder.

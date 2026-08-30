@@ -398,3 +398,61 @@ kümesini doldurduğunda botun önceden-ilanlı alarmı hükmü ilan eder:
 CI alt > 0 → VALIDATION_GATE_MET; değilse VALIDATION_SAMPLE_FULL.
 Mühürlü hükümler (VALIDATION_VERDICTS) için alarm susar. Kırmızı-önce
 testli (test_alarms_announce_validation_verdict_moment).
+
+# ============================================================
+# 2026-08-30 KARAR TOPLANTISI (Serhat onayı: "mühürle")
+# İKİ HÜKÜM: S2 doğrulaması GEÇEMEDİ + P4 filtresi ELENDİ
+# ============================================================
+
+## Madde 1 — S2_DONCHIAN DOĞRULAMA HÜKMÜ: GEÇEMEDİ
+Pencere 2026-08-21T20:00Z'de ilan edilmişti (seçim sınavı 165 kümede
+GEÇİLMİŞTİ — projede ilk). Doğrulama kohortu 2026-08-29'da doldu ve
+hükmü **botun kendi alarmı ilan etti** (VALIDATION_SAMPLE_FULL) — 08-21'de
+kurduğumuz hüküm-anı mekanizması ilk işini yaptı, hüküm insan okumasına
+bırakılmadı.
+Gerçekleşen (2026-08-30 defteri): **54 küme** (hedef 50), net **−77.3R**,
+küme-CI **[−0.627, −0.298]**. Geçmek için CI alt > 0 gerekiyordu.
+DİKKAT ÇEKİCİ: CI'nin ÜST sınırı bile sıfırın altında — bu "kanıt
+bulunamadı" değil, ters yönde belirgin bir sonuç. Seçim geçişinin ralli
+haftasına ait bir eser olduğu tezi doğrulandı; S2'nin GENEL küme-CI'si de
+[−0.108, +0.230]'a gerileyerek 08-21'deki geçişi tamamen sildi.
+SONUÇ: ÜÇÜNCÜ PENCERE İLAN EDİLMEZ (S1 emsali). S2 emekli DEĞİLDİR —
+kenar-ölümü koşulu (genel CI üst < 0) oluşmadı; ölçüm/kıyas için koşar,
+umut statüsü düşer. VALIDATION_VERDICTS kaydı girildi → alarm susar.
+
+## Madde 2 — P4 (OI-ONAYLI KIRILIM FİLTRESİ): ELENDİ
+Ön-kayıt: docs/ideas.md 2026-08-16 (kurallar backtest KOŞULMADAN
+donduruldu). Canlı gölge-kohort 2026-08-16'da açıldı; hüküm koşulu
+"her iki kohortta ≥50 küme" 2026-08-29'da sağlandı.
+
+| Kohort | Küme | Kapanmış | E_net | küme-CI |
+|---|---|---|---|---|
+| OI-ARTIŞLI (ΔOI ≥ +%5) | 56 | 84 | **−0.078** | [−0.377, +0.298] |
+| OI-ARTIŞSIZ | 80 | 219 | **+0.078** | [−0.246, +0.442] |
+
+Ön-kayıtlı merdiven: *"FİLTRE ELENDİ: OI-ARTIŞLI E_net ≤ OI-ARTIŞSIZ
+E_net (teyit katkı vermiyor) VEYA OI-ARTIŞLI küme-CI üst < 0."*
+−0.078 ≤ +0.078 → **ELENDİ**. Üstelik işaret backtest'in TERSİ yönde.
+
+BACKTEST vs CANLI (projenin en öğretici karşıtlığı):
+- Backtest (2026-08-16, 2877 işlem): artışlı +22.32R / artışsız −170.88R;
+  E_net farkı +0.113 — "çarpıcı ve hipotez yönünde" diye kaydedilmişti.
+- Canlı ileriye dönük (2026-08-29): fark −0.156, İŞARET TERS.
+DERS: geçmişe bakan analiz çarpıcı bir fark gösterdi; ileriye dönük
+ölçüm o farkın tesadüf olduğunu ortaya çıkardı. "Backtest hüküm değil,
+budamadır" kuralının canlı kanıtı. Bu, ön-kayıt disiplininin bu projede
+ölçülen EN NET getirisidir: filtre v2'ye kanıtsız girseydi, temele
+konmuş çürük bir taş olurdu.
+
+SONUÇ: OI-onay kapısı v2 tasarımından DÜŞTÜ (v2-tasarim.md girdi #2
+güncellendi). Etiketleme DURMAZ — ölçüm sürer, arşiv büyür, hüküm
+oi_cohorts.verdict alanında görünür (sessiz kaybolma yok).
+NOT: "katılım kapısı" fikri tamamen ölmedi — HACİM ayağı (S12_RELVOL)
+ayrı bir aday olarak yaşıyor (26 küme, +9.4R). Ölen, OI ayağıdır.
+
+## Genel tablo (2026-08-30 itibarıyla)
+İstatistiksel olgunluğa (≥50 küme) ulaşan HER motor sınavı geçemedi:
+şampiyon (kilit-1, kilit-2), S1 (seçim + doğrulama), S2 (seçim geçti →
+doğrulama geçemedi), S8 (seçim), + dört emekli (S3/S6/S4/S7) + backtest
+mezarları (P1, S5/TSM, S-ATT1, ve şimdi P4). Ayakta kalan tek umut:
+genç adaylar S11 (26 küme, +18.6R) ve S12 (26 küme, +9.4R).

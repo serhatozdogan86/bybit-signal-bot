@@ -123,7 +123,15 @@ VALIDATION_WINDOWS = {"S1_TSMOM": "2026-08-12T00:00:00Z",
 # VALIDATION_* alarmi bunlar icin SUSAR (hukum verildi, gurultu olmaz).
 # S1 muhru SABITTIR: muhur sonrasi kohortun ralliyle artiya donmesi hukmu
 # ACMAZ - sonuc-bagimli yeniden acma p-hacking'dir (2026-08-21 tutanagi).
-VALIDATION_VERDICTS = {"S1_TSMOM": "GECEMEDI (2026-08-20)"}
+VALIDATION_VERDICTS = {"S1_TSMOM": "GECEMEDI (2026-08-20)",
+                       # S2 (2026-08-30, Serhat onayi): dogrulama
+                       # kohortu doldu (51 kume) ve GECEMEDI -
+                       # net -80.9R, CI [-0.674,-0.342] (UST sinir
+                       # bile eksi). Secim gecisinin ralli eseri
+                       # oldugu dogrulandi. UCUNCU PENCERE YOK;
+                       # S2 emekli DEGIL (kenar-olumu kosulu
+                       # olusmadi), olcum icin kosar.
+                       "S2_DONCHIAN": "GECEMEDI (2026-08-30)"}
 
 # ---- strateji parametre sabitleri: TEK KAYNAK (v1.2, suruklenme yasagi) ----
 # Hem _generate() hem STRATEGY_INFO (pano detay penceresi) BU sabitleri okur;
@@ -174,6 +182,13 @@ S9_TP_RISK = 100.0       # S9: SENTETIK erisilemez hedef (cikis zamanla)
 # etiketi dusulur (kontrat adedi). SALT OLCUM - hicbir karari degistirmez.
 # Backtest bulgusu: artisli kohort +22.32R vs artissiz -170.88R (BELIRSIZ).
 S2_OI_RISE = 0.05        # kohort esigi: dOI(24s) >= +%5 -> "artisli"
+# P4 HUKMU (2026-08-29 olcum, 2026-08-30 muhur - Serhat onayi):
+# her iki kohort >=50 kume doldu; on-kayitli merdiven (ideas.md
+# 2026-08-16) 'artisli E_net <= artissiz E_net -> ELENDI' der.
+# Canli: artisli E_net -0.078 <= artissiz +0.078 -> ELENDI, ustelik
+# backtest'in TERSI yonde. Etiketleme SURER (olcum durmaz, arsiv
+# buyur); hukum kohort blogunda gorunur - sessiz kaybolma yok.
+P4_VERDICT = ("ELENDI (2026-08-29): artisli E_net <= artissiz E_net; backtest bulgusu ileriye donuk veride DOGRULANMADI")
 # S10 52W-HIGH (2026-08-16, on-kayit ideas.md): zirveye yakinlik capasi.
 S10_ANCHOR_D = 365       # S10: zirve penceresi (gun)
 S10_MIN_HIST = 90        # S10: asgari gunluk gecmis
@@ -1183,6 +1198,7 @@ class ChallengerEngine:
                     **coh_out,
                     "unlabeled_closed": len(closed) - len(labeled),
                     "threshold": S2_OI_RISE,
+                    "verdict": P4_VERDICT,
                 }
             # --- on-kayitli dogrulama penceresi muhasebesi (varsa) ---
             vstart = VALIDATION_WINDOWS.get(strat)

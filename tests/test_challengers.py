@@ -838,8 +838,9 @@ def test_s2_validation_window_declared_and_s1_verdict_sealed():
                "106,192,'S1:L1','CLOSED','WIN',3.0,20,2)")
     v = eng.stats()["strategies"]["S1_TSMOM"]["validation"]
     assert v["verdict"].startswith("GECEMEDI")
+    # S2'nin penceresi de var; hukmu 2026-08-30'da muhurlendi (ayri test)
     v2 = eng.stats()["strategies"]["S2_DONCHIAN"].get("validation")
-    assert v2 is not None and v2.get("verdict") is None
+    assert v2 is not None and v2["start_utc"].startswith("2026-08-21")
 
 
 def _eng_v():
@@ -911,3 +912,49 @@ def test_dashboard_shows_cost_column():
     mob = re.search(r"@media \(max-width:760px\)\{(.*?)\n  \}",
                     DASHBOARD_HTML, re.S)
     assert mob and ".c-cost{display:none}" in mob.group(1)
+
+
+def test_s2_validation_verdict_sealed_and_alarm_silenced(tmp_path):
+    """2026-08-30 muhur (Serhat onayi): S2 dogrulama kohortu doldu
+    (51 kume) ve GECEMEDI (CI [-0.674,-0.342]). Muhur kaydi girince
+    VALIDATION_* alarmi SUSAR (hukum verildi, gurultu olmaz); ucuncu
+    pencere ilan EDILMEZ."""
+    from app.services import alarms
+    from app.services.challengers import VALIDATION_VERDICTS
+    assert VALIDATION_VERDICTS["S2_DONCHIAN"].startswith("GECEMEDI")
+    eng, db = _eng(tmp_path)
+    db.execute("INSERT INTO challenger_signals(strategy,pair,direction,"
+               "created_utc,entry_ts,entry,stop,tp,timeout_bars,cluster_id,"
+               "status,outcome,r_multiple,hold_bars,regime) VALUES("
+               "'S2_DONCHIAN','AUSDT','LONG','2026-09-01T00:00:00Z',1,100,"
+               "90,106,192,'S2:L1','CLOSED','LOSS',-1.0,20,2)")
+    va = eng.stats()["strategies"]["S2_DONCHIAN"]["validation"]
+    assert va["verdict"].startswith("GECEMEDI")
+    # muhurlu hukum -> alarm susar (kume 50'yi gecse bile)
+    ch = {"max_open": {}, "strategies": {"S2_DONCHIAN": {
+        "open": 0, "clusters": 227, "ci": [-0.108, 0.23],
+        "validation": {"clusters": 54, "target_clusters": 50,
+                       "ci": [-0.627, -0.298], "net_r": -77.3,
+                       "decided": 100, "verdict": va["verdict"],
+                       "start_utc": "2026-08-21T20:00:00Z"}}}}
+    codes = [a["code"] for a in alarms.evaluate({}, None, ch)["alarms"]]
+    assert not [c for c in codes if "VALIDATION" in c]
+
+
+def test_p4_cohort_verdict_sealed(tmp_path):
+    """P4 (OI onay filtresi) ELENDI (2026-08-29): her iki kohort >=50 kume
+    doldu; on-kayitli merdiven (ideas.md 08-16) 'artisli E_net <= artissiz
+    E_net -> ELENDI' diyor. Hukum kohort blogunda GORUNUR (arsiv kendi
+    kendini aciklar); olcum durmaz, etiket toplanmaya devam eder."""
+    from app.services.challengers import P4_VERDICT
+    assert P4_VERDICT.startswith("ELENDI")
+    eng, db = _eng(tmp_path)
+    db.execute("INSERT INTO challenger_signals(strategy,pair,direction,"
+               "created_utc,entry_ts,entry,stop,tp,timeout_bars,cluster_id,"
+               "status,outcome,r_multiple,hold_bars,regime,doi_24h) VALUES("
+               "'S2_DONCHIAN','AUSDT','LONG','x',1,100,90,106,192,'S2:L1',"
+               "'CLOSED','WIN',3.0,20,2,0.09)")
+    oc = eng.stats()["strategies"]["S2_DONCHIAN"]["oi_cohorts"]
+    assert oc["verdict"] == P4_VERDICT
+    # olcum SURUYOR: kohort sayaclari hala doluyor (hukum sayaci durdurmaz)
+    assert oc["oi_artisli"]["closed"] == 1

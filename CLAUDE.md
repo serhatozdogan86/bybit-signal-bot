@@ -33,10 +33,13 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
   (kilit penceresi maksDD 20.15R > 20R; tutanak config-lock.md). Üçüncü
   kilit YOK; şampiyon VERİ KAYNAĞI statüsünde koşar. v2 tasarımı ana
   gündem: docs/v2-tasarim.md (~2 hafta; çıkış-lab + S2 CI seyri girdi).
-  Umut sıralaması (08-21): **S2 SEÇİM SINAVINI GEÇTİ — projede ilk**
-  (165 küme, net +95.8R, CI [+0.03,+0.43]); doğrulama penceresi
-  2026-08-21T20:00Z'de açıldı (hüküm: yeni 50 küme + CI alt > 0; hüküm
-  anını VALIDATION_* alarmı ilan eder — S1 dersi). Sonra S11, S8/S12.
+  S2: seçim sınavını 08-21'de GEÇTİ (projede ilk) ama DOĞRULAMA
+  penceresinde GEÇEMEDİ (08-30 mühür: 54 küme, net −77.3R, CI
+  [−0.63,−0.30] — üst sınır bile eksi; ralli eseriydi). Üçüncü pencere
+  YOK; emekli değil. P4 (OI-onay filtresi) ELENDİ (08-29: artışlı E_net
+  −0.078 ≤ artışsız +0.078, backtest'in TERSİ) — v2'nin OI kapısı düştü,
+  hacim ayağı (S12) yaşıyor. ≥50 kümeye ulaşan HER motor sınavı geçemedi;
+  ayakta kalan umut: S11 (26 küme) ve S12 (26 küme), ikisi de genç.
   Perakende araştırması: docs/perakende-arastirmasi-2026-08-17.md.
   S5+TSM momentum ailesi RAFTA (90g backtest kenar yok; raftan çıkma
   tetiği docs/ideas.md). S-ATT1 (Wikipedia dikkat) backtestte ELENDİ
