@@ -522,3 +522,15 @@ göstermişti (artışlı +22R vs artışsız −171R, E_net farkı +0.113) ve
 (2026-08-29, 56 ve 80 küme) farkı TERSİNE çevirdi (−0.156). midas'ta
 backtest'e dayanarak canlıya alınan/alınacak her öğe için aynı uyarı
 geçerlidir: backtest budamadır, hüküm ileriye dönük veriden gelir.
+
+## Çıkış laboratuvarı yedeğe girdi — ikiz kontrolü (2026-09-01)
+
+Kural 3b (ölçüm aleti / izleme altyapısı): çıkış laboratuvarı raporu
+artık gist yedeğine `0_exitlab.json` olarak yazılıyor — uzaktan izlenmesi
+için. Gerekçe sınıfı DAHA ÖNCE yaşandı: aday verisi yedeğe girmediği için
+bir süre uzaktan denetlenememişti (test_challenger_stats_in_gist_backup).
+midas'ta karşılığı: midas'ın çıkış laboratuvarı (V0–V4) VAR ve daha
+olgun; yedeğine/uzaktan raporuna girip girmediği O TARAFTA kontrol
+edilmeli — bu depodan yazma erişimi yok, midas oturumuna AÇIK İŞ olarak
+bırakıldı. Aynı sınıf boşluk orada da varsa aynı desenle kapatılır
+(payload'a ekle + fail-soft + değişmezlik testi).

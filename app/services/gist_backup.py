@@ -97,6 +97,9 @@ class GistBackup:
             "0_decisions.json": json.dumps(self._tracker.recent_decisions(2000), indent=2),
             "0_challengers.json": json.dumps(
                 self._challenger_payload(), indent=2),
+            # cikis laboratuvari (2026-09-01): uzaktan izlenebilsin diye
+            # yedege girer - aday verisinde ayni bosluk yasanmisti
+            "0_exitlab.json": json.dumps(self._exitlab_payload(), indent=2),
             "0_commentary.json": json.dumps(
                 self._commentary.recent(6) if self._commentary else [],
                 indent=2),
@@ -116,6 +119,20 @@ class GistBackup:
                 files[f"candles_{symbol}_{interval}.csv"] = _candles_csv(
                     rows[-self._candle_max_rows:])
         return files
+
+    def _exitlab_payload(self) -> dict:
+        """Cikis lab raporu (V0/V1). Aday motoruyla AYNI DB baglantisini
+        kullanir; salt-okur. Hata yedegi COKMEZ (fail-soft, aday deseni)."""
+        eng = getattr(self, "_challengers", None)
+        if eng is None:
+            return {"note": "aday motoru bagli degil"}
+        try:
+            from app.services import exit_lab
+            from app.services.challengers import SAMPLING_REGIME
+            return exit_lab.build_report(eng._db, SAMPLING_REGIME)
+        except Exception:
+            log.exception(kv(event="exitlab_backup_error"))
+            return {"note": "cikis lab yedegi hata verdi; sonraki senkronda tekrar"}
 
     def _challenger_payload(self) -> dict:
         eng = getattr(self, "_challengers", None)

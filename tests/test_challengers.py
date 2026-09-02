@@ -958,3 +958,25 @@ def test_p4_cohort_verdict_sealed(tmp_path):
     assert oc["verdict"] == P4_VERDICT
     # olcum SURUYOR: kohort sayaclari hala doluyor (hukum sayaci durdurmaz)
     assert oc["oi_artisli"]["closed"] == 1
+
+
+def test_exitlab_in_gist_backup_payload(tmp_path):
+    """IZLEME BOSLUGU: cikis laboratuvari yedege girmezse uzaktan izlenemez
+    (aday verisinde ayni bosluk yasanmisti). build_files 0_exitlab.json
+    icermeli; motor bagli degilse yedek COKMEmeli."""
+    from unittest.mock import MagicMock
+    from app.services.gist_backup import GistBackup
+    tracker, db = _make_tracker(tmp_path)
+    eng = ChallengerEngine(db, "15")
+    gb = GistBackup(MagicMock(), tracker, symbols=["TESTUSDT"],
+                    intervals=["15"])
+    gb.set_challengers(eng)
+    files = gb.build_files()
+    assert "0_exitlab.json" in files
+    payload = json.loads(files["0_exitlab.json"])
+    assert payload["variants"] == ["V0_SABIT", "V1_IZ"]
+    assert "v0_fidelity_mismatch" in payload and "strategies" in payload
+    # motor baglanmadan yedek yine ayakta (fail-soft)
+    gb2 = GistBackup(MagicMock(), tracker, symbols=["TESTUSDT"],
+                     intervals=["15"])
+    assert "0_exitlab.json" in gb2.build_files()
