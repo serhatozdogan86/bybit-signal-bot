@@ -38,8 +38,11 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
   [−0.63,−0.30] — üst sınır bile eksi; ralli eseriydi). Üçüncü pencere
   YOK; emekli değil. P4 (OI-onay filtresi) ELENDİ (08-29: artışlı E_net
   −0.078 ≤ artışsız +0.078, backtest'in TERSİ) — v2'nin OI kapısı düştü,
-  hacim ayağı (S12) yaşıyor. ≥50 kümeye ulaşan HER motor sınavı geçemedi;
-  ayakta kalan umut: S11 (26 küme) ve S12 (26 küme), ikisi de genç.
+  hacim ayağı (S12) yaşıyor. ≥50 kümeye ulaşan HER motor sınavı geçemedi
+  (09-05: S11 de 50 kümede geçemedi); sınava girmemiş TEK aday S12.
+  ÇIKIŞ LAB ARA OKUMASI (09-05, hüküm DEĞİL): 1×R iz süren çıkış
+  trend/kırılım ailesinde geri tepiyor (S2 +30.6 → −30.1); tüm fark-CI'ler
+  sıfırı içeriyor. Tek iz mesafesi ölçüldü — başkası YENİ ön-kayıt ister.
   Perakende araştırması: docs/perakende-arastirmasi-2026-08-17.md.
   S5+TSM momentum ailesi RAFTA (90g backtest kenar yok; raftan çıkma
   tetiği docs/ideas.md). S-ATT1 (Wikipedia dikkat) backtestte ELENDİ

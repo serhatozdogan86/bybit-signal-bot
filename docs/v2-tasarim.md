@@ -18,9 +18,11 @@ KİLİT-2 sınavı bu dosyadan etkilenmez.
   ama DOĞRULAMA penceresinde GEÇEMEDİ (54 küme, net −77.3R, CI üst sınırı
   bile eksi). Kırılım ailesi v2 iskeletinin "kanıtlı" adayı DEĞİLDİR;
   seçim geçişi ralli eseriydi. Üçüncü pencere yok.
-- **Ayakta kalan tek umut (2026-08-30):** S11 (sıkışma, 26 küme, +18.6R,
-  maliyet 0.024R) ve S12 (hacim kapısı, 26 küme, +9.4R). İkisi de genç;
-  hüküm için küme birikmesi gerekiyor.
+- **Ayakta kalan umut (GÜNCEL 2026-09-05):** S11 seçim örneklemini
+  DOLDURDU (50 küme) ve GEÇEMEDİ (net +14.9R, CI [−0.146, +0.488]);
+  ölüm koşulu oluşmadı, koşmaya devam ediyor ama umut listesinden düştü.
+  Sınava girmemiş TEK aday kaldı: S12 (39 küme, +18.1R). S9 ölüm eşiğine
+  yakın (22 küme, CI üst +0.033).
 - **UYARI (kayda geçer):** ≥50 kümeye ulaşan HER motor sınavı geçemedi.
   v2, "daha iyi bir giriş kalıbı" arayışıyla değil, GİRDİ 0 (maliyet) +
   çıkış tasarımı ekseninde kurulmalıdır — giriş kalıbı arayışının bu
@@ -36,9 +38,41 @@ KİLİT-2 sınavı bu dosyadan etkilenmez.
    merdiven → ELENDİ). **OI katılım kapısı v2'den DÜŞTÜ.** Ders: backtest
    farkı çarpıcıydı ve yanlıştı — ön-kayıt disiplini bu taşı temele
    koymamızı engelledi. Katılım fikrinin HACİM ayağı (S12) yaşıyor.
-3. **Çıkış laboratuvarı (V0 sabit / V1 iz süren):** hüküm kuralı
-   ön-kayıtlı, veri birikiyor. v2'nin çıkış tasarımı bu hükümle seçilir
-   ("çıkış girişten belirleyici" — midas ikiz bulgusuyla uyumlu).
+3. **Çıkış laboratuvarı (V0 sabit / V1 iz süren) — ARA OKUMA 2026-09-05,
+   HÜKÜM DEĞİL.** Tam defter yeniden oynatıldı: 5340 işlem, V0 sadakat
+   uyumsuzluğu 0 (alet defteri birebir üretiyor). Fark = V1 − V0:
+
+   | Motor | Küme | V0 net | V1 net | Fark E | Fark-CI | Durum |
+   |---|---|---|---|---|---|---|
+   | S1 | 295 | +72.75 | +14.51 | −0.047 | [−0.114, +0.013] | BELİRSİZ |
+   | S2 | 285 | +30.56 | **−30.10** | −0.075 | [−0.164, +0.016] | BELİRSİZ |
+   | S12 | 39 | +18.13 | −1.12 | −0.054 | [−0.182, +0.054] | veri birikiyor |
+   | S11 | 50 | +14.94 | +17.23 | +0.026 | [−0.064, +0.113] | BELİRSİZ |
+   | S8 | 123 | −6.67 | +1.20 | +0.035 | [−0.049, +0.126] | BELİRSİZ |
+   | S7 (ölü) | 108 | −250.31 | −192.75 | +0.075 | [−0.032, +0.181] | BELİRSİZ |
+
+   **Hiçbiri hüküm değildir** — tüm fark-CI'leri sıfırı içeriyor
+   (ön-kayıtlı kural: ≥50 küme VE fark-CI alt > 0 → V1 üstün).
+   YÖN BİLGİSİ (tasarım girdisi): trend/kırılım ailesinde (S1, S2, S12)
+   1×R iz süren stop **geri tepiyor** — S2'yi artıdan eksiye çeviriyor.
+   Mekanizma makul: bu motorlar uzun tutuşla yaşıyor; 1 risk mesafesinde
+   peşi sıra gelen stop, olağan dalgalanmada pozisyonu erken atıyor.
+   Perakende araştırmasının ve midas'ın "kazananı koştur" fikri bu
+   evrene BU HALİYLE transfer olmuyor.
+
+   **KAPSAM UYARISI:** yalnız TEK iz mesafesi (1×R) ölçüldü ve bu görece
+   DAR bir iz. Sonuç "iz süren çıkış kötüdür" DEĞİL, "1×R iz bu
+   motorlarda daha kötü"dür. Daha geniş iz (2×R, 3×R…) denemek YENİ
+   ÖN-KAYIT ister — bu ara okumaya bakarak "en iyi mesafeyi" seçmek
+   arka kapıdan parametre taramasıdır ve YASAKTIR (Kural 4/5).
+
+   **METODOLOJİK KAYIT (kendi hatam, kayda geçer):** 2026-09-01'de bu
+   aletin KISMİ örneklemine (son ~200 sinyalden 61 işlem, geri çekilme
+   haftası) bakıp "V1 her stratejide önde" demiştim; aynı mesajda
+   "örneklem taraflı, tek rejimden hüküm çıkmaz" diye uyarmıştım.
+   Tam defter bunu TERSİNE çevirdi. Uyarı doğruydu, okuma yanlıştı.
+   P4 dersiyle aynı sınıf: kısmi/geçmişe dönük bakış ile ön-kayıtlı tam
+   ölçüm farklı sonuç verir; hüküm YALNIZ ikincisinden gelir.
 4. **S1 gözlemi (GÜNCEL 2026-08-27):** doğrulama penceresi 2026-08-20'de
    GEÇEMEDİ hükmüyle mühürlendi. Rakamı sonradan şişti (+89.9R) ama
    küme-CI alt sınırı hiçbir gün sıfırı geçmedi (bugün −0.045) — trend
