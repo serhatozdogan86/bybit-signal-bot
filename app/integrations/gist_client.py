@@ -76,6 +76,20 @@ class GistClient:
                          error=str(exc)[:150]))
             return False
 
+    def list_gist_files(self, gist_id: str) -> list[str]:
+        """Gist'teki dosya ADLARI (meta okur, ICERIK INDIRMEZ).
+
+        fetch_gist icerik cozer (bu gist ~33 MB); budama icin yalniz adlar
+        gerekir. Hata -> bos liste (budama atlanir, yedekleme durmaz)."""
+        try:
+            r = self._session.get(f"{_API}/gists/{gist_id}", timeout=_TIMEOUT)
+            r.raise_for_status()
+            return list(r.json().get("files", {}).keys())
+        except requests.RequestException as exc:
+            log.error(kv(event="gist_list_error", gist_id=gist_id,
+                         error=str(exc)[:150]))
+            return []
+
     def fetch_gist(self, gist_id: str) -> dict[str, str] | None:
         """Gist dosyalarini {isim: icerik} olarak dondurur (truncation'i cozer)."""
         try:

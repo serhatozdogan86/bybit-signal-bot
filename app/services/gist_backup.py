@@ -28,6 +28,15 @@ log = logging.getLogger("gist_backup")
 MARKER = "bybit-signal-bot-data (auto-managed, do not rename)"
 
 
+# GitHub SERT siniri: gist basina 300 dosya. 2026-09-18 arizasi tam bu
+# sinirda yasandi (7 istatistik + 150 parite x 2 dilim = 307 -> 422 ve 13
+# gun yedeksizlik). Tavan margin birakilarak 280'e cekildi; mum yedegi de
+# yalniz EN INCE dilimi tasir (degerlendirme/restore onu kullanir, HTF her
+# taramada canli cekilir) -> tipik yuk 7 + 150 = 157 dosya.
+MAX_GIST_FILES = 280
+_PRUNE_PER_SYNC = 60       # tek PATCH'i sismemek icin budama parca parca
+
+
 def _candles_csv(rows: list[dict]) -> str:
     buf = io.StringIO()
     buf.write("ts,open,high,low,close,volume\n")
@@ -113,12 +122,47 @@ class GistBackup:
             pairs = self._tracker.signal_pairs()   # yalnizca sinyal ureten pariteler
         else:
             pairs = self._symbols()
+        # YALNIZ en ince dilim yedeklenir (2026-09-18 arizasi): degerlendirme
+        # ve restore LTF mumlarini kullanir; HTF her taramada Bybit'ten taze
+        # cekildigi icin arsivi kurtarma acisindan kritik degil.
+        iv = self._backup_interval()
         for symbol in pairs:
-            for interval in self._intervals:
-                rows = self._tracker.export_candles(symbol, interval)
-                files[f"candles_{symbol}_{interval}.csv"] = _candles_csv(
-                    rows[-self._candle_max_rows:])
+            if len(files) >= MAX_GIST_FILES:
+                log.warning(kv(event="gist_file_budget_hit",
+                               limit=MAX_GIST_FILES, pairs=len(pairs),
+                               note="fazla parite yedege girmedi"))
+                break
+            rows = self._tracker.export_candles(symbol, iv)
+            files[f"candles_{symbol}_{iv}.csv"] = _candles_csv(
+                rows[-self._candle_max_rows:])
         return files
+
+    def _backup_interval(self) -> str:
+        """Yedeklenecek mum dilimi: en ince olan (sayisal en kucuk)."""
+        return min(self._intervals,
+                   key=lambda i: int(i) if str(i).isdigit() else 10**9)
+
+    def _prune_list(self, keep: dict) -> dict[str, None]:
+        """Gist'te duran ama artik GONDERILMEYEN mum dosyalari -> silme emri.
+        Yalniz candles_* dokunulur; istatistik dosyalari ASLA silinmez.
+        Adlar meta-cagriyla alinir (icerik indirilmez); hata -> bos."""
+        if self._gist_id is None:
+            return {}
+        try:
+            existing = self._client.list_gist_files(self._gist_id)
+        except Exception:
+            log.exception(kv(event="gist_prune_list_error"))
+            return {}
+        stale = [n for n in existing
+                 if n.startswith("candles_") and n.endswith(".csv")
+                 and n not in keep]
+        if not stale:
+            return {}
+        # butceyi asmamak icin parca parca (kalanlar sonraki senkronda)
+        room = max(0, MAX_GIST_FILES - len(keep))
+        cut = stale[:min(_PRUNE_PER_SYNC, room)]
+        log.info(kv(event="gist_prune", stale=len(stale), removing=len(cut)))
+        return {n: None for n in cut}
 
     def _exitlab_payload(self) -> dict:
         """Cikis lab raporu (V0/V1). Aday motoruyla AYNI DB baglantisini
@@ -148,6 +192,7 @@ class GistBackup:
 
     def sync(self) -> bool:
         files = self.build_files()
+        prune = self._prune_list(files)
         if self._gist_id is None:
             self._gist_id = self._client.find_gist(MARKER)
         if self._gist_id is None:
@@ -155,6 +200,7 @@ class GistBackup:
             ok = self._gist_id is not None
         else:
             payload = dict(files)
+            payload.update(prune)      # artik gonderilmeyen mumlari sil
             if not self._legacy_cleanup_done:
                 # eski adsiz-onekli dosyalari bir kez temizle (null = sil)
                 for legacy in ("performance.json", "signals.json",

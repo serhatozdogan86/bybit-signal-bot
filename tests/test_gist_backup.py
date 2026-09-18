@@ -69,8 +69,11 @@ def test_sync_creates_then_updates_and_payload_complete(tmp_path):
     gid = backup.info()["gist_id"]
     files = client.storage[gid]
     for expected in ("0_performance.json", "0_signals.json", "0_decisions.json",
-                     "candles_BTCUSDT_15.csv", "candles_BTCUSDT_240.csv", "README.md"):
+                     "candles_BTCUSDT_15.csv", "README.md"):
         assert expected in files
+    # 2026-09-18 arizasi: HTF mumlari artik yedege GIRMEZ (gist 300 dosya
+    # siniri asilmisti). Sozlesme tests/test_gist_file_limit.py'de.
+    assert "candles_BTCUSDT_240.csv" not in files
     assert json.loads(files["0_performance.json"])["open_signals"] == 1
     assert files["candles_BTCUSDT_15.csv"].count("\n") == 70  # header + 69 kapanmis bar
 

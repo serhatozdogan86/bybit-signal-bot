@@ -534,3 +534,24 @@ olgun; yedeğine/uzaktan raporuna girip girmediği O TARAFTA kontrol
 edilmeli — bu depodan yazma erişimi yok, midas oturumuna AÇIK İŞ olarak
 bırakıldı. Aynı sınıf boşluk orada da varsa aynı desenle kapatılır
 (payload'a ekle + fail-soft + değişmezlik testi).
+
+## Gist 300-dosya sınırı arızası — ikiz kontrolü (2026-09-18)
+
+Kural 3b kapsamında: bu bir **mekanizma/altyapı hatası** ve ikizde aynı
+sınıf risk VARDIR — midas da gist yedeği kullanıyorsa aynı 300-dosya
+duvarına toslar (GitHub'ın gist başına sert sınırı). Bizde 13 gün
+yedeksiz kalındı ve fark edilmesi bir haftayı buldu.
+Bizdeki düzeltme deseni (midas'a birebir taşınabilir):
+1. `MAX_GIST_FILES` bütçesi — istatistik dosyaları önce, mum dosyaları
+   bütçe dolunca kesilir + uyarı loglanır.
+2. Mum yedeği YALNIZ en ince dilim (değerlendirme/restore onu kullanır;
+   HTF her taramada canlı çekiliyor).
+3. Artık gönderilmeyen `candles_*` dosyaları budanır (None = sil), yoksa
+   evren dönüşü yeni adlar ekleyip sayacı tekrar 300'e tırmandırır.
+4. `list_gist_files` — meta-okur (içerik indirmez; bu gist ~33 MB).
+Bu depodan midas'a yazma erişimi yok → **midas oturumuna AÇIK İŞ**:
+gist dosya sayısını ölç (300'e yakınsa acil) ve aynı deseni uygula.
+
+DERS (iki depo için de): izleme kanalı ile arıza kanalı AYNI olmamalı.
+Yedek bozulunca "yedek bozuldu" alarmı da görünmez oldu; arızayı ancak
+yedeğin zaman damgasına bakan dış kontrol yakaladı.

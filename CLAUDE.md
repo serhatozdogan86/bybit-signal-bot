@@ -94,7 +94,11 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
 - Canlı SQLite'a yazan sorgu YASAK; denetim için önce dosyayı kopyala.
 - Uzaktan durum: gist 7841e94325309e69812439897a0c186c
   (codeload.github.com/gist/<id>/tar.gz/HEAD; 0_performance.json,
-  0_signals.json, 0_challengers.json, candles_*.csv).
+  0_signals.json, 0_challengers.json, 0_exitlab.json, candles_*.csv).
+  GITHUB SERT SINIRI: gist başına 300 dosya. 2026-09-18'de tam bu sınır
+  aşıldı (307 dosya → HTTP 422 → 13 gün yedeksiz). Düzeltme: mum yedeği
+  yalnız EN İNCE dilim + MAX_GIST_FILES=280 bütçesi + artık
+  gönderilmeyen candles_* dosyalarının budanması.
 - Rotalar: /verify /alarms /measurement /challengers /correlation
   /exitlab (DASHBOARD_TOKEN'lı).
 - Bybit API bazı ortamlardan coğrafi engelli; VM'den erişilir.
