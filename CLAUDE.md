@@ -31,8 +31,13 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
   (08-12) + S4/S7 (08-18, CHALLENGER_DEAD; slot devri YOK — config-lock
   08-18 tutanağı). KİLİT-2 HÜKMÜ (2026-08-20): GEÇEMEDİ — yanlışlama #2
   (kilit penceresi maksDD 20.15R > 20R; tutanak config-lock.md). Üçüncü
-  kilit YOK; şampiyon VERİ KAYNAĞI statüsünde koşar. v2 tasarımı ana
-  gündem: docs/v2-tasarim.md (~2 hafta; çıkış-lab + S2 CI seyri girdi).
+  kilit YOK; şampiyon VERİ KAYNAĞI statüsünde koşar.
+  ŞAMPİYON v1 DOSYASI KAPANDI (2026-09-18 mühür, config-lock.md):
+  yanlışlama #1 KENAR ÖLÜMÜ tetiklendi — kilit kohortunda 197 küme,
+  küme-CI ÜST sınırı −0.028 < 0; maksDD 100.6R (tavan 20R'nin 5 katı).
+  Hüküm ön-kayıtlı alarm kanalından okundu. Motor durmaz, umut statüsü
+  SIFIR; hiçbir v2 bileşeni canlı sonuçlarına dayandırılamaz.
+  v2 tasarımı artık TEK gündem: docs/v2-tasarim.md (çıkış-lab girdi).
   S2: seçim sınavını 08-21'de GEÇTİ (projede ilk) ama DOĞRULAMA
   penceresinde GEÇEMEDİ (08-30 mühür: 54 küme, net −77.3R, CI
   [−0.63,−0.30] — üst sınır bile eksi; ralli eseriydi). Üçüncü pencere

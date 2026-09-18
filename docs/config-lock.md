@@ -456,3 +456,90 @@ ayrı bir aday olarak yaşıyor (26 küme, +9.4R). Ölen, OI ayağıdır.
 doğrulama geçemedi), S8 (seçim), + dört emekli (S3/S6/S4/S7) + backtest
 mezarları (P1, S5/TSM, S-ATT1, ve şimdi P4). Ayakta kalan tek umut:
 genç adaylar S11 (26 küme, +18.6R) ve S12 (26 küme, +9.4R).
+
+# ============================================================
+# 2026-09-18 KARAR TOPLANTISI (Serhat onayı: "mühürle")
+# ŞAMPİYON (breakout_retest): KENAR ÖLÜMÜ — v1 DOSYASI KAPANDI
+# ============================================================
+
+## Madde 1 — YANLIŞLAMA #1 (KENAR ÖLÜMÜ) TETİKLENDİ
+Hüküm, ön-kayıtlı kanaldan okundu (2026-08-20 dersi: hüküm YALNIZ ilan
+edilmiş alarm kanalından okunur, pano kartları ara göstergedir). VM
+scheduler günlüğü, 2026-09-18:
+
+    WARNING | scheduler | event=alarm code=EDGE_DEATH
+      msg=kume-CI ust siniri -0.028 < 0 (197 kume) - onceden ilan
+          edilmis kenar olumu kriteri tetiklendi.
+    WARNING | scheduler | event=alarm code=MAX_DD
+      msg=maksimum dusus 100.6R > 20.0R esigi.
+
+Ölçüm penceresi: KİLİT-2 kohortu (`bootstrap_since_lock`,
+ACTIVE_LOCK_UTC = 2026-08-13T00:00:00Z). maksDD de kilit-içi
+(`max_drawdown_r(since_lock=True)`).
+
+**197 kapanmış küme, küme-CI ÜST sınırı −0.028.** Üst sınırın bile
+sıfırın altında olması "kanıt bulunamadı" değildir; ters yönde belirgin
+bir sonuçtur — S2'nin 08-30 doğrulamasıyla aynı imza. Eşik 20 kümeydi;
+197 küme ile örneklem tartışılacak gibi değil.
+
+## Madde 2 — İKİNCİ YANLIŞLAMA DA AÇIK
+maksDD 100.6R, ilan edilmiş 20R tavanının **5 katı**. KİLİT-2 zaten
+20.15R ile 08-20'de bu kriterden düşmüştü; aradaki dört haftada düşüş
+100.6R'ye çıktı. Yani motor yalnız "kenarını yitirmiş" değil, kilit
+penceresinde ağır kayıp üretmiştir.
+
+## HÜKÜM
+Şampiyon **breakout_retest** motorunun v1 dosyası KAPANDI. İki ayrı
+ön-kayıtlı yanlışlama kriteri (kenar ölümü + maksDD) bağımsız olarak
+tetiklendi. ÜÇÜNCÜ KİLİT İLAN EDİLMEZ (KİLİT-2 tutanağı, 08-20: üçüncü
+kilit yok). Sonuç-bağımlı yeniden açma p-hacking'dir.
+
+STATÜ: motor DURDURULMAZ — **VERİ KAYNAĞI** olarak koşmaya devam eder
+(mum arşivi, küme etiketleme, çıkış laboratuvarı ve korelasyon aleti
+onun defterinden beslenir). Umut statüsü SIFIRDIR; hiçbir karar, hiçbir
+v2 bileşeni onun canlı sonuçlarına dayandırılamaz.
+`app/strategies/` DONMUŞ kalır (Kural 1) — hüküm mühürlendi diye motor
+kurcalanmaz; donmuş motor, ölçüm aletinin kalibrasyonudur.
+
+## Madde 3 — GENEL TABLO (projenin bilançosu, 2026-09-18)
+İstatistiksel olgunluğa (≥50 kapanmış küme) ulaşan **HER** motor
+sınavı geçemedi. İstisna YOK:
+
+| Motor | Pencere | Sonuç |
+|---|---|---|
+| Şampiyon breakout_retest | kilit-1 | GEÇEMEDİ (yanlışlama #2 + CI) |
+| Şampiyon breakout_retest | kilit-2 | GEÇEMEDİ (08-20 maksDD) → **09-18 KENAR ÖLÜMÜ** |
+| S1_TSMOM | seçim + doğrulama | GEÇEMEDİ (08-20) |
+| S2_DONCHIAN | seçim GEÇTİ → doğrulama | GEÇEMEDİ (08-30) |
+| S8_FUNDING | seçim | GEÇEMEDİ |
+| S11_SQUEEZE | seçim (50 küme) | GEÇEMEDİ (09-05) |
+| S3, S6 | — | EMEKLİ (08-12, kenar ölümü) |
+| S4, S7 | — | EMEKLİ (08-18, CHALLENGER_DEAD) |
+| P1, S5/TSM, S-ATT1, P4 | backtest / gölge kohort | ELENDİ |
+
+Sınava **hiç girmemiş tek aday: S12_RELVOL** (hacim-kapılı seans
+kırılımı). Ondan başka canlı umut yoktur.
+
+SONUÇ: v2 tasarımı (docs/v2-tasarim.md) artık **tek gündem**dir. v1'in
+bıraktığı bağlayıcı girdiler: GİRDİ 0 (maliyet dayanıklılığı —
+maliyet/işlem ≤ 0.05R, dar stop yasak), OI kapısının düşmesi (P4),
+çıkış-lab ara okuması (hüküm değil; yeni ön-kayıt ister).
+
+## Madde 4 — SÜREÇ DERSİ: İZLEME KANALI ile ARIZA KANALI AYNI OLAMAZ
+Bu hüküm 13 gün GEÇ okundu. Sebep: 2026-09-05'te gist yedeği 300-dosya
+sert sınırına çarpıp sustu (HTTP 422). Gist, hem uzaktan izleme
+penceresi hem felaket-kurtarma kopyasıydı; o kırılınca dışarıdan bakan
+göz "bot mu öldü, yedek mi öldü" ayrımını yapamadı.
+Dürüst tespit: **alarm mekanizması çalışıyordu** — STALE_BACKUP
+(eşik 3 saat) 13 gün boyunca ötmüştü. Kusur ilan etmekte değil,
+ilan edileni Serhat'a ULAŞTIRMAKTAydı: alarmın tek çıkışı panoydu,
+panoya da bakan yoktu.
+KURAL (bundan böyle bağlayıcı): bir arızayı BİLDİREN yolun, o arızadan
+ETKİLENMEYEN bir yol olması gerekir. Yedek kanalının sağlığı, yedek
+kanalının kendisinden okunamaz.
+Yapılan (2026-09-18): 300-dosya sınırı düzeltildi — mum yedeği yalnız
+en ince dilim, MAX_GIST_FILES=280 bütçesi, yetim candles_* budaması;
+sınıfı kapatan 4 kırmızı-önce test (tests/test_gist_file_limit.py).
+AÇIK MADDE (v2 gündemine): panodan bağımsız bir bildirim yolu
+(örn. dışarıdan çekilen sağlık ucu veya ikinci bir kanal). Ön-kayıt
+gerektirmez — ölçüm kuralı değil, işletim altyapısıdır.

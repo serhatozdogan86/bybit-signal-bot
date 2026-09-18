@@ -5,10 +5,17 @@ v2 tasarımı bittiğinde kurallar docs/ideas.md'ye ÖN-KAYITLA girer ve v2,
 sıfırdan sınava tabi YENİ ADAY olur. app/strategies/ (v1) donmuş kalır;
 KİLİT-2 sınavı bu dosyadan etkilenmez.
 
-## Neden v2? (güncelleme 2026-08-20 — HÜKÜMLER KESİNLEŞTİ)
+## Neden v2? (güncelleme 2026-09-18 — v1 DOSYASI KAPANDI)
 - v1 şampiyonu KİLİT-1'İ ve KİLİT-2'Yİ geçemedi (kilit-2: yanlışlama #2,
   maksDD 20.15R > 20R, 2026-08-20 tutanağı). Üçüncü kilit YOK; v1 artık
   VERİ KAYNAĞI. v2 tek yol.
+- **2026-09-18 MÜHÜR — KENAR ÖLÜMÜ:** kilit kohortunda 197 kapanmış küme,
+  küme-CI **ÜST** sınırı −0.028 (< 0) → ön-kayıtlı yanlışlama #1
+  tetiklendi; maksDD 100.6R (20R tavanının 5 katı). v1'in umut statüsü
+  SIFIRDIR. **Bağlayıcı sonuç: v2'nin hiçbir bileşeni v1'in canlı
+  sonuçlarına "işe yarıyor" gerekçesiyle dayandırılamaz.** v1 defterinden
+  alınabilecek tek şey ÖLÇÜM (maliyet, çıkış, rejim asimetrisi) —
+  performans DEĞİL. Tutanak: config-lock.md 2026-09-18.
 - S1 doğrulaması da geçemedi (90 küme, net −24.4R) — trend bileşeni v2'ye
   "kanıtlı" değil "denenmiş-belirsiz" statüsüyle girer (aşağıdaki madde 4
   buna göre okunmalı).
