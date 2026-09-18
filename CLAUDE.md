@@ -38,6 +38,13 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
   Hüküm ön-kayıtlı alarm kanalından okundu. Motor durmaz, umut statüsü
   SIFIR; hiçbir v2 bileşeni canlı sonuçlarına dayandırılamaz.
   v2 tasarımı artık TEK gündem: docs/v2-tasarim.md (çıkış-lab girdi).
+  ANATOMİ (2026-09-18, /anatomy — 429 işlem/197 küme): kaybın %96'sı
+  MALİYET. Brüt −3.52R (işlem başına −0.008R = yazı-tura), maliyet
+  −79.33R, maliyet/işlem 0.185R (bütçenin 3.7 katı), stop medyanı %1.4.
+  Sorun giriş kalıbı DEĞİL. Yön/rejim premisi ÇÜRÜDÜ: motor zaten
+  rejim uyumlu (SHORT=bear 59/27, LONG=bull+neutral 370/170 birebir).
+  Kayıp geniş tabanlı (en kötü 5 küme toplamın 1/3'ü; kalan 192 küme
+  hâlâ −55.6R). Aritmetik: 0.05R bütçesi ≥ %3-4 stop ister.
   S2: seçim sınavını 08-21'de GEÇTİ (projede ilk) ama DOĞRULAMA
   penceresinde GEÇEMEDİ (08-30 mühür: 54 küme, net −77.3R, CI
   [−0.63,−0.30] — üst sınır bile eksi; ralli eseriydi). Üçüncü pencere

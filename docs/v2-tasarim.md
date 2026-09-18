@@ -36,9 +36,29 @@ KİLİT-2 sınavı bu dosyadan etkilenmez.
   evrende getirisi ölçülmüş biçimde düşüktür.
 
 ## ÖLÇÜLMÜŞ girdiler (v2 bunları merkeze alır)
-1. **Yön/rejim asimetrisi (v1'in en net dersi):** kilit-2 ara verisi
-   LONG −49.3R / SHORT +31.5R (net). v1 rejime rağmen iki yöne de aynı
-   iştahla bakıyor. v2'de rejim uyumu süs değil, İSKELET olmalı.
+1. **~~Yön/rejim asimetrisi~~ → PREMİSİ YANLIŞ ÇIKTI (2026-09-18, /anatomy):**
+   Ağustos'ta şöyle yazmıştık: *"kilit-2 ara verisi LONG −49.3R /
+   SHORT +31.5R; v1 rejime RAĞMEN iki yöne de aynı iştahla bakıyor;
+   v2'de rejim uyumu süs değil İSKELET olmalı."* Tam defter (197 küme)
+   bu premisi ÇÜRÜTTÜ:
+
+   | Grup | İşlem | Küme | Grup | İşlem | Küme |
+   |---|---|---|---|---|---|
+   | SHORT | 59 | 27 | bear | 59 | 27 |
+   | LONG | 370 | 170 | bull + neutral | 366+4 | 168+2 |
+
+   Sayılar BİREBİR örtüşüyor: motor SHORT'u yalnız bear rejiminde,
+   LONG'u yalnız bull/neutral rejiminde açıyor. **v1 zaten rejim
+   uyumludur.** "İki yöne de aynı iştahla bakıyor" gözlemi yanlıştı —
+   yön ile rejim ayrı iki değişken değil, TEK değişken. Bu eksende
+   v2'ye taşınacak iş YOKTUR; oraya harcanacak tasarım emeği boşa
+   giderdi.
+   SHORT tarafı da umut değildir: 27 küme (eşik 50) → örneklem
+   yetersiz, kanıt sayılmaz. Üstelik maliyeti DAHA yüksek (0.268R/işlem)
+   ve brüt +19.28R'nin net'e yalnız +3.44R'si kalıyor.
+   DERS: 61 işlemlik ara okumadan çıkarılan "en net ders", tam defterde
+   yok oldu. Bu, çıkış-lab'da 09-01'de yaşadığımız hatanın aynısı —
+   kısmi örneklemden hüküm çıkarma. Ara okumalar HÜKÜM DEĞİLDİR.
 2. **~~P4 OI-kohort bulgusu~~ → ELENDİ (2026-08-29, canlı):** backtest
    artışlıyı +22R, artışsızı −171R göstermişti; canlı ileriye dönük veri
    TERSİNİ verdi (artışlı E_net −0.078 ≤ artışsız +0.078, ön-kayıtlı
@@ -93,6 +113,61 @@ KİLİT-2 sınavı bu dosyadan etkilenmez.
 **Bu, v2'nin BİRİNCİ tasarım kısıtıdır.** Diğer girdiler "hangi giriş?"
 sorusuna cevap arar; bu girdi "giriş ne olursa olsun hayatta kalır mı?"
 sorusunu cevaplar.
+
+### ⭐⭐ TAM DEFTER TEYİDİ (2026-09-18, /anatomy — 429 işlem / 197 küme)
+Şampiyonun kilit-2 defteri bu girdiyi tartışmasız hale getirdi:
+
+| Ölçü | Değer |
+|---|---|
+| Brüt (maliyetsiz) R | **−3.52** → işlem başına −0.008R |
+| Maliyet toplamı | **−79.33R** |
+| Net R | **−82.85** |
+| Maliyet/işlem | **0.185R** (bütçe 0.05R'nin 3.7 katı) |
+| Stop mesafesi medyanı | **%1.4** |
+
+**Kaybın %96'sı maliyettir.** Motorun girişi "kötü" değil — brüt olarak
+429 işlemde tam yazı-tura (−0.008R/işlem). Yani v1 bir kenar bulamadı,
+ama bir kenar KAYBETMEDİ de; sadece her işlemde 0.185R bilet parası
+ödedi. İki yıl boyunca "daha iyi bir giriş kalıbı" aradık; ölçüm
+diyor ki sorun giriş kalıbında değildi.
+
+**KONVEKSİTE UYARISI (v2 için kritik):** medyan stop %1.4 ile beklenen
+maliyet ~0.118R; ölçülen 0.185R. Fark, maliyetin stop mesafesiyle TERS
+orantılı olmasından gelir (maliyet ∝ 1/stop) — ortalamayı medyan işlem
+değil, DAR STOPLU AZINLIK belirler. Sonuç: v2'nin kısıtı "ortalama
+maliyet hedefi" olamaz; **sert bir ALT SINIR (minimum stop mesafesi)**
+olmalı. Ortalama hedefi, dar stopların ortalamayı patlatmasını
+engellemez.
+
+### Aritmetik: 0.05R bütçesi için gereken stop mesafesi
+Türetim VERİDEN DEĞİL, **kilitli maliyet sabitlerinden** yapılmıştır
+(taker %0.055 ×2, stop kayması 5bps, funding %0.01/8s) — bu yüzden
+Kural 4'ün "veriden eşik türetme" yasağına girmez; getirilere değil,
+sabitlere dayanır.
+
+| Kayıp oranı | Tutuş | Gereken stop |
+|---|---|---|
+| %50 | 6 saat | ≥ %2.85 |
+| %50 | 24 saat | ≥ %3.30 |
+| %50 | 48 saat | ≥ %3.90 |
+| %60 | 48 saat | ≥ %4.00 |
+
+Yani v2'nin stopu, v1'in medyanının (%1.4) **2–3 katı** olmak
+zorundadır. Bu bir tercih değil, aritmetik zorunluluktur.
+
+### DÜRÜST SINIR — geniş stop KAZANDIRMAZ
+Geniş stop, kâr üretmez; yalnızca maliyet handikapını kaldırır. v1'in
+başabaş olması için işlem başına **+0.185R brüt kenar** gerekiyordu —
+bu gerçekçi olmayan bir talep. Bütçe içinde (0.05R) bu talep +0.05R'ye
+iner. **Hâlâ bir brüt kenara ihtiyacımız var; sadece artık mümkün bir
+kenara.** v2 "geniş stop koyarsak kazanırız" motoru DEĞİLDİR; "kazanma
+ihtimali aritmetik olarak var olan" ilk motorumuzdur.
+
+### Kayıp geniş tabanlı — suçlanacak tek felaket yok
+En kötü 5 küme: −27.21R (toplamın üçte biri). Onlar çıkarılsa bile
+kalan 192 küme −55.64R. En kötü 5 parite (XMR, BTC, ONDO, ALGO, EIGEN)
+yine üçte bir. Tek bir patlama yok; yavaş, yaygın bir kanama var —
+"şu pariteyi/şu günü çıkaralım" türü bir kurtarma yolu YOKTUR.
 
 ### Bulgu: ölenlerin çoğunu kötü giriş değil, MALİYET öldürdü
 Canlı defterden (2026-08-27) ham (maliyetsiz) ve net R yan yana:
