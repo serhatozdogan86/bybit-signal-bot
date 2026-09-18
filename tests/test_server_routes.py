@@ -54,3 +54,32 @@ def test_pwa_manifest_and_icons():
     assert any(i["sizes"] == "512x512" for i in data["icons"])
     icon = client.get("/icon-192.png")
     assert icon.status_code == 200 and icon.data[:4] == b"\x89PNG"
+
+
+def test_anatomy_route_serves_declared_sections():
+    """/anatomy rotasi ILAN EDILMIS bolumleri doner; tracker yoksa 404.
+
+    ?all=1 tum deftere gecer - kilit penceresiyle karistirilmasin diye
+    rota hangi pencerede oldugunu cevabinda YAZAR."""
+    from unittest.mock import MagicMock
+    from app.server import create_app
+    from app.services import anatomy
+
+    tracker = MagicMock()
+    tracker.anatomy_report.side_effect = lambda since_lock=True: {
+        "window": ("KILIT-2 sonrasi" if since_lock else "tum defter"),
+        **{s: {} for s in anatomy.SECTIONS}}
+    app = create_app(MagicMock(get_meta=lambda: {"last_scan_utc": None}),
+                     MagicMock(), tracker)
+    client = app.test_client()
+    body = client.get("/anatomy")
+    assert body.status_code == 200
+    for s in anatomy.SECTIONS:
+        assert s in body.get_json()
+    assert body.get_json()["window"] == "KILIT-2 sonrasi"
+    assert client.get("/anatomy?all=1").get_json()["window"] == "tum defter"
+
+    # golge takip kapaliysa sessiz bos cevap degil, acik 404
+    app2 = create_app(MagicMock(get_meta=lambda: {"last_scan_utc": None}),
+                      MagicMock(), None)
+    assert app2.test_client().get("/anatomy").status_code == 404

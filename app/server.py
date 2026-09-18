@@ -240,6 +240,18 @@ def create_app(store: StateStore, scheduler: Scheduler,
             json.dumps(tracker.diagnostics(), indent=2),
             mimetype="application/json")
 
+    @app.get("/anatomy")
+    def anatomy_view():
+        """Olum sonrasi anatomi: kenar NEDEN yok? Salt olcum, sabit
+        bolumler (Kural 5). ?all=1 -> tum defter, varsayilan kilit sonrasi."""
+        if tracker is None:
+            return jsonify({"error": "shadow tracking disabled"}), 404
+        all_book = request.args.get("all") in ("1", "true", "yes")
+        return app.response_class(
+            json.dumps(tracker.anatomy_report(since_lock=not all_book),
+                       indent=2),
+            mimetype="application/json")
+
     @app.get("/verify")
     def verify_view():
         """Bagimsiz sonuc denetimi: kayitlar mum arsiviyle celisiyor mu?"""

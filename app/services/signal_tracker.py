@@ -29,7 +29,7 @@ from datetime import datetime, timezone
 from app.logging_setup import kv
 from app.models.candle import KlineSeries
 from app.models.decision import Decision, DecisionType, Direction
-from app.services import measurement, verifier
+from app.services import anatomy, measurement, verifier
 from app.services.database import Database
 
 log = logging.getLogger("tracker")
@@ -901,6 +901,20 @@ class SignalTracker:
             peak = max(peak, cum)
             dd = max(dd, peak - cum)
         return round(dd, 2)
+
+    def anatomy_report(self, since_lock: bool = True) -> dict:
+        """OLUM SONRASI ANATOMI (2026-09-18): kenar NEDEN yok?
+
+        Salt okuma. Bolumleri SABIT ve her biri onceden ilan edilmis bir
+        soruya karsilik gelir - ayrintili gerekce app/services/anatomy.py
+        baslik yorumunda (Kural 5 uyumu).
+        """
+        rows = self._db.query(
+            "SELECT id,pair,direction,outcome,entry_min,entry_max,stop_loss,"
+            "fill_price,r_multiple,created_utc,closed_utc,cluster_id,"
+            "market_bias FROM signals WHERE status='CLOSED' AND blocked=0 "
+            "AND outcome IN ('WIN','LOSS')")
+        return anatomy.build_report(rows, cost_r, since_lock=since_lock)
 
     def diagnostics(self) -> dict:
         """Konsey P0-3 teshisleri. Yalniz OKUMA; hicbir esik degistirmez.

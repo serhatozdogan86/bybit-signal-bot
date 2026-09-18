@@ -105,7 +105,11 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
   yalnız EN İNCE dilim + MAX_GIST_FILES=280 bütçesi + artık
   gönderilmeyen candles_* dosyalarının budanması.
 - Rotalar: /verify /alarms /measurement /challengers /correlation
-  /exitlab (DASHBOARD_TOKEN'lı).
+  /exitlab /anatomy (DASHBOARD_TOKEN'lı).
+  /anatomy = ölüm sonrası anatomi (2026-09-18): kenar NEDEN yok?
+  Bölümleri SABİT (yön / rejim / maliyet / yoğunlaşma) — her biri
+  önceden ilan edilmiş bir soru; yeni bölüm eklemek testi kırar
+  (Kural 5). Çıkan hiçbir sayı doğrudan kural olamaz (Kural 4).
 - Bybit API bazı ortamlardan coğrafi engelli; VM'den erişilir.
 
 ## ŞERİTLER (iki Claude çakışmasın)

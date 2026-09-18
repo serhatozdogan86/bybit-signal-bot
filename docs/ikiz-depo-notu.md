@@ -555,3 +555,31 @@ gist dosya sayısını ölç (300'e yakınsa acil) ve aynı deseni uygula.
 DERS (iki depo için de): izleme kanalı ile arıza kanalı AYNI olmamalı.
 Yedek bozulunca "yedek bozuldu" alarmı da görünmez oldu; arızayı ancak
 yedeğin zaman damgasına bakan dış kontrol yakaladı.
+
+## Ölüm sonrası anatomi aleti — ikiz kontrolü (2026-09-18)
+
+Kural 3b kapsamında: bu **yeni bir ölçüm aletidir**
+(`app/services/anatomy.py`, rota `/anatomy`), dolayısıyla ikizde
+karşılığı kontrol edilmelidir.
+
+NE YAPAR: kapanmış defteri dört ÖNCEDEN İLAN EDİLMİŞ eksende ayrıştırır
+— yön (LONG/SHORT), rejim (market_bias), maliyet (GİRDİ 0), yoğunlaşma
+(en kötü kümeler/pariteler) — her alt grup için resmî kümeblok
+bootstrap CI ile. Bölüm listesi `SECTIONS` sabitinde DONMUŞTUR; sessizce
+yeni bölüm eklemek `test_anatomy_sections_are_declared`'ı kırar. Bu,
+aletin p-hacking'e dönüşmesini yapısal olarak engeller (Kural 5).
+
+NEDEN TAŞINMALI: midas'ta da bir motor öldüğünde aynı soru sorulacak —
+"kenar yok" bir hüküm, "neden yok" apayrı bir soru. Bizde bu soru
+197 kümelik defter birikene kadar hiç sorulmadı; alet yoktu diye.
+
+KRİTİK TASARIM AYRINTISI (taşınırsa birebir korunmalı): alt grup
+özetleri `claim` alanı taşır — ÖRNEKLEM YETERSİZ / BELİRSİZ / KANITLI
+ARTI / KANITLI EKSİ. Alt grup eşiği ana eşikle AYNIDIR (50 küme);
+alt gruba daha gevşek eşik vermek, tam da kaçındığımız seçici okuma
+olurdu. `test_small_subgroup_is_never_called_evidence` bunu zorlar.
+
+Bu depodan midas'a yazma erişimi yok → **midas oturumuna AÇIK İŞ**:
+karşılığı var mı kontrol et; yoksa aynı desenle (sabit bölümler +
+claim üçlemesi + alt-grup eşiği = ana eşik) kur ve aynı davranışı
+tetikleyen testi yaz. "Okudum, yok" ile kapanmaz (Kural 3b).
