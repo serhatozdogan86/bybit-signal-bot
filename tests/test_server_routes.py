@@ -83,3 +83,32 @@ def test_anatomy_route_serves_declared_sections():
     app2 = create_app(MagicMock(get_meta=lambda: {"last_scan_utc": None}),
                       MagicMock(), None)
     assert app2.test_client().get("/anatomy").status_code == 404
+
+
+def test_portfolio_route_serves_measurement_not_verdict():
+    """/portfolio rotasi olcum doner ve HUKUM OLMADIGINI yazar."""
+    from unittest.mock import MagicMock
+    from app.server import create_app
+
+    eng = MagicMock()
+    eng.stats.return_value = {"strategies": {
+        "A": {"cost_per_trade": 0.02, "clusters": 60},
+        "PAHALI": {"cost_per_trade": 0.9, "clusters": 60}}}
+    eng._db.query.return_value = []
+    eng._net_r = lambda r: None
+    sch = MagicMock()
+    sch.challengers = eng
+    app = create_app(MagicMock(get_meta=lambda: {"last_scan_utc": None}),
+                     sch, MagicMock())
+    body = app.test_client().get("/portfolio")
+    assert body.status_code == 200
+    js = body.get_json()
+    assert js["members"] == ["A"]                 # pahali uye DISARIDA
+    assert js["member_rule"]["reads_returns"] is False
+    assert "GECTI MI" in js["verdict_warning"]
+
+    sch2 = MagicMock()
+    sch2.challengers = None
+    app2 = create_app(MagicMock(get_meta=lambda: {"last_scan_utc": None}),
+                      sch2, MagicMock())
+    assert app2.test_client().get("/portfolio").status_code == 404

@@ -60,6 +60,13 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
   PORTFÖY YOLU AÇIK (Faz B): üye kuralı getiriye BAKMAZ — emekli
   olmayan + maliyet/işlem ≤0.05R + ≥50 küme. Adım 1: /correlation.
   v2 RAFTA; raftan çıkma koşulları ön-kayıtlı (config-lock 09-20).
+  KORELASYON ÖLÇÜLDÜ (09-20): manşet N_eff 4.45 YANILTICI — emeklileri
+  ve şampiyonu kapsıyor. ÜYELERE daraltılınca ort. korelasyon 0.406,
+  N_eff 1.91. S1/S2/S11 birbirine çok yakın (0.56–0.66) = aynı bahis;
+  tek gerçek çeşitlendirici S8 (S1 ile 0.044, S11 ile 0.059).
+  Portföy aleti: /portfolio, app/services/portfolio.py — portföy kümesi
+  = YÖN + TAKVİM GÜNÜ (motorlar arası örtüşme TEK bloğa düşer; kasıtlı
+  muhafazakâr). Üye kuralı getiriye BAKMAZ. Rapor HÜKÜM DEĞİLDİR.
   S2: seçim sınavını 08-21'de GEÇTİ (projede ilk) ama DOĞRULAMA
   penceresinde GEÇEMEDİ (08-30 mühür: 54 küme, net −77.3R, CI
   [−0.63,−0.30] — üst sınır bile eksi; ralli eseriydi). Üçüncü pencere
@@ -127,7 +134,7 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
   yalnız EN İNCE dilim + MAX_GIST_FILES=280 bütçesi + artık
   gönderilmeyen candles_* dosyalarının budanması.
 - Rotalar: /verify /alarms /measurement /challengers /correlation
-  /exitlab /anatomy (DASHBOARD_TOKEN'lı).
+  /exitlab /anatomy /portfolio (DASHBOARD_TOKEN'lı).
   /anatomy = ölüm sonrası anatomi (2026-09-18): kenar NEDEN yok?
   Bölümleri SABİT (yön / rejim / maliyet / yoğunlaşma) — her biri
   önceden ilan edilmiş bir soru; yeni bölüm eklemek testi kırar

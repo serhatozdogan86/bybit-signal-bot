@@ -313,6 +313,24 @@ def create_app(store: StateStore, scheduler: Scheduler,
         return app.response_class(json.dumps(rep, indent=2),
                                   mimetype="application/json")
 
+    @app.get("/portfolio")
+    def portfolio_view():
+        """Faz B olcum aleti: uye kuralini uygular ve BIRLESIK defterin
+        resmi kume-CI'sini olcer. Portfoy kumesi = yon + takvim gunu
+        (motorlar arasi ortusme TEK bloga duser; kasitli muhafazakar).
+        Salt rapor - HUKUM DEGIL (config-lock 2026-09-20)."""
+        eng = getattr(scheduler, "challengers", None)
+        if eng is None:
+            return jsonify({"error": "portfolio needs challengers"}), 404
+        from app.services import portfolio
+        from app.services.challengers import RETIRED, SAMPLING_REGIME
+        members = portfolio.select_members(eng.stats(), RETIRED)
+        rows = eng._db.query("SELECT * FROM challenger_signals")
+        rep = portfolio.build_report(rows, members, eng._net_r,
+                                     SAMPLING_REGIME)
+        return app.response_class(json.dumps(rep, indent=2),
+                                  mimetype="application/json")
+
     @app.get("/signals")
     def signals():
         if tracker is None:
