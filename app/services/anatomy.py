@@ -121,6 +121,7 @@ def cost_anatomy(rows: list[dict], cost_fn) -> dict:
     gross = net = cost_sum = 0.0
     n = 0
     stop_fracs: list[float] = []
+    per_trade: list[tuple[float, float]] = []      # (stop_frac, maliyet_R)
     for r in rows:
         cst = cost_fn(r)
         if cst is None or r.get("r_multiple") is None:
@@ -137,6 +138,7 @@ def cost_anatomy(rows: list[dict], cost_fn) -> dict:
             frac = abs(entry - stop) / entry
             if frac > 0:
                 stop_fracs.append(frac)
+                per_trade.append((frac, cst))
     if not n:
         return {"trades": 0, "note": "maliyet hesaplanabilir kayit yok"}
     cpt = cost_sum / n
@@ -151,10 +153,45 @@ def cost_anatomy(rows: list[dict], cost_fn) -> dict:
         "stop_frac_median": measurement.median_or_none(stop_fracs),
         # projenin en pahali dersi, tek bayrakta
         "gross_positive_net_negative": gross > 0 and net < 0,
+        "stop_floor_scan": stop_floor_scan(per_trade),
         "note": ("maliyet modeli v0 (kilitli): 2x taker %0.055 + stop "
                  "kaymasi 5bps + funding %0.01/8s. Dar stop, R cinsinden "
                  "maliyeti buyutur - GIRDI 0."),
     }
+
+
+# Taranan stop tabanlari. ILAN EDILMIS sabit liste - "en iyi tabani bul"
+# taramasi DEGILDIR; v2 butcesi (0.05R) etrafindaki aritmetik araligi
+# kaplar (bkz. v2-tasarim.md GIRDI 0 tablosu).
+STOP_FLOORS = (0.01, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05)
+
+
+def stop_floor_scan(per_trade: list[tuple[float, float]]) -> list[dict]:
+    """Her stop tabani icin: kac islem HAYATTA KALIRDI ve maliyeti ne olurdu?
+
+    NEDEN: v2'nin stop tabani aritmetikten geliyor, ama "o taban konursa
+    motor ne kadar yavaslar" sorusunun cevabi VERIDE. Bu tarama yalniz
+    FREKANS ve MALIYET soyler.
+
+    ⚠️ HAYATTA KALMA YANILGISI (rapora da basilir): bu bir BACKTEST
+    DEGILDIR. v1'in gecmisini stop genisligine gore suzmek, genis stoplu
+    bir motoru KOSTURMAK ile ayni sey degildir - oyle bir motor bambaska
+    girisler secerdi. Buradaki getiri sayilari bu yuzden RAPOR EDILMEZ;
+    yalnizca islem sayisi ve maliyet verilir. Kenar tahmini YAPILAMAZ.
+    """
+    total = len(per_trade)
+    out: list[dict] = []
+    for floor in STOP_FLOORS:
+        kept = [(f, c) for f, c in per_trade if f >= floor]
+        cpt = (sum(c for _, c in kept) / len(kept)) if kept else None
+        out.append({
+            "stop_floor": floor,
+            "trades_kept": len(kept),
+            "share_kept": (round(len(kept) / total, 3) if total else None),
+            "cost_per_trade": (round(cpt, 3) if cpt is not None else None),
+            "within_budget": (cpt is not None and cpt <= 0.05),
+        })
+    return out
 
 
 def concentration(rows: list[dict], cost_fn, top: int = 5) -> dict:

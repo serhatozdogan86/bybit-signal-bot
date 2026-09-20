@@ -128,3 +128,51 @@ def test_report_carries_reading_warning():
     rep = anatomy.build_report([_row(1, "LONG", "L1", 1.0)], _cost)
     assert "KANIT DEGILDIR" in rep["reading_warning"]
     assert "ON-KAYIT" in rep["note"]
+
+
+# ------------------------------------------------ stop tabani taramasi
+def test_stop_floor_scan_reports_frequency_not_returns():
+    """Tarama SIKLIK ve MALIYET verir; GETIRI vermez.
+
+    Kritik: v1 gecmisini stop genisligine gore suzup 'su kadar R ederdi'
+    demek hayatta kalma yanilgisidir (genis stoplu motor baska girisler
+    secerdi). Getiri alani olmamali ki kimse oyle okuyamasin."""
+    scan = anatomy.stop_floor_scan([(0.01, 0.20), (0.02, 0.10),
+                                    (0.04, 0.05), (0.05, 0.04)])
+    assert [s["stop_floor"] for s in scan] == list(anatomy.STOP_FLOORS)
+    for row in scan:
+        assert set(row) == {"stop_floor", "trades_kept", "share_kept",
+                            "cost_per_trade", "within_budget"}
+        for banned in ("net_r", "gross_r", "e_net", "ci"):
+            assert banned not in row
+
+
+def test_stop_floor_scan_counts_and_budget():
+    """Taban yukseldikce islem AZALIR, maliyet DUSER; butce bayragi doger."""
+    scan = {s["stop_floor"]: s for s in anatomy.stop_floor_scan(
+        [(0.01, 0.20), (0.02, 0.10), (0.04, 0.05), (0.05, 0.04)])}
+    assert scan[0.01]["trades_kept"] == 4        # hepsi
+    assert scan[0.04]["trades_kept"] == 2        # yalniz 0.04 ve 0.05
+    assert scan[0.01]["share_kept"] == 1.0
+    assert scan[0.01]["within_budget"] is False  # ort. 0.0975 > 0.05
+    assert scan[0.04]["within_budget"] is True   # ort. 0.045 <= 0.05
+    # monotonluk: taban buyudukce hayatta kalan islem artmaz
+    kept = [s["trades_kept"] for s in anatomy.stop_floor_scan(
+        [(0.01, 0.2), (0.02, 0.1), (0.04, 0.05), (0.05, 0.04)])]
+    assert kept == sorted(kept, reverse=True)
+
+
+def test_stop_floors_are_a_declared_fixed_list():
+    """Taban listesi SABIT - 'en iyi tabani bul' taramasi degil (Kural 5)."""
+    assert anatomy.STOP_FLOORS == (0.01, 0.02, 0.025, 0.03, 0.035,
+                                   0.04, 0.05)
+
+
+def test_empty_floor_bucket_is_none_not_zero():
+    """Hicbir islem kalmayan tabanda maliyet None olmali - 0.0 yazmak
+    'butce icinde' yanilgisi yaratirdi."""
+    scan = {s["stop_floor"]: s for s in
+            anatomy.stop_floor_scan([(0.01, 0.20)])}
+    assert scan[0.05]["trades_kept"] == 0
+    assert scan[0.05]["cost_per_trade"] is None
+    assert scan[0.05]["within_budget"] is False
