@@ -79,7 +79,7 @@ def cost_r(row: dict) -> float | None:
     dogrudan R'ye cevrilir. Veri eksikse None.
     """
     try:
-        if row.get("outcome") not in ("WIN", "LOSS"):
+        if row.get("outcome") not in measurement.MEASURED_OUTCOMES:
             return None
         entry = row.get("fill_price") or (
             row["entry_max"] if row["direction"] == "LONG" else row["entry_min"])
@@ -768,7 +768,7 @@ class SignalTracker:
             "SELECT id,direction,outcome,entry_min,entry_max,stop_loss,"
             "fill_price,r_multiple,created_utc,closed_utc,cluster_id "
             "FROM signals WHERE status='CLOSED' AND blocked=0 "
-            "AND outcome IN ('WIN','LOSS')")
+            "AND outcome IN " + measurement.MEASURED_OUTCOMES_SQL)
         net_vals = []
         cluster_map_all: dict[str, list[float]] = {}
         cluster_map_lock: dict[str, list[float]] = {}
@@ -886,7 +886,8 @@ class SignalTracker:
         """
         sql = ("SELECT direction,outcome,entry_min,entry_max,stop_loss,"
                "fill_price,r_multiple,closed_utc FROM signals WHERE "
-               "status='CLOSED' AND blocked=0 AND outcome IN ('WIN','LOSS')")
+               "status='CLOSED' AND blocked=0 AND outcome IN "
+               + measurement.MEASURED_OUTCOMES_SQL)
         params: tuple = ()
         if since_lock:
             sql += " AND created_utc >= ?"
@@ -913,7 +914,7 @@ class SignalTracker:
             "SELECT id,pair,direction,outcome,entry_min,entry_max,stop_loss,"
             "fill_price,r_multiple,created_utc,closed_utc,cluster_id,"
             "market_bias FROM signals WHERE status='CLOSED' AND blocked=0 "
-            "AND outcome IN ('WIN','LOSS')")
+            "AND outcome IN " + measurement.MEASURED_OUTCOMES_SQL)
         return anatomy.build_report(rows, cost_r, since_lock=since_lock)
 
     def diagnostics(self) -> dict:

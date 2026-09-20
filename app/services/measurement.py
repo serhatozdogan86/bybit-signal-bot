@@ -40,6 +40,23 @@ ACTIVE_LOCK_UTC = LOCK2_UTC
 # >=50 bagimsiz KAPANMIS kume VE kume-CI alt siniri > 0.
 FAZ1_TARGET_CLUSTERS = 50
 
+# OLCUM NUFUSU - TEK GERCEK KAYNAK (2026-09-20 bulgusu, config-lock).
+# Sampiyon ve adaylar AYNI nufusu kullanmak ZORUNDADIR; 09-20'ye kadar
+# kullanmiyorlardi (sampiyon EXPIRED'i disariya atiyordu, adaylar
+# aliyordu) ve challengers.stats() notu "ayni standart" diye YANLIS
+# yaziyordu. Etki: aday kohortlari 50-kume kapisina cabuk variyordu
+# (S11: 91 kume / 42 karar).
+#
+# EXPIRED ICERIDEDIR cunku: sure dolunca GERCEK fiyattan kapanan GERCEK
+# bir pozisyondur ve gercek bir R uretir. Bazi adaylarda (S12, hedefsiz)
+# zaman-cikisi motorun ASIL cikis bicimidir; disarida birakmak
+# stratejinin ana sonucunu defterden silmek olurdu.
+# NOT_FILLED ve AMBIGUOUS DISARIDADIR: ilkinde pozisyon hic acilmadi,
+# ikincisi patolojik kapanistir.
+MEASURED_OUTCOMES = ("WIN", "LOSS", "EXPIRED")
+MEASURED_OUTCOMES_SQL = "(%s)" % ",".join(
+    "'%s'" % o for o in MEASURED_OUTCOMES)
+
 # Hayalet R kayma senaryolari (giris kenarindan sapma orani)
 SLIP_SCENARIOS = (0.001, 0.003, 0.005)
 

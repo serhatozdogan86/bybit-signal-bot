@@ -26,6 +26,8 @@ from datetime import datetime, timedelta, timezone
 
 from app.logging_setup import kv
 from app.services import measurement
+# Olcum nufusu: sampiyonla ORTAK tek gercek kaynak (2026-09-20).
+MEASURED_OUTCOMES = measurement.MEASURED_OUTCOMES
 from app.services.signal_tracker import FUNDING_8H, STOP_SLIP, TAKER_FEE
 
 log = logging.getLogger("challengers")
@@ -1104,7 +1106,11 @@ class ChallengerEngine:
 
     def stats(self) -> dict:
         out = {"note": ("Golge adaylar - sampiyonla ayni maliyet modeli, "
-                        "ayni kume-CI standardi, ayni 50-kume esigi. "
+                        "ayni kume-CI standardi, ayni 50-kume esigi "
+                        "(2026-09-20: bu iddia O TARIHE KADAR YANLISTI - "
+                        "sampiyon EXPIRED'i disariya atiyordu; ortak "
+                        "sabit measurement.MEASURED_OUTCOMES ile "
+                        "birlestirildi). "
                         "v1 cikislari sabit hedefli (trend adaylari icin "
                         "muhafazakar alt sinir). Rejim-2: acik pozisyon "
                         "tavani stratejiye gore ayarlandi; rejim-1 kayitlari "
@@ -1122,7 +1128,7 @@ class ChallengerEngine:
         for strat in STRATEGIES:
             mine = [r for r in rows if r["strategy"] == strat]
             closed = [r for r in mine if r["status"] == "CLOSED"
-                      and r["outcome"] in ("WIN", "LOSS", "EXPIRED")]
+                      and r["outcome"] in MEASURED_OUTCOMES]
             decided = [r for r in closed if r["outcome"] in ("WIN", "LOSS")]
             wins = sum(1 for r in decided if r["outcome"] == "WIN")
             clusters: dict[str, list[float]] = {}

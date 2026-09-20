@@ -543,3 +543,127 @@ sınıfı kapatan 4 kırmızı-önce test (tests/test_gist_file_limit.py).
 AÇIK MADDE (v2 gündemine): panodan bağımsız bir bildirim yolu
 (örn. dışarıdan çekilen sağlık ucu veya ikinci bir kanal). Ön-kayıt
 gerektirmez — ölçüm kuralı değil, işletim altyapısıdır.
+
+# ============================================================
+# 2026-09-20 KARAR TOPLANTISI (Serhat onayı: "1. portföy yolunu aç,
+# önce korelasyonu ölç / 2. önerdiğin gibi / 3. v2'yi beklet")
+# ÜÇ MADDE: ölçüm nüfusu birleştirildi + portföy yolu açıldı +
+# v2'nin raftan çıkma koşulları ön-kayıtlandı
+# ============================================================
+
+## Madde 1 — ÖLÇÜM NÜFUSU BİRLEŞTİRİLDİ (EXPIRED)
+
+### Bulgu
+`challengers.stats()` kendi notunda "şampiyonla aynı küme-CI standardı,
+aynı 50-küme eşiği" yazıyordu. **Bu iddia yanlıştı:**
+
+| | Şampiyon | Adaylar |
+|---|---|---|
+| Küme/CI nüfusu | `WIN, LOSS` | `WIN, LOSS, EXPIRED` |
+
+Ölçülen etki (09-20 tablosu): S11 **91 küme / 42 karara bağlanmış**,
+S9 37/11, S8 218/159. S11'in örnekleminin yarısından fazlası EXPIRED.
+Aday kohortları 50-küme kapısına şampiyondan ÇABUK varıyordu.
+
+### Karar: EXPIRED İÇERİDE, her iki tarafta
+Gerekçe: süre dolunca GERÇEK fiyattan kapanan GERÇEK bir pozisyondur ve
+gerçek bir R üretir. Dahası bazı adaylarda (S12, hedefsiz) zaman-çıkışı
+motorun ASIL çıkış biçimidir — dışarıda bırakmak stratejinin ana
+sonucunu defterden silmek olurdu. Korelasyon aleti (correlation.py)
+şampiyonun EXPIRED'ini ZATEN sayıyordu; tutarsız olan tek yer
+şampiyonun `stats()`'iydi.
+NOT_FILLED ve AMBIGUOUS DIŞARIDA kalır (ilkinde pozisyon hiç açılmadı,
+ikincisi patolojik kapanış). Düzeltmenin fazla geniş olmadığı testle
+zorlanır (`test_not_filled_still_excluded_everywhere`).
+
+### ⚠️ ÖN-KAYIT — SAYILARI GÖRMEDEN İLAN EDİLDİ
+**Bu düzeltmeden sonra çıkacak yeni sayılar NE OLURSA OLSUN, aşağıdaki
+mühürlü hükümler AÇILMAZ:**
+- Şampiyon kilit-1 ve kilit-2 hükümleri (2026-08-20, 2026-09-18)
+- S1 seçim + doğrulama hükümleri (2026-08-20)
+- S2 seçim + doğrulama hükümleri (2026-08-21, 2026-08-30)
+- S11 seçim hükmü (2026-09-05)
+- S8, S3/S6/S4/S7 hükümleri
+
+Gerekçe: mührü, sonradan değişen bir muhasebeyle yeniden hesaplamak
+SONUÇ-BAĞIMLI YENİDEN AÇMADIR — bu projenin en temel yasağı. Hükümler
+verildikleri günün muhasebesiyle verilmiştir ve o hâlleriyle kalırlar.
+Bu paragraf, düzeltme koşulmadan ÖNCE yazılmıştır; yani "yeni sayı
+hoşuma gitti/gitmedi" diye karar veremeyiz. Kendi kuralımızı kendimize
+uyguluyoruz.
+
+Düzeltme İLERİYE dönüktür: bundan sonra açılacak pencereler ve canlı
+ölçümler ortak nüfusu kullanır.
+
+### Kural 3 uyumu
+`tests/test_expired_cohort.py` — 7 test, düzeltmeden ÖNCE 6'sı KIRMIZI
+verdi (doğrulandı). Tek gerçek kaynak: `measurement.MEASURED_OUTCOMES`
++ `MEASURED_OUTCOMES_SQL`; şampiyon ve adaylar AYNI nesneyi kullanır
+(`test_champion_and_challenger_use_the_same_cohort`, `is` ile).
+Dokunulan noktalar: `cost_r` kapısı, `stats()` kohortu, `max_drawdown_r`,
+`anatomy_report`. Kasıtlı DOKUNULMAYANLAR: WIN/LOSS'a ÖZGÜ kırılımlar
+(kazanma oranı, WIN/LOSS tutuş medyanı, MFE/MAE) — onlar zaten
+"kazanan mı kaybeden mi" sorusunu sorar.
+
+### Kural 3b — ikiz depo
+midas-signal-bot aynı iskeletten doğdu; aynı asimetri orada da
+muhtemeldir. AÇIK İŞ: midas'ta şampiyon/aday küme nüfusları
+karşılaştırılacak, sonuç ikiz-depo-notu'na yazılacak (bulunmasa bile).
+
+## Madde 2 — PORTFÖY YOLU AÇILDI (Faz B)
+
+Gerekçe (09-20 aday tablosu): dört motor küçük-ama-pozitif ve maliyet
+bütçesi İÇİNDE — S1 (+78.16R, 0.037), S2 (+39.94R, 0.041),
+S11 (+10.47R, 0.022), S8 (+5.40R, 0.019). Hiçbiri tek başına sınavı
+geçemiyor çünkü gürültü kenardan büyük; hepsinin CI'si sıfırı içeriyor.
+
+**Portföy tezi:** birbirleriyle tam örtüşmüyorlarsa, birlikte ölçülen
+defterin gürültüsü azalır ve CI daralır. Bu yalnız "geçme" ihtimalini
+artırmaz — **her iki yönde de KESİN bir cevaba** götürür: gerçek kenar
+sıfırsa CI sıfır etrafında daralır ve temiz bir HAYIR alırız.
+
+**ADIM 1 (şimdi): korelasyon ölçümü.** Üyeler birbirini gerçekten
+dengeliyor mu? `/correlation` aleti (Faz A, 2026-08-13'te yazıldı, hiç
+kullanılmadı) etkin bağımsız bahis sayısını (N_eff) verir. Ölçüm
+sonucu görülmeden ön-kayıt YAZILMAZ.
+
+**ÜYE SEÇİM KURALI — getiriye BAKMAZ (p-hacking kapısı):**
+> Emekli olmayan, maliyet/işlem ≤ 0.05R olan ve ≥50 kümeye ulaşmış
+> TÜM adaylar.
+Bugün bu kural S1, S2, S8, S11 **ve S12'yi** seçer — S12 net EKSİ
+olmasına rağmen, çünkü kural getiriye bakmıyor. Kuralı dürüst yapan
+tam olarak budur.
+
+**AÇIKÇA KAYDA GEÇEN GERİLİM:** bu havuzu geçmiş veriye bakarak
+tanıyoruz. Seçim kuralı getiriye bakmasa bile havuzun kendisi geçmişte
+oluştu. Tek ilacı: pencere İLAN EDİLDİKTEN SONRAKİ veriyle test etmek.
+Portföy de sıfırdan sınava girer; geçmiş sayılar SAYILMAZ.
+
+## Madde 3 — v2 RAFA KALKTI + RAFTAN ÇIKMA KOŞULLARI (ön-kayıt)
+
+v2 şampiyon tasarımı BEKLEMEYE alındı. Sebep: portföy çıkarsa v2'nin
+sıfırdan tasarımına gerek kalmayabilir; elimizdeki parçalardan kurulur.
+
+**v2 ŞU KOŞULLARDAN BİRİ GERÇEKLEŞİRSE RAFTAN ÇIKAR** (şimdi ilan
+edildi ki sonradan hedef kaydırmayalım):
+
+1. **Portföy penceresi GEÇEMEZSE.** Pencere ≥50 kümeye ulaşır ve
+   küme-CI alt sınırı ≤ 0 olursa. (Portföyün de ÜÇÜNCÜ penceresi YOK —
+   S1/S2 emsali.)
+2. **Portföy KURULAMAZSA.** Korelasyon ölçümü üyelerin birbirinin
+   kopyası olduğunu gösterirse (etkin bağımsız bahis sayısı ~1),
+   çeşitlendirme kazancı yoktur; portföy tezi daha kurulmadan düşer.
+3. **ÜYELER ÖLÜRSE.** Pencere dolmadan üyelerin çoğu kenar-ölümü
+   koşuluna (küme-CI üst sınırı < 0, ≥20 küme) girerse.
+4. **ZAMAN AŞIMI.** Portföy penceresi ilan tarihinden itibaren
+   **4 ay** içinde 50 kümeye ulaşmazsa, aç kalma (starvation) sayılır
+   ve gündem v2'ye döner.
+
+**v2 raftan çıkarsa ne OLMAYACAĞI da şimdi kayıtlıdır:** v2 bir
+"maliyet düzeltme" motoru DEĞİLDİR. 09-20 tablosu gösterdi ki en güçlü
+adaylarımızda maliyet ZATEN bütçe içinde (0.019–0.041); maliyet teşhisi
+şampiyon ve emekliler (S7 0.359, S3 0.261, S6 0.208, S9 0.330) için
+geçerlidir, en iyi adaylar için değil. Dolayısıyla v2, ya ZEMİNİ
+değiştirmeli (zaman dilimi / evren) ya da gerçekten farklı bir kenar
+kaynağı bulmalıdır. Bu satır, 09-18'de yazdığım "v2 GİRDİ 0 ekseninde
+kurulmalı" önerisinin DÜZELTMESİDİR.

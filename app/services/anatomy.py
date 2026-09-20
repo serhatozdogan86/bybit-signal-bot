@@ -236,7 +236,7 @@ def concentration(rows: list[dict], cost_fn, top: int = 5) -> dict:
 def build_report(rows: list[dict], cost_fn, since_lock: bool = True) -> dict:
     """Tam anatomi raporu. rows = kapanmis (WIN/LOSS) sampiyon kayitlari."""
     used = [r for r in rows
-            if r.get("outcome") in ("WIN", "LOSS")
+            if r.get("outcome") in measurement.MEASURED_OUTCOMES
             and (not since_lock
                  or (r.get("created_utc") or "") >= measurement.ACTIVE_LOCK_UTC)]
     return {
