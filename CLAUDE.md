@@ -44,7 +44,22 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
   Sorun giriş kalıbı DEĞİL. Yön/rejim premisi ÇÜRÜDÜ: motor zaten
   rejim uyumlu (SHORT=bear 59/27, LONG=bull+neutral 370/170 birebir).
   Kayıp geniş tabanlı (en kötü 5 küme toplamın 1/3'ü; kalan 192 küme
-  hâlâ −55.6R). Aritmetik: 0.05R bütçesi ≥ %3-4 stop ister.
+  hâlâ −55.6R). Aritmetik: 0.05R bütçesi ≥ %3-4 stop ister (AMPİRİK:
+  %2 taban yetiyor — taramada 0.049).
+  ⭐ ADAY TABLOSU (09-20): BRÜT kenar VAR ve dördünde maliyetten sonra
+  da duruyor — S1 +78.16R (CI[−0.051,+0.133], mal/iş 0.037), S2 +39.94R
+  (0.041), S11 +10.47R (0.022), S8 +5.40R (0.019). Hepsinin CI'si
+  sıfırı İÇERİYOR → tek başına hiçbiri geçmiyor. DÜZELTME: "maliyet
+  evrensel teşhis" YANLIŞ — en iyi adaylarda maliyet zaten bütçede;
+  teşhis şampiyon + emekliler için geçerli (S7 0.359, S9 0.330,
+  S3 0.261, S6 0.208).
+  ÖLÇÜM NÜFUSU BİRLEŞTİRİLDİ (09-20): measurement.MEASURED_OUTCOMES =
+  (WIN, LOSS, EXPIRED); şampiyon EXPIRED'i dışarıda bırakıyordu,
+  adaylar bırakmıyordu. Mühürlü hükümler AÇILMAZ (sayılar görülmeden
+  ilan edildi — config-lock 09-20).
+  PORTFÖY YOLU AÇIK (Faz B): üye kuralı getiriye BAKMAZ — emekli
+  olmayan + maliyet/işlem ≤0.05R + ≥50 küme. Adım 1: /correlation.
+  v2 RAFTA; raftan çıkma koşulları ön-kayıtlı (config-lock 09-20).
   S2: seçim sınavını 08-21'de GEÇTİ (projede ilk) ama DOĞRULAMA
   penceresinde GEÇEMEDİ (08-30 mühür: 54 küme, net −77.3R, CI
   [−0.63,−0.30] — üst sınır bile eksi; ralli eseriydi). Üçüncü pencere
