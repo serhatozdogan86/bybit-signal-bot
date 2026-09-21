@@ -74,8 +74,13 @@ def test_stale_five_candidate_text_gone():
 
 
 def test_candidate_count_is_derived_not_handwritten():
-    # baslik etiketi cizilen satir sayisindan gelir (nRow), elle sayi yok
-    assert re.search(r'chalCount.*?\$\{nRow\} aday', DASHBOARD_HTML, re.S)
+    # baslik etiketi cizilen satir sayisindan gelir (nRow), elle sayi yok.
+    # 2026-09-21: etiket "canli aday" oldu (elenenler arsive tasindi);
+    # NIYET degismedi - sayi hala nRow'dan turer.
+    assert re.search(r'chalCount.*?\$\{nRow\} canlı aday',
+                     DASHBOARD_HTML, re.S)
+    # sayac YALNIZ canli adaylari saymali: dongu CHAL_CANLI uzerinde doner
+    assert "for(const k of canli){" in DASHBOARD_HTML
 
 
 # ---------------------------------------------------------------- RU cevirisi
@@ -147,3 +152,88 @@ def test_verdict_used_in_table_and_modal():
     cd = re.search(r"function chalDetail\(k\)\{.*?openModal", DASHBOARD_HTML, re.S)
     assert rc and "chalVerdict(" in rc.group(0), "tablo rozeti chalVerdict kullanmali"
     assert cd and "chalVerdict(" in cd.group(0), "detay penceresi chalVerdict kullanmali"
+
+
+# ------------------------------------------- 2026-09-21 pano sadelestirme
+def test_eliminated_candidates_are_not_in_main_table():
+    """Pano SADELESIR: elenen/emekli adaylar ana tabloda cizilmez.
+
+    Ana dongu CHAL_CANLI uzerinde doner; ayirma chalVerdict'in ILAN
+    EDILMIS kuralindan gelir (elle liste YOK - suruklenme yasagi)."""
+    assert 'vd-out" ? arsiv : canli' in DASHBOARD_HTML
+    assert "for(const k of canli){" in DASHBOARD_HTML
+    # eski hali (hepsini cizen dongu) geri gelmemeli
+    assert "for(const k of Object.keys(CHAL_ADI)){\n    const s=ch.strategies[k];if(!s)continue;\n    nRow++;" \
+        not in DASHBOARD_HTML
+
+
+def test_archive_opens_only_on_click_and_keeps_records():
+    """Arsiv YALNIZ tiklaninca acilir ve kayitlari SILMEZ."""
+    assert 'id="arsivBtn"' in DASHBOARD_HTML
+    assert "ab.addEventListener(\"click\",openArsiv)" in DASHBOARD_HTML
+    assert "function openArsiv(" in DASHBOARD_HTML
+    # arsiv metni "silinmedi" guvencesini TASIR (sessiz kayip yok)
+    assert "silinmedi" in DASHBOARD_HTML
+    # arsiv her motorun NEDEN elendigini yazar
+    assert "kenar ölümü (CI üst < 0)" in DASHBOARD_HTML
+
+
+def test_live_candidate_trades_are_listed_per_candidate():
+    """Her canli adayin islemleri AYRI blokta gorunur."""
+    assert 'id="chalTrades"' in DASHBOARD_HTML
+    assert "function renderChalTrades(" in DASHBOARD_HTML
+    assert 'class="chtblock"' in DASHBOARD_HTML
+    # ayni ornekleme rejimi suzgeci (rakamlar celismesin - v3.7 dersi)
+    assert "(r.regime||1)===rej" in DASHBOARD_HTML
+
+
+def test_portfolio_card_says_it_is_not_a_verdict():
+    """Portfoy karti HUKUM OLMADIGINI yazar - bu uyari SILINEMEZ."""
+    assert 'id="pfoCard"' in DASHBOARD_HTML
+    assert "function renderPortfolioBook(" in DASHBOARD_HTML
+    assert "HÜKÜM DEĞİLDİR" in DASHBOARD_HTML
+    # kapi rozeti iki durumu da tasir
+    assert "KAPI AÇIK" in DASHBOARD_HTML and "KAPI KAPALI" in DASHBOARD_HTML
+    # pano /portfolio ucunu gercekten cagirir
+    assert 'j("/portfolio")' in DASHBOARD_HTML
+    assert "renderPortfolioBook(pfo)" in DASHBOARD_HTML
+
+
+def test_new_dashboard_strings_have_ru_translations():
+    """Proje kurali: yeni metinlerin RU karsiligi sozlukte olur."""
+    for tr_key in ("Portföy · Birleşik Defter", "Canlı Adayların İşlemleri",
+                   "Güven aralığı", "KAPI AÇIK", "Bağımsız blok",
+                   "Arşiv · elenen ve emekli adaylar"):
+        assert f'"{tr_key}":"' in DASHBOARD_HTML, f"RU eksik: {tr_key}"
+
+
+# ---------------------------------------------- 2026-09-21 AD CAKISMASI
+def test_no_duplicate_js_function_names():
+    """Panoda AYNI ADDA iki JS fonksiyonu olamaz.
+
+    ARIZA (2026-09-21, bu testin dogum sebebi): yeni portfoy karti icin
+    renderPortfolio() yazdim; panoda para-simulasyonu karti icin ZATEN
+    ayni adda bir fonksiyon vardi. JS'te sonraki bildirim oncekini EZER -
+    yani yeni kart hic calismadi ve eski kart yanlis argumanla cagrilip
+    "(signals||[]) is not iterable" ile patladi.
+    Metin tabanli testler bunu GOREMEDI (ikisi de string olarak vardi);
+    hatayi ancak tarayicida acinca gordum. Bu test o sinifi kapatir."""
+    names = re.findall(r"^function\s+([A-Za-z_$][\w$]*)\s*\(",
+                       DASHBOARD_HTML, re.M)
+    dupes = sorted({n for n in names if names.count(n) > 1})
+    assert not dupes, f"ayni adda birden fazla fonksiyon: {dupes}"
+
+
+def test_archive_table_columns_line_up():
+    """Arsiv tablosunda baslik sayisi = hucre sayisi.
+
+    ARIZA (2026-09-21, tarayicida gorulda): 7 baslik / 7 hucre vardi ama
+    durum rozeti STRATEJI hucresinin ICINDEydi; bu yuzden "durum"
+    basliginin altina islem sayisi dusuyor, tum sutunlar bir kayiyordu."""
+    blok = DASHBOARD_HTML.split("function openArsiv(")[1].split("openModal(")[0]
+    basliklar = blok.count("<th>")
+    # satir sablonundaki hucreler (dongu govdesi)
+    govde = blok.split("for(const k of CHAL_ARSIV)")[1]
+    hucreler = govde.count("<td")
+    assert basliklar == hucreler, \
+        f"arsiv sutunlari kaymis: {basliklar} baslik / {hucreler} hücre"

@@ -340,6 +340,13 @@ DASHBOARD_HTML = r"""<!doctype html>
   @media(max-width:760px){#modal .sheet{max-width:96vw}}
   /* aday detay penceresi (Faz B) */
   #chalBody table.sig tbody tr{cursor:pointer}
+  /* canli adaylarin islemleri: her aday kendi blogunda */
+  .chtblock{margin:0 0 12px}
+  .chtblock:last-child{margin-bottom:0}
+  .chthead{display:flex;align-items:center;gap:8px;font-weight:600;
+    font-size:12.5px;margin:0 0 5px;padding-bottom:4px;
+    border-bottom:1px solid var(--line)}
+  .chthead .tag{margin-left:auto}
   .sheet h4.chsec{font-size:13px;font-weight:600;margin:14px 0 6px;
                   color:var(--blue)}
   .sheet .chp{font-size:12.5px;line-height:1.55;margin:0}
@@ -412,8 +419,15 @@ DASHBOARD_HTML = r"""<!doctype html>
     .cols{grid-template-rows:minmax(0,1fr) minmax(0,auto)}
     .col[data-tab="ozet"]{grid-column:1;grid-row:1/span 2}
     .col[data-tab="sinyaller"]{grid-column:2;grid-row:1}
+    /* 2026-09-21: aday seridinde artik UC kart var (portfoy + canli
+       tablo + her adayin islemleri). 320px'e sigmiyordu, alttaki kart
+       kesiliyordu (tarayicida gorulda). Serit buyutuldu ve KENDI ICINDE
+       kayar hale getirildi - sayfa duzeni bozulmadan hepsi erisilebilir. */
     .col[data-tab="adaylar"]{display:flex;grid-column:2;grid-row:2;
-       max-height:clamp(200px,32vh,320px)}
+       max-height:clamp(320px,46vh,560px);overflow-y:auto;
+       scrollbar-width:thin;padding-right:2px}
+    .col[data-tab="adaylar"] > .card{flex:0 0 auto}
+    .col[data-tab="adaylar"] .cbody.scroll{max-height:300px}
     .col[data-tab="piyasa"]{grid-column:3;grid-row:1/span 2}
   }
   @media (max-width:760px){
@@ -667,9 +681,17 @@ try{if(localStorage.getItem("ui_theme")==="dark")
     </div>
 
     <div class="col" data-tab="adaylar">
+      <div class="card" id="pfoCard">
+        <div class="chead"><span class="tipwrap" tabindex="0" data-tip="Canli adaylarin BIRLESIK defteri. Portfoy kumesi = YON + TAKVIM GUNU: iki motor ayni gun ayni yonde islem actiysa bu TEK bagimsiz bahis sayilir (ayni bahsi iki kez saymak guven araligini yapay daraltirdi). Uye kurali GETIRIYE BAKMAZ: emekli olmayan + maliyet/islem <=0.05R + >=50 kume. Bu kart bir HUKUM DEGILDIR - 'kurulabilir mi' sorusunu olcer; hukum yalniz ilan edilmis bir pencerede verilir.">Portföy · Birleşik Defter <span class="i">ⓘ</span></span> <span class="tag" id="pfoTag">ölçüm · hüküm değil</span></div>
+        <div class="cbody strat" id="pfoBody"><div class="empty">yükleniyor…</div></div>
+      </div>
       <div class="card fill">
         <div class="chead"><span class="tipwrap" tabindex="0" data-tip="Faz B gölge yarışı: tablodaki aday stratejiler, şampiyonla AYNI maliyet modeli ve AYNI sınavla (≥50 kapanmış küme + küme-CI alt sınırı > 0) kâğıt üzerinde ölçülür. Gerçek işlem yok. Girişler kapanış bazlı; v1 çıkışları sabit hedefli — trend adayları (S1/S2) için sonuçlar muhafazakâr alt sınırdır. Şampiyonun ilk sınavı GEÇİLEMEDİ (hüküm arşivlendi); yarış, bir sonraki şampiyon adayını belirlemek için sürüyor. Rozetler: YARIŞIYOR = küme <50; ELENDİ = küme ≥20 ve CI üst sınırı <0 (kenar ölümü); SINAV BİTTİ · GEÇEMEDİ = küme ≥50 ve CI alt sınırı ≤0. Çoklu karşılaştırma düzeltmesi: kazanan, seçildikten SONRA toplanan veride de sınavı geçmek zorundadır. Yatırım tavsiyesi değildir.">Aday Stratejiler · Gölge Yarış <span class="i">ⓘ</span></span> <span class="tag" id="chalCount">Faz B</span> <span class="tag">satıra tıkla → detay</span></div>
         <div class="cbody scroll" id="chalBody"><div class="empty">aday verisi birikiyor…</div></div>
+      </div>
+      <div class="card fill" id="chalTradesCard">
+        <div class="chead">Canlı Adayların İşlemleri <span class="tag">her aday ayrı</span></div>
+        <div class="cbody scroll" id="chalTrades"><div class="empty">yükleniyor…</div></div>
       </div>
     </div>
     <div class="col" data-tab="ayar">
@@ -842,7 +864,7 @@ const RU={
 "Piyasa Nabzı":"Пульс рынка","canlı metrikler":"живые метрики",
 "Saatlik Değerlendirme":"Часовой обзор","hourly_review · otomatik":"hourly_review · автоматически",
 "Haber Akışı":"Лента новостей","kripto haber · dış kaynak":"крипто-новости · внешний источник",
-"Portföy Simülasyonu":"Симуляция портфеля","gölge · bileşik":"тень · сложный процент",
+"Portföy · Birleşik Defter":"Портфель · сводная книга","ölçüm · hüküm değil":"измерение · не вердикт","Canlı Adayların İşlemleri":"Сделки живых кандидатов","her aday ayrı":"каждый кандидат отдельно","Üyeler":"Участники","Bağımsız blok":"Независимых блоков","İşlem başına":"На сделку","Güven aralığı":"Доверительный интервал","Etkin bağımsız bahis":"Эффективных независимых ставок","Kapının açılması için gereken blok":"Блоков нужно для открытия ворот","KAPI AÇIK":"ВОРОТА ОТКРЫТЫ","KAPI KAPALI · aralık sıfırı içeriyor":"ВОРОТА ЗАКРЫТЫ · интервал включает ноль","Arşiv · elenen ve emekli adaylar":"Архив · выбывшие и списанные кандидаты","işlem yok":"нет сделок","henüz sonuçlanan işlem yok":"пока нет закрытых сделок","canlı aday yok":"нет живых кандидатов","canlı aday kalmadı — hepsi arşivde":"живых кандидатов нет — все в архиве","portföy verisi yok":"нет данных портфеля","Portföy Simülasyonu":"Симуляция портфеля","gölge · bileşik":"тень · сложный процент",
 /* KPI */
 "Win Rate":"Винрейт","Toplam R":"Суммарный R","Açık Pozisyon":"Открытые позиции",
 "Giriş İsabeti":"Точность входа","Taranan Evren":"Сканируемая вселенная",
@@ -1090,6 +1112,7 @@ const RU_PAT=[
  [/([+\-][\d.]+)R canlı/, (m,n)=>`${n}R сейчас`],
  [/(\d+) parite/, (m,n)=>`${n} пар`],
  [/^(\d+) aday$/, (m,n)=>`кандидатов: ${n}`],
+ [/^Faz B · (\d+) canlı aday$/, (m,n)=>`Фаза B · живых кандидатов: ${n}`],
  [/(\d+) tarama/, (m,n)=>`${n} сканов`],
  [/^ · likit (\d+)$/, (m,n)=>` · ликвидных ${n}`],
  [/^Tümü (\d+)$/, (m,n)=>`Все ${n}`],
@@ -1388,6 +1411,7 @@ const CHAL_ADI={S1_TSMOM:"S1 · Trend Takibi",S2_DONCHIAN:"S2 · Kırılım (Don
   S10_52WHIGH:"S10 · 52 Hafta Zirvesi",S11_SQUEEZE:"S11 · Sıkışma Kırılımı",
   S12_RELVOL:"S12 · Hacim Kapılı Kırılım"};
 let CHAL=null;   // /challengers son yaniti - detay penceresi buradan okur
+let CHAL_CANLI=[], CHAL_ARSIV=[];   // pano sadeligi: elenenler arsive
 /* Durum rozeti PROGRAMATIK olarak sunucu verisinden (kume/CI/emeklilik)
    turetilir — elle yazilmis strateji-durum listesi YOK (drift yasagi).
    Kurallar (on-ilanli): ELENDİ = emekli VEYA kume>=20 ve CI ustu<0;
@@ -1411,6 +1435,13 @@ function renderChallengers(ch){
   if(!ch||!ch.strategies){el.innerHTML='<div class="empty">aday verisi birikiyor…</div>';return;}
   CHAL=ch;
   const sgn=v=>v==null?"—":(v>0?"+":"")+num(v,2);
+  // CANLI = elenmemis; ELENMIS/EMEKLI arsive gider (pano sadelesir)
+  const canli=[], arsiv=[];
+  for(const k of Object.keys(CHAL_ADI)){
+    const st=ch.strategies[k]; if(!st)continue;
+    (chalVerdict(st).cls==="vd-out" ? arsiv : canli).push(k);
+  }
+  CHAL_CANLI=canli; CHAL_ARSIV=arsiv;
   let h='<table class="sig"><thead><tr><th>strateji</th><th>açık</th>'+
     '<th>sonuç</th><th>WR</th><th>net R</th>'+
     '<th class="r c-cost" title="İşlem başına maliyet: brüt R ile net R '+
@@ -1420,8 +1451,8 @@ function renderChallengers(ch){
     '">maliyet/işl.</th>'+
     '<th>küme</th><th>CI</th></tr></thead><tbody>';
   let nRow=0;
-  for(const k of Object.keys(CHAL_ADI)){
-    const s=ch.strategies[k];if(!s)continue;
+  for(const k of canli){
+    const s=ch.strategies[k];
     nRow++;
     const v=chalVerdict(s);
     const wr=s.win_rate==null?"—":(s.win_rate*100).toFixed(0)+"%";
@@ -1437,6 +1468,9 @@ function renderChallengers(ch){
        `<td class="num ${ciCls}">${ci}</td></tr>`;
   }
   h+="</tbody></table>";
+  if(!canli.length)h='<div class="empty">canlı aday kalmadı — hepsi arşivde</div>';
+  if(arsiv.length)h+=`<div style="margin-top:10px"><button class="setbtn" id="arsivBtn">`+
+    `🗄 Arşiv — elenen / emekli adaylar (${arsiv.length})</button></div>`;
   const toplam=Object.values(ch.strategies).reduce((a,s)=>a+(s.decided||0),0);
   if(!toplam)h+='<div class="empty" style="margin-top:8px">henüz sonuçlanan aday işlemi yok — veri birikiyor</div>';
   if(ch.retired_rows)h+=`<div class="note" style="margin-top:8px">örnekleme rejimi ${ch.sampling_regime}: `+
@@ -1444,9 +1478,68 @@ function renderChallengers(ch){
     `hesaba GİRMEZ (tabloda durur, silinmedi).</div>`;
   el.innerHTML=h;
   // baslik etiketi: aday sayisi elle degil, cizilen satirdan sayilir
-  const cc=$("chalCount");if(cc)cc.textContent=`Faz B · ${nRow} aday`;
+  const cc=$("chalCount");if(cc)cc.textContent=`Faz B · ${nRow} canlı aday`;
   el.querySelectorAll("tbody tr[data-k]").forEach(row=>
     row.addEventListener("click",()=>chalDetail(row.dataset.k)));
+  const ab=$("arsivBtn"); if(ab)ab.addEventListener("click",openArsiv);
+  renderChalTrades();
+}
+
+/* ---------- ARSIV: elenen/emekli adaylar - YALNIZ tiklaninca ----------
+   Pano sadelesir ama veri KAYBOLMAZ: her elenen motor mezar tasiyla
+   burada durur (sessiz silme yok). */
+function openArsiv(){
+  if(!CHAL||!CHAL.strategies)return;
+  const sgn=v=>v==null?"—":(v>0?"+":"")+num(v,2);
+  let h='<p class="chp">Bu motorlar artık takip edilmiyor. Kayıtları '+
+    'silinmedi — hüküm neyse orada duruyor.</p>'+
+    '<div style="overflow-x:auto"><table class="mini"><thead><tr>'+
+    '<th>strateji</th><th>işlem</th><th>net R</th>'+
+    '<th>maliyet/işl.</th><th>küme</th><th>CI</th></tr></thead><tbody>';
+  for(const k of CHAL_ARSIV){
+    const s=CHAL.strategies[k]; const v=chalVerdict(s);
+    const ci=s.ci?`[${sgn(s.ci[0])}, ${sgn(s.ci[1])}]`:"—";
+    const neden=s.retired_utc?`emekli ${String(s.retired_utc).slice(0,10)}`
+                             :"kenar ölümü (CI üst < 0)";
+    h+=`<tr><td><b>${CHAL_ADI[k]||k}</b><span class="vd ${v.cls}">${v.t}</span>`+
+       `<div class="muted" style="font-size:11px">${neden}</div></td>`+
+       `<td>${s.decided}</td>`+
+       `<td class="num ${s.net_r>0?"pos":s.net_r<0?"neg":""}">${sgn(s.net_r)}</td>`+
+       `<td class="num ${costCls(s.cost_per_trade)}">${costTxt(s.cost_per_trade)}</td>`+
+       `<td class="num">${s.clusters}</td><td class="num">${ci}</td></tr>`;
+  }
+  h+='</tbody></table></div>';
+  openModal("Arşiv · elenen ve emekli adaylar",h);
+}
+
+/* ---------- Canli adaylarin islemleri: HER ADAY AYRI ---------- */
+function renderChalTrades(){
+  const el=$("chalTrades"); if(!el||!CHAL)return;
+  const sgn=v=>v==null?"—":(v>0?"+":"")+num(v,2);
+  const rej=CHAL.sampling_regime||1;
+  let h="";
+  for(const k of CHAL_CANLI){
+    const rows=(CHAL.recent||[]).filter(r=>r.strategy===k&&(r.regime||1)===rej)
+                                .slice(0,8);
+    h+=`<div class="chtblock"><div class="chthead">${CHAL_ADI[k]||k}`+
+       `<span class="tag">${rows.length?`son ${rows.length} işlem`:"işlem yok"}</span></div>`;
+    if(!rows.length){h+='<div class="empty">henüz sonuçlanan işlem yok</div></div>';continue;}
+    h+='<div style="overflow-x:auto"><table class="mini"><thead><tr>'+
+       '<th>parite</th><th>yön</th><th>sonuç</th><th>net R</th><th>zaman</th>'+
+       '</tr></thead><tbody>';
+    for(const r of rows){
+      const o=r.outcome||r.status;
+      h+=`<tr><td><b>${r.pair}</b></td>`+
+         `<td><span class="badge b-${r.direction}">${r.direction}</span></td>`+
+         `<td><span class="badge b-${o}">${o}</span></td>`+
+         `<td class="num ${r.net_r>0?"pos":r.net_r<0?"neg":""}">`+
+         `${r.net_r==null?"—":sgn(r.net_r)}</td>`+
+         `<td class="num">${fmtTs(r.created_utc)}</td></tr>`;
+    }
+    h+='</tbody></table></div></div>';
+  }
+  el.innerHTML=h||'<div class="empty">canlı aday yok</div>';
+  translateNode(el);
 }
 /* Aday detay penceresi. Aciklama+parametreler /challengers yanitindaki
    strategy_info'dan gelir (tek kaynak challengers.py; burada elle metin YOK) */
@@ -1505,6 +1598,44 @@ function chalDetail(k){
       info.honesty.map(n=>`<div class="note">${n}</div>`).join("");
   }
   openModal(CHAL_ADI[k]||info.name||k,html);
+}
+
+/* ---------- PORTFOY KARTI (Faz B, 2026-09-20) ----------
+   BIRLESIK defterin resmi kume-CI'si. Kartin tasidigi en onemli mesaj
+   HUKUM OLMADIGIDIR: gecmis defterden okunan CI "kurulabilir mi"yi
+   cevaplar, "gecti mi"yi DEGIL (config-lock 09-20). Uyari metni karttan
+   SILINEMEZ - testle zorlanir. */
+function renderPortfolioBook(pf){
+  const el=$("pfoBody"); if(!el)return;
+  if(!pf||pf.clusters==null){
+    el.innerHTML='<div class="empty">portföy verisi yok</div>';return;}
+  const sgn=(v,d)=>v==null?"—":(v>0?"+":"")+num(v,d==null?2:d);
+  const ci=Array.isArray(pf.ci)?pf.ci:null;
+  const ciCls=ci?(ci[0]>0?"pos":(ci[1]<0?"neg":"")):"";
+  const uye=(pf.members||[]).map(k=>(CHAL_ADI[k]||k).split(" · ")[0]).join(", ");
+  const kapi=pf.gate_met
+    ? '<span class="vd vd-pass">KAPI AÇIK</span>'
+    : '<span class="vd vd-run">KAPI KAPALI · aralık sıfırı içeriyor</span>';
+  const g=(l,v,cls)=>`<div class="srow"><span>${l}</span>`+
+    `<b class="${cls||""}">${v}</b></div>`;
+  let h=g("Üyeler",uye||"—")+
+    g("İşlem",pf.trades==null?"—":pf.trades)+
+    g("Bağımsız blok",pf.clusters)+
+    g("Net R",sgn(pf.net_r),pf.net_r>0?"pos":pf.net_r<0?"neg":"")+
+    g("İşlem başına",sgn(pf.e_net,3))+
+    g("Güven aralığı",ci?`[${sgn(ci[0],3)}, ${sgn(ci[1],3)}]`:"—",ciCls)+
+    g("Durum",kapi);
+  const ind=pf.independence_members_only||{};
+  if(ind.effective_bets!=null)
+    h+=g("Etkin bağımsız bahis",`${num(ind.effective_bets,2)} / ${ind.n_measured}`);
+  if(pf.required_clusters_for_ci_low_gt_0)
+    h+=g("Kapının açılması için gereken blok",
+         pf.required_clusters_for_ci_low_gt_0);
+  h+='<div class="note" style="margin-top:8px" id="pfoWarn">Bu kart bir '+
+     'HÜKÜM DEĞİLDİR. Aralık, "kurulabilir mi" sorusunu ölçer; hüküm yalnız '+
+     'önceden ilan edilmiş bir pencerede verilir.</div>';
+  el.innerHTML=h;
+  translateNode(el);
 }
 
 /* ---------- v3.6 olcum karti: kume-CI + Faz-1 kapisi ---------- */
@@ -2368,10 +2499,11 @@ function renderFooter(backup,healthy,ms,perf){
 /* ---------- loop ---------- */
 async function refresh(){
   const t0=performance.now();
-  const [perf,signals,status,uni,comments,market,news,px,backup,chal]=await Promise.all([
+  const [perf,signals,status,uni,comments,market,news,px,backup,chal,pfo]=
+    await Promise.all([
     j("/performance"),j("/signals?limit=500"),j("/status"),j("/universe"),
     j("/commentary?limit=4"),j("/market"),j("/news"),j("/prices"),
-    j("/backup/info"),j("/challengers")]);
+    j("/backup/info"),j("/challengers"),j("/portfolio")]);
   const fetchMs=Math.round(performance.now()-t0);
   PREV_PRICES=PRICES;PRICES=(px&&px.prices)||{};
   LAST_STATUS=status;
@@ -2380,6 +2512,7 @@ async function refresh(){
   renderKpis(perf,status,uni,SIGNALS);
   renderMeasure(perf);
   renderChallengers(chal);
+  renderPortfolioBook(pfo);
   renderCurve(SIGNALS);
   renderDuel(SIGNALS);
   renderChips();renderSignals();
