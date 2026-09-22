@@ -134,7 +134,11 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
   yalnız EN İNCE dilim + MAX_GIST_FILES=280 bütçesi + artık
   gönderilmeyen candles_* dosyalarının budanması.
 - Rotalar: /verify /alarms /measurement /challengers /correlation
-  /exitlab /anatomy /portfolio (DASHBOARD_TOKEN'lı).
+  /exitlab /anatomy /portfolio /filllab (DASHBOARD_TOKEN'lı).
+  /filllab = dolum laboratuvarı (2026-09-22): dinlenen limit emir
+  gerçekten dolar mıydı? Eşikler ÖN-KAYITLI (ideas.md H-FILL, ölçümden
+  ÖNCE donduruldu): geçiş ≥5bps GÜVENLİ; hüküm ≥200 işlem ve ≥%90.
+  DESTEKLENSE BİLE maliyet modeli v0 kendiliğinden DEĞİŞMEZ.
   /anatomy = ölüm sonrası anatomi (2026-09-18): kenar NEDEN yok?
   Bölümleri SABİT (yön / rejim / maliyet / yoğunlaşma) — her biri
   önceden ilan edilmiş bir soru; yeni bölüm eklemek testi kırar

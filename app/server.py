@@ -252,6 +252,17 @@ def create_app(store: StateStore, scheduler: Scheduler,
                        indent=2),
             mimetype="application/json")
 
+    @app.get("/filllab")
+    def filllab_view():
+        """Dolum laboratuvari: dinlenen limit emir dolar miydi? Esikler
+        on-kayitli (ideas.md H-FILL). Salt olcum; maliyet modelini
+        DEGISTIRMEZ - v0 kilitli kalir."""
+        if tracker is None:
+            return jsonify({"error": "shadow tracking disabled"}), 404
+        return app.response_class(
+            json.dumps(tracker.fill_report(), indent=2),
+            mimetype="application/json")
+
     @app.get("/verify")
     def verify_view():
         """Bagimsiz sonuc denetimi: kayitlar mum arsiviyle celisiyor mu?"""

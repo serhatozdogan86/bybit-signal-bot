@@ -29,7 +29,7 @@ from datetime import datetime, timezone
 from app.logging_setup import kv
 from app.models.candle import KlineSeries
 from app.models.decision import Decision, DecisionType, Direction
-from app.services import anatomy, measurement, verifier
+from app.services import anatomy, fill_lab, measurement, verifier
 from app.services.database import Database
 
 log = logging.getLogger("tracker")
@@ -902,6 +902,24 @@ class SignalTracker:
             peak = max(peak, cum)
             dd = max(dd, peak - cum)
         return round(dd, 2)
+
+    def fill_report(self) -> dict:
+        """DOLUM LABORATUVARI: dinlenen limit emir gercekten dolar miydi?
+
+        On-kayit: docs/ideas.md H-FILL (2026-09-22) - esikler bu olcum
+        yapilmadan ONCE donduruldu. Salt okuma.
+        """
+        rows = self._db.query(
+            "SELECT id,pair,direction,entry_min,entry_max,fill_ts "
+            "FROM signals WHERE blocked=0 AND fill_price IS NOT NULL "
+            "AND fill_ts IS NOT NULL")
+
+        def bar_lookup(pair: str, ts: int):
+            return self._db.query_one(
+                "SELECT low,high FROM candles WHERE symbol=? AND interval=? "
+                "AND ts=?", (pair, self._ltf, ts))
+
+        return fill_lab.build_report(rows, bar_lookup)
 
     def anatomy_report(self, since_lock: bool = True) -> dict:
         """OLUM SONRASI ANATOMI (2026-09-18): kenar NEDEN yok?

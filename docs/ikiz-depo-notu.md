@@ -583,3 +583,31 @@ Bu depodan midas'a yazma erişimi yok → **midas oturumuna AÇIK İŞ**:
 karşılığı var mı kontrol et; yoksa aynı desenle (sabit bölümler +
 claim üçlemesi + alt-grup eşiği = ana eşik) kur ve aynı davranışı
 tetikleyen testi yaz. "Okudum, yok" ile kapanmaz (Kural 3b).
+
+## Dolum laboratuvarı — ikiz kontrolü (2026-09-22)
+
+Kural 3b: bu **yeni bir ölçüm aletidir** (`app/services/fill_lab.py`,
+rota `/filllab`), dolayısıyla ikizde karşılığı kontrol edilmelidir.
+
+NE YAPAR: dolmuş her sinyalde, limit emrin duracağı seviyeden fiyatın
+ne kadar **içeri geçtiğini** ölçer (LONG'da kenar − mum.dibi). Derin
+geçiş = dinlenen emir dolardı = maker tarifesi savunulabilir.
+
+NEDEN TAŞINMALI: midas da aynı maliyet modelini (taker varsayımı)
+kullanıyorsa aynı soru orada da geçerlidir — ve aynı şekilde
+cevaplanabilir, çünkü ikisi de mum arşivi + fill_ts tutuyor.
+
+TAŞINIRSA BİREBİR KORUNMASI GEREKENLER:
+1. **Ön-kayıt önce.** Eşikler (5 bps, %90, ≥200 işlem) ölçümden ÖNCE
+   dondurulmalı. Sonradan eşik seçmek bu ölçümü değersiz kılar.
+2. **VERİ_HATASI sessizce atılmaz.** Negatif geçiş derinliği "dolmamış
+   olmalıydı" demektir; sayılır ve raporlanır (v3.6 dersi: sessiz kayıp
+   = şişik istatistik).
+3. **Kuyruk uyarısı rapordan silinmez.** Mum verisi sıra pozisyonunu
+   göstermez; bu kanıt değil, en güçlü vekildir.
+4. **Hüküm DESTEKLENDİ çıksa bile maliyet modeli kendiliğinden
+   değişmez.** Ayrı karar + tutanak gerekir.
+
+Bu depodan midas'a yazma erişimi yok → **midas oturumuna AÇIK İŞ**:
+karşılığı var mı kontrol et; yoksa aynı desenle kur ve aynı davranışı
+tetikleyen testi yaz. "Okudum, yok" ile kapanmaz (Kural 3b).

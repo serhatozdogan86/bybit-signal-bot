@@ -112,3 +112,24 @@ def test_portfolio_route_serves_measurement_not_verdict():
     app2 = create_app(MagicMock(get_meta=lambda: {"last_scan_utc": None}),
                       sch2, MagicMock())
     assert app2.test_client().get("/portfolio").status_code == 404
+
+
+def test_filllab_route_says_it_does_not_change_cost_model():
+    """/filllab olcum doner ve maliyet modelini DEGISTIRMEDIGINI yazar."""
+    from unittest.mock import MagicMock
+    from app.server import create_app
+    from app.services import fill_lab
+
+    tracker = MagicMock()
+    tracker.fill_report.return_value = fill_lab.build_report(
+        [], lambda p, t: None)
+    app = create_app(MagicMock(get_meta=lambda: {"last_scan_utc": None}),
+                     MagicMock(), tracker)
+    js = app.test_client().get("/filllab").get_json()
+    assert js["prereg"]["safe_bps"] == 5.0
+    assert "KILITLI" in js["if_supported"].upper()
+    assert "KUYRUK" in js["limitation"]
+
+    app2 = create_app(MagicMock(get_meta=lambda: {"last_scan_utc": None}),
+                      MagicMock(), None)
+    assert app2.test_client().get("/filllab").status_code == 404
