@@ -600,3 +600,61 @@ Backtest artışlıyı +22R, artışsızı −171R göstermişti — canlı veri
 doğrulamadı. Etiketleme sürer (ölçüm durmaz); hüküm oi_cohorts.verdict
 alanında görünür. v2'nin "OI katılım kapısı" girdisi DÜŞTÜ; hacim ayağı
 (S12) ayrı aday olarak yaşamaya devam eder.
+
+## H-FILL — LİMİT EMİR DOLUM ÖLÇÜMÜ (ön-kayıt: 2026-09-22, Serhat isteği)
+
+**Bu bölüm ÖLÇÜM YAPILMADAN ÖNCE yazılmıştır.** Hiçbir sayıya
+bakılmadı; kural önce donuyor (Kural 4).
+
+### Soru
+Maliyet modeli v0, girişin de çıkışın da **piyasa emri** (taker, %0.055)
+olduğunu varsayar. Oysa motorun girişi doğası gereği **limit** emirdir:
+fiyatın geri gelip giriş bölgemize değmesini bekliyoruz. Limit emir
+ucuz tarifeye (maker) girer. Model kendi içinde bunu zaten yazıyor:
+*"limit varsayımı kanıtlanana kadar taker."*
+
+Soru şudur: **dinlenen bir limit emir gerçekten dolar mıydı?**
+
+### Neden mum verisi bunu TAM kanıtlayamaz (baştan kabul)
+Bir limit emrin dolması sıra (kuyruk) pozisyonuna bağlıdır; mum verisi
+kuyruğu göstermez. Fiyat seviyemize sadece **değip** dönerse emrimiz
+sıranın arkasında kalmış olabilir. Ama fiyat seviyemizin **içinden
+geçtiyse**, dinlenen emir neredeyse kesin dolar. Ölçebileceğimiz en
+güçlü kanıt budur — kanıtın kendisi değil, en iyi vekili.
+
+### Ölçüm (donmuş)
+Dolmuş her şampiyon sinyali için:
+- kenar = LONG'da entry_max, SHORT'ta entry_min (limit emrin duracağı yer)
+- dolum mumu = fill_ts'teki mum (mum arşivinden)
+- **geçiş derinliği** = LONG'da (kenar − mum.low), SHORT'ta (mum.high − kenar)
+- geçiş_bps = geçiş derinliği / kenar × 10.000
+
+Sınıflandırma (eşik ÖNCEDEN ilan edilmiştir):
+- **GÜVENLİ**: geçiş_bps ≥ **5.0** (yani %0.05) → dinlenen emir dolardı
+- **SINIRDA**: 0 ≤ geçiş_bps < 5.0 → kuyruk belirsiz, sayılmaz
+- **VERİ HATASI**: geçiş_bps < 0 → dolmamış olmalıydı; ayrıca raporlanır,
+  sessizce atılmaz
+
+### HÜKÜM MERDİVENİ (donmuş, sayı görülmeden)
+> **DESTEKLENDİ**: en az 200 dolmuş işlem VE GÜVENLİ payı ≥ **%90**
+> **DESTEKLENMEDİ**: diğer her durum
+
+### Hüküm DESTEKLENDİ çıkarsa ne OLUR ve ne OLMAZ
+- **OLMAZ:** maliyet modeli kendiliğinden değişmez. v0 kilitlidir
+  (CLAUDE.md). Değişiklik ayrı bir karar toplantısı, Serhat onayı ve
+  config-lock tutanağı ister.
+- **OLMAZ:** mühürlü hükümler açılmaz. Şampiyon, S1, S2, S8, S11 ve
+  emekliler hakkındaki hükümler verildikleri günün modeliyle kalır.
+- **OLUR:** yalnız **GİRİŞ** ayağı için maker tarifesi tartışmaya açılır.
+  Çıkışlar (stop/hedef tetiklemesi) piyasa olayıdır → taker KALIR.
+- **OLUR:** v2 tasarımının stop tabanı gevşer (%3.30 → ~%2.60).
+
+### BEKLENEN YANLIŞLAMA (şimdiden yazılı)
+GÜVENLİ payı %90'ın altında çıkarsa hipotez DÜŞER: taker varsayımı
+korunur, v2 stop tabanı %3.30'da kalır ve bu konu KAPANIR. "Eşiği
+biraz indirelim" denmeyecektir — eşik şimdi, sayı görülmeden yazıldı.
+
+### Kirlenme uyarısı (seçim yanlılığı YOK)
+Bu ölçüm defterdeki işlemleri DEĞİŞTİRMEZ. Dolmayan sinyaller zaten
+kâr/zarar hesabının dışında. Değişen tek şey, defterdeki mevcut
+işlemlerin giriş ücreti olurdu — hangi işlemlerin deftere girdiği değil.
