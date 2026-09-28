@@ -133,3 +133,33 @@ def test_filllab_route_says_it_does_not_change_cost_model():
     app2 = create_app(MagicMock(get_meta=lambda: {"last_scan_utc": None}),
                       MagicMock(), None)
     assert app2.test_client().get("/filllab").status_code == 404
+
+
+def test_agreement_route_carries_backtest_warning():
+    """/agreement backtest uyarisini TASIR (oldurebilir, kutsayamaz)."""
+    from unittest.mock import MagicMock
+    from app.server import create_app
+
+    eng = MagicMock()
+    eng.stats.return_value = {"strategies": {
+        "S1_TSMOM": {"cost_per_trade": 0.02, "clusters": 60}}}
+    eng._db.query.return_value = [
+        {"strategy": "S1_TSMOM", "pair": "BTCUSDT", "direction": "LONG",
+         "entry_ts": 0, "regime": 2},
+        {"strategy": "S1_TSMOM", "pair": "BTCUSDT", "direction": "LONG",
+         "entry_ts": 86_400_000, "regime": 2}]
+    eng._net_r = lambda r: None
+    sch = MagicMock()
+    sch.challengers = eng
+    app = create_app(MagicMock(get_meta=lambda: {"last_scan_utc": None}),
+                     sch, MagicMock())
+    js = app.test_client().get("/agreement").get_json()
+    assert "OLDUREBILIR, KUTSAYAMAZ" in js["backtest_warning"]
+    assert js["members"] == ["S1_TSMOM"]
+    assert len(js["frequency_scan"]) == 16          # 4 pencere x 4 K
+
+    sch2 = MagicMock()
+    sch2.challengers = None
+    app2 = create_app(MagicMock(get_meta=lambda: {"last_scan_utc": None}),
+                      sch2, MagicMock())
+    assert app2.test_client().get("/agreement").status_code == 404

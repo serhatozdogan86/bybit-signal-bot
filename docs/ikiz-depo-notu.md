@@ -611,3 +611,23 @@ TAŞINIRSA BİREBİR KORUNMASI GEREKENLER:
 Bu depodan midas'a yazma erişimi yok → **midas oturumuna AÇIK İŞ**:
 karşılığı var mı kontrol et; yoksa aynı desenle kur ve aynı davranışı
 tetikleyen testi yaz. "Okudum, yok" ile kapanmaz (Kural 3b).
+
+## Teyit laboratuvarı — ikiz kontrolü (2026-09-28)
+
+Kural 3b: yeni ölçüm aleti (`app/services/agreement_lab.py`, `/agreement`).
+
+NE YAPAR: birden çok motorun aynı parite+yönde, belli bir pencere
+içinde açtığı sinyalleri gruplar; "en az K motor" filtresinin sinyal
+sayısını ne kadar daralttığını ölçer.
+
+TAŞINIRSA BİREBİR KORUNMASI GEREKENLER:
+1. **Sıklık taraması GETİRİ raporlamaz.** Eşik (W,K) getiriye bakarak
+   seçilirse ölçüm değersizleşir — testle zorlanır.
+2. **Pencere grubun İLK girişinden ölçülür**, öncekinden değil. Aksi
+   halde zincirleme kayma olur ve grup sonsuza kadar büyür.
+3. **Aynı motorun iki sinyali teyit DEĞİLDİR** — farklı motor sayılır.
+4. **Backtest ÖLDÜREBİLİR, KUTSAYAMAZ.** Teyitli kohort daha iyi çıksa
+   bile kanıt değildir; ileri pencere ister (P4 dersi). Eşitlik de
+   elemedir.
+
+Bu depodan midas'a yazma erişimi yok → **midas oturumuna AÇIK İŞ.**

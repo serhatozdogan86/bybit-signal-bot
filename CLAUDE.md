@@ -134,7 +134,11 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
   yalnız EN İNCE dilim + MAX_GIST_FILES=280 bütçesi + artık
   gönderilmeyen candles_* dosyalarının budanması.
 - Rotalar: /verify /alarms /measurement /challengers /correlation
-  /exitlab /anatomy /portfolio /filllab (DASHBOARD_TOKEN'lı).
+  /exitlab /anatomy /portfolio /filllab /agreement (DASHBOARD_TOKEN'lı).
+  /agreement = teyit laboratuvarı (2026-09-28): kaç motor aynı sinyali
+  veriyor? Tanım + taranan liste ÖN-KAYITLI (ideas.md H-TEYIT).
+  SIKLIK kararı getiriden BAĞIMSIZ verilir. Geçmiş getiri YALNIZ budama
+  amaçlı: backtest ÖLDÜREBİLİR, KUTSAYAMAZ (P4 dersi).
   /filllab = dolum laboratuvarı (2026-09-22): dinlenen limit emir
   gerçekten dolar mıydı? Eşikler ÖN-KAYITLI (ideas.md H-FILL, ölçümden
   ÖNCE donduruldu): geçiş ≥5bps GÜVENLİ; hüküm ≥200 işlem ve ≥%90.

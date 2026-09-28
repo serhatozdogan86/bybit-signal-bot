@@ -342,6 +342,28 @@ def create_app(store: StateStore, scheduler: Scheduler,
         return app.response_class(json.dumps(rep, indent=2),
                                   mimetype="application/json")
 
+    @app.get("/agreement")
+    def agreement_view():
+        """Teyit laboratuvari: kac motor ayni sinyali veriyor? Tanim ve
+        taranan liste on-kayitli (ideas.md H-TEYIT). Gecmis getiri YALNIZ
+        budama amaclidir - backtest oldurebilir, KUTSAYAMAZ (P4 dersi)."""
+        eng = getattr(scheduler, "challengers", None)
+        if eng is None:
+            return jsonify({"error": "agreement needs challengers"}), 404
+        from app.services import agreement_lab, portfolio
+        from app.services.challengers import RETIRED, SAMPLING_REGIME
+        members = portfolio.select_members(eng.stats(), RETIRED)
+        rows = [r for r in eng._db.query(
+                    "SELECT * FROM challenger_signals")
+                if (r.get("regime") or 1) == SAMPLING_REGIME]
+        days = None
+        ts = [r["entry_ts"] for r in rows if r.get("entry_ts")]
+        if len(ts) > 1:
+            days = round((max(ts) - min(ts)) / 86_400_000, 2) or None
+        rep = agreement_lab.build_report(rows, eng._net_r, members, days)
+        return app.response_class(json.dumps(rep, indent=2),
+                                  mimetype="application/json")
+
     @app.get("/signals")
     def signals():
         if tracker is None:
