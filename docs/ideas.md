@@ -658,3 +658,64 @@ biraz indirelim" denmeyecektir — eşik şimdi, sayı görülmeden yazıldı.
 Bu ölçüm defterdeki işlemleri DEĞİŞTİRMEZ. Dolmayan sinyaller zaten
 kâr/zarar hesabının dışında. Değişen tek şey, defterdeki mevcut
 işlemlerin giriş ücreti olurdu — hangi işlemlerin deftere girdiği değil.
+
+## H-TEYIT — ÇOKLU MOTOR TEYİDİ (ön-kayıt: 2026-09-28, Serhat'ın fikri)
+
+**ÖLÇÜM YAPILMADAN ÖNCE yazıldı.** Hiçbir sayıya bakılmadı.
+
+### Fikir (Serhat)
+Portföyün 5 üyesinden **en az 3'ü aynı sinyali** veriyorsa bot yayınlasın.
+Amaç: hem gereksiz daraltma sağlamak (günde 105 sinyal takip edilemez),
+hem de teyit edilmiş sinyalin daha iyi olması beklentisi.
+
+### Bilinen kuşku (şimdiden kayda geçer)
+Korelasyon ölçümü (09-20) S1/S2/S11/S12'nin büyük ölçüde AYNI bahis
+olduğunu gösterdi (0.49–0.66). Dolayısıyla "3 motor aynı fikirde" çoğu
+zaman BAĞIMSIZ teyit değil, aynı fikrin üç kez sayılması olabilir.
+Bu kuşku ölçümden ÖNCE yazılmıştır ki sonuç ne çıkarsa çıksın
+"zaten biliyorduk" denemesin.
+
+### TEYİT TANIMI (donmuş)
+İki sinyal "aynı sinyal" sayılır:
+- aynı **parite** VE aynı **yön**, VE
+- ikincinin girişi, grubun **ilk** girişinden en fazla **W saat** sonra
+
+Gruplama kuralı (deterministik): (parite, yön) içinde girişler zamana
+göre sıralanır; ilk giriş grubu açar, W saat içindekiler gruba katılır,
+dışındaki ilk giriş YENİ grup açar.
+Grup "teyitli" sayılır: içindeki **FARKLI motor** sayısı ≥ K.
+
+### TARANAN SABİT LİSTE (Kural 5: "en iyisini bul" taraması DEĞİL)
+W ∈ {1, 4, 12, 24} saat · K ∈ {2, 3, 4, 5}
+Liste sabittir; sonradan yeni bir W/K eklenemez.
+
+### ÖLÇÜLEN
+1. **SIKLIK** (asıl amaç): her (W,K) için kaç sinyal hayatta kalır,
+   toplamın yüzde kaçı, günde kaç mesaj eder.
+2. **GEÇMİŞ GETİRİ** — YALNIZCA BUDAMA AMAÇLI (aşağıya bak).
+
+### ⚠️ HÜKÜM MERDİVENİ — BACKTEST YALNIZ ÖLDÜREBİLİR, KUTSAYAMAZ
+P4'ün dersi bağlayıcıdır: geçmişe bakan analiz çarpıcı bir fark
+gösterdi, canlı veri TERSİNİ verdi. O yüzden:
+
+> **ELENDİ** (fikir düşer, konu kapanır): K=3, W=4s noktasında
+> teyitli kohortun işlem başına net R'si, teyitsiz kohortunkine
+> EŞİT ya da DÜŞÜKSE.
+>
+> **KANIT DEĞİL, İLERİ TAŞINIR**: teyitli kohort daha iyiyse, bu
+> **hiçbir şeyi kanıtlamaz.** Fikir ancak ÖN-KAYITLI bir İLERİ
+> pencerede (yeni kohort, ≥50 küme, küme-CI alt > 0) sınanırsa
+> hüküm kazanır.
+
+Yani geçmiş veri fikri **öldürebilir**, ama **onaylayamaz**.
+
+### SIKLIK KARARI GETİRİDEN BAĞIMSIZDIR
+Sinyal akışını daraltmak için (W,K) seçimi YALNIZ sıklığa bakılarak
+yapılır — "hangi (W,K) geçmişte daha çok kazandırmış" diye SEÇİLMEZ.
+Getiriye bakarak eşik seçmek, tam olarak kaçındığımız hatadır.
+
+### BEKLENEN YANLIŞLAMA
+Teyit, korelasyon yüzünden işe yaramayabilir. Eğer K=3'te sinyal sayısı
+çok az düşüyorsa (yani motorlar zaten hep birlikte ateşliyorsa), bu
+"teyit" boş bir kavramdır ve daraltma için de işe yaramaz — o zaman
+parite daraltmasına döneriz.
