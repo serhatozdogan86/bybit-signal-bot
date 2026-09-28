@@ -631,3 +631,37 @@ TAŞINIRSA BİREBİR KORUNMASI GEREKENLER:
    elemedir.
 
 Bu depodan midas'a yazma erişimi yok → **midas oturumuna AÇIK İŞ.**
+
+## Yedek KAPSAMI eksikti — ikiz kontrolü (2026-09-28)
+
+Kural 3b: bu **kanıtlı bir mekanizma hatasıdır**, ikizde de aynısı
+muhtemeldir.
+
+ARIZA: VM Oracle'da durdu, kapasite yokluğundan açılmadı. O anda yedeğin
+kapsamı denetlendi:
+- aday motorların işlemleri: yalnızca **son 200** (toplam ~4.300)
+- aday işlemlerini geri yükleyen fonksiyon: **YOK**
+- şampiyon sinyalleri: yalnızca **son 500**
+
+Yani portföy ölçümünün %95'i tek kopyaydı (VM diski). 18 Eylül'de
+yedeğin **dosya sayısı** arızası düzeltilip "yedek çalışıyor" denmişti;
+düzeltilen sey dosya sayısıydı, **kapsam denetlenmemişti.**
+
+DÜZELTME (birebir taşınabilir):
+1. `ChallengerEngine.export_rows()` — TÜM ham kayıtlar (özet değil).
+2. `ChallengerEngine.import_rows()` — geri yükleme; **tekrarsız**
+   (strategy+pair+created_utc). Kopya, küme sayısını ve dolayısıyla
+   HÜKMÜ şişirirdi.
+3. `0_challenger_rows.json` yedeğe girer; `restore_if_empty` onu okur.
+4. Şampiyon sinyal yedeğindeki 500 sınırı kaldırıldı.
+5. `MAX_BACKUP_ROWS` tavanı + `0_backup_health.json`: tavan aşılırsa
+   **en yeniler** tutulur ve `complete:false` yazılır — sessiz kesinti
+   YOK.
+
+DERS (iki depo için de bağlayıcı): **"yedek çalışıyor" demek yetmez;
+yedeğin NEYİ kapsadığı ayrıca denetlenir.** Kapsam artık her senkronda
+kendini raporluyor.
+
+Bu depodan midas'a yazma erişimi yok → **midas oturumuna AÇIK İŞ**:
+midas'ın yedeği aday/ham kayıtları taşıyor mu ölç; taşımıyorsa aynı
+desenle kapat ve aynı davranışı tetikleyen testleri yaz.

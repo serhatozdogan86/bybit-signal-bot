@@ -34,6 +34,11 @@ MARKER = "bybit-signal-bot-data (auto-managed, do not rename)"
 # yalniz EN INCE dilimi tasir (degerlendirme/restore onu kullanir, HTF her
 # taramada canli cekilir) -> tipik yuk 7 + 150 = 157 dosya.
 MAX_GIST_FILES = 280
+# Yedek dosyasi basina satir tavani. 3 yillik kosuda aday kayitlari
+# ~115 bin satira cikar; tek dosyada 30 MB'i asar. Tavan asilirsa
+# EN YENILER tutulur ve durum 0_backup_health.json'a YAZILIR - sessiz
+# kesinti YOK (2026-09-28 dersi: yedegin kapsami denetlenmeliydi).
+MAX_BACKUP_ROWS = 60_000
 _PRUNE_PER_SYNC = 60       # tek PATCH'i sismemek icin budama parca parca
 
 
@@ -101,21 +106,43 @@ class GistBackup:
         # sirayla harcar; stats sona kalirsa API bos icerik dondurur.
         files = {
             "0_performance.json": json.dumps(self._tracker.stats(), indent=2),
-            "0_signals.json": json.dumps(self._tracker.recent_signals(500), indent=2),
+            # 2026-09-28: 500 siniri KALKTI - yedek kurtarmaya yetmeliydi
+            "0_signals.json": json.dumps(
+                self._tracker.recent_signals(100_000), indent=2),
             "0_blocked.json": json.dumps(self._tracker.blocked_signals(300), indent=2),
             "0_decisions.json": json.dumps(self._tracker.recent_decisions(2000), indent=2),
             "0_challengers.json": json.dumps(
                 self._challenger_payload(), indent=2),
+            # HAM aday kayitlari: ozet degil, KURTARMAYA yeten veri
+            # (2026-09-28 dersi - VM diski tek kopyaydi)
+            "0_challenger_rows.json": json.dumps(
+                self._challenger_rows(), indent=2),
             # cikis laboratuvari (2026-09-01): uzaktan izlenebilsin diye
             # yedege girer - aday verisinde ayni bosluk yasanmisti
             "0_exitlab.json": json.dumps(self._exitlab_payload(), indent=2),
             "0_commentary.json": json.dumps(
                 self._commentary.recent(6) if self._commentary else [],
                 indent=2),
+            "0_backup_health.json": "",      # asagida doldurulur
             "README.md": (f"# bybit-signal-bot data\nAuto-synced: {now}\n\n"
                           "Shadow-tracking stats and backtest dataset. "
                           "Managed by the bot - do not edit manually.\n"),
         }
+        # KAPSAM KAYDI: yedegin neyi tasidigi acikca yazilir. "Yedek
+        # calisiyor" demek yetmez - NEYI kapsadigi denetlenebilmeli.
+        chal_backed = len(json.loads(files["0_challenger_rows.json"]))
+        sig_backed = len(json.loads(files["0_signals.json"]))
+        chal_total = getattr(self, "_chal_total", chal_backed)
+        files["0_backup_health.json"] = json.dumps({
+            "generated_utc": now,
+            "challenger_rows_total": chal_total,
+            "challenger_rows_backed_up": chal_backed,
+            "champion_signals_backed_up": sig_backed,
+            "row_cap": MAX_BACKUP_ROWS,
+            "complete": chal_backed >= chal_total,
+            "note": ("complete=false ise en ESKI kayitlar yedege girmedi; "
+                     "tavan asildi. Sessiz kesinti yok - burada gorunur."),
+        }, indent=2)
         if self._candle_mode == "off":
             return files
         if self._candle_mode == "signals":
@@ -177,6 +204,23 @@ class GistBackup:
         except Exception:
             log.exception(kv(event="exitlab_backup_error"))
             return {"note": "cikis lab yedegi hata verdi; sonraki senkronda tekrar"}
+
+    def _challenger_rows(self) -> list[dict]:
+        """TUM aday ham kayitlari; motor yoksa/hata verirse bos (fail-soft)."""
+        eng = getattr(self, "_challengers", None)
+        if eng is None:
+            return []
+        try:
+            rows = eng.export_rows()
+        except Exception:
+            log.exception(kv(event="challenger_rows_backup_error"))
+            return []
+        self._chal_total = len(rows)
+        if len(rows) > MAX_BACKUP_ROWS:
+            log.warning(kv(event="backup_rows_capped", table="challenger",
+                           total=len(rows), kept=MAX_BACKUP_ROWS))
+            return rows[-MAX_BACKUP_ROWS:]
+        return rows
 
     def _challenger_payload(self) -> dict:
         eng = getattr(self, "_challengers", None)
@@ -267,6 +311,18 @@ class GistBackup:
                     json.loads(blk_file))
             except (json.JSONDecodeError, TypeError):
                 log.warning(kv(event="gist_restore_blocked_parse_error"))
+        # aday ham kayitlari (2026-09-28): portfoy olcumunun tasiyicisi
+        chal_total = 0
+        chal_file = files.get("0_challenger_rows.json")
+        eng = getattr(self, "_challengers", None)
+        if chal_file and eng is not None:
+            try:
+                chal_total = eng.import_rows(json.loads(chal_file))
+            except (json.JSONDecodeError, TypeError):
+                log.warning(kv(event="gist_restore_challengers_parse_error"))
+            except Exception:
+                log.exception(kv(event="gist_restore_challengers_error"))
         log.info(kv(event="gist_restore_ok", gist_id=self._gist_id,
-                    candles=candles_total, signals=signals_total))
+                    candles=candles_total, signals=signals_total,
+                    challengers=chal_total))
         return True

@@ -133,6 +133,12 @@ Serhat yazılımcı DEĞİL. Ona yazarken:
   aşıldı (307 dosya → HTTP 422 → 13 gün yedeksiz). Düzeltme: mum yedeği
   yalnız EN İNCE dilim + MAX_GIST_FILES=280 bütçesi + artık
   gönderilmeyen candles_* dosyalarının budanması.
+  YEDEK KAPSAMI (2026-09-28, VM kapanınca fark edildi): yedek ÖZET
+  değil KURTARMAYA YETEN veri taşır — 0_challenger_rows.json (TÜM aday
+  ham kayıtları) + sınırsız 0_signals.json + restore_if_empty bunları
+  geri yükler (tekrarsız). MAX_BACKUP_ROWS tavanı aşılırsa en yeniler
+  tutulur ve 0_backup_health.json'da complete:false yazar — sessiz
+  kesinti YOK. DERS: "yedek çalışıyor" demek yetmez, KAPSAMI denetlenir.
 - Rotalar: /verify /alarms /measurement /challengers /correlation
   /exitlab /anatomy /portfolio /filllab /agreement (DASHBOARD_TOKEN'lı).
   /agreement = teyit laboratuvarı (2026-09-28): kaç motor aynı sinyali

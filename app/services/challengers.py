@@ -682,6 +682,49 @@ class ChallengerEngine:
         except Exception:
             pass  # kolon zaten var
 
+    # ----------------------------------------------------- yedek / kurtarma
+    def export_rows(self) -> list[dict]:
+        """TUM aday kayitlari (ozet degil, HAM satir).
+
+        2026-09-28 dersi: yedekte yalnizca stats + son 200 kayit vardi;
+        VM diski kaybolsa portfoy olcumunun %95'i giderdi. Yedek, ozeti
+        degil KURTARMAYA YETECEK olani tasimalidir.
+        """
+        return self._db.query("SELECT * FROM challenger_signals ORDER BY id")
+
+    def import_rows(self, rows: list[dict]) -> int:
+        """Yedekten aday kayitlarini geri yukle.
+
+        TEKRARSIZ: (strategy, pair, created_utc) ucluSU zaten varsa
+        atlanir - ayni yedegi iki kez yuklemek kayit KOPYALAMAZ (kopya,
+        kume sayisini ve dolayisiyla HUKMU sisirirdi).
+        """
+        imported = 0
+        for r in rows or []:
+            if self._db.query_one(
+                    "SELECT id FROM challenger_signals WHERE strategy=? "
+                    "AND pair=? AND created_utc=?",
+                    (r.get("strategy"), r.get("pair"), r.get("created_utc"))):
+                continue
+            self._db.execute(
+                "INSERT INTO challenger_signals(strategy,pair,direction,"
+                "created_utc,entry_ts,entry,stop,tp,timeout_bars,status,"
+                "outcome,exit_price,exit_ts,r_multiple,hold_bars,cluster_id,"
+                "ambiguous,regime,doi_24h) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (r.get("strategy"), r.get("pair"), r.get("direction"),
+                 r.get("created_utc"), r.get("entry_ts"), r.get("entry"),
+                 r.get("stop"), r.get("tp"), r.get("timeout_bars"),
+                 r.get("status", "OPEN"), r.get("outcome"),
+                 r.get("exit_price"), r.get("exit_ts"), r.get("r_multiple"),
+                 r.get("hold_bars"), r.get("cluster_id"),
+                 r.get("ambiguous", 0), r.get("regime", 1),
+                 r.get("doi_24h")))
+            imported += 1
+        if imported:
+            log.info(kv(event="challenger_restore", imported=imported))
+        return imported
+
     # ------------------------------------------------------- sinyal uretimi
     def on_scan(self, symbol: str, htf, ltf, funding: float | None) -> int:
         """Tarama sirasinda zaten cekilmis serilerle aday sinyalleri uret."""
