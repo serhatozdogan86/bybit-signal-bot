@@ -3,3 +3,6 @@ __pycache__/
 .env
 venv/
 .pytest_cache/
+
+# yerel sanal ortam (2026-10-27: sistem paketleriyle catisma nedeniyle)
+.venv/
